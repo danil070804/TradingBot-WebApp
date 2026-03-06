@@ -194,49 +194,138 @@ function bindDepositForm() {
     });
 }
 
-function bindLiveOrderBook() {
+function buildCandleState() {
+    return { tf: 30, candles: [] };
+}
+
+function pushCandle(state, price, ts) {
+    const bucket = Math.floor(ts / state.tf) * state.tf;
+    const last = state.candles[state.candles.length - 1];
+    if (!last || last.bucket !== bucket) {
+        const open = last ? last.close : price;
+        state.candles.push({ bucket, open, high: price, low: price, close: price });
+        if (state.candles.length > 80) state.candles.shift();
+    } else {
+        last.high = Math.max(last.high, price);
+        last.low = Math.min(last.low, price);
+        last.close = price;
+    }
+}
+
+function drawCandles(canvas, candles) {
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const w = canvas.clientWidth || canvas.width;
+    const h = canvas.clientHeight || canvas.height;
+    canvas.width = w;
+    canvas.height = h;
+    ctx.clearRect(0, 0, w, h);
+    if (!candles.length) return;
+
+    const highs = candles.map((c) => c.high);
+    const lows = candles.map((c) => c.low);
+    const max = Math.max(...highs);
+    const min = Math.min(...lows);
+    const range = Math.max(0.00001, max - min);
+    const pad = 10;
+    const usableH = h - pad * 2;
+    const cw = Math.max(4, Math.floor((w - pad * 2) / candles.length) - 2);
+
+    for (let i = 0; i < candles.length; i += 1) {
+        const c = candles[i];
+        const x = pad + i * (cw + 2);
+        const yHigh = pad + ((max - c.high) / range) * usableH;
+        const yLow = pad + ((max - c.low) / range) * usableH;
+        const yOpen = pad + ((max - c.open) / range) * usableH;
+        const yClose = pad + ((max - c.close) / range) * usableH;
+        const up = c.close >= c.open;
+        ctx.strokeStyle = up ? "#8fff4f" : "#ff6f6f";
+        ctx.fillStyle = up ? "rgba(143,255,79,0.35)" : "rgba(255,111,111,0.35)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x + cw / 2, yHigh);
+        ctx.lineTo(x + cw / 2, yLow);
+        ctx.stroke();
+        const bodyY = Math.min(yOpen, yClose);
+        const bodyH = Math.max(2, Math.abs(yClose - yOpen));
+        ctx.fillRect(x, bodyY, cw, bodyH);
+        ctx.strokeRect(x, bodyY, cw, bodyH);
+    }
+}
+
+function bindMarketSocket() {
     const asksWrap = document.getElementById("orderbook-asks");
     const bidsWrap = document.getElementById("orderbook-bids");
     const markEl = document.getElementById("orderbook-mark");
     const pairSelect = document.querySelector('select[name="asset_name"]');
-    if (!asksWrap || !bidsWrap || !markEl) return;
+    const canvas = document.getElementById("candle-canvas");
+    const tfSelect = document.getElementById("chart-tf");
+    if (!asksWrap || !bidsWrap || !markEl || !pairSelect) return;
 
-    const seedBySymbol = (symbol) => {
-        const s = (symbol || "BTC").toUpperCase();
-        let h = 0;
-        for (let i = 0; i < s.length; i += 1) h = (h * 31 + s.charCodeAt(i)) % 100000;
-        return 100 + h * 7.3;
-    };
-
-    let mark = seedBySymbol(pairSelect ? pairSelect.value : "BTC");
-
-    const draw = () => {
-        mark += (Math.random() - 0.5) * Math.max(1, mark * 0.0009);
-        mark = Math.max(0.0001, mark);
-        markEl.textContent = mark.toFixed(mark >= 100 ? 2 : 5);
-        const asks = [];
-        const bids = [];
-        for (let i = 0; i < 10; i += 1) {
-            const spread = (i + 1) * (mark * 0.00035);
-            const askPrice = mark + spread + (Math.random() * spread * 0.4);
-            const bidPrice = mark - spread - (Math.random() * spread * 0.4);
-            const qtyA = (Math.random() * (4 + i * 0.2) + 0.06).toFixed(3);
-            const qtyB = (Math.random() * (4 + i * 0.2) + 0.06).toFixed(3);
-            asks.push(`<div class="book-row ask"><span>${askPrice.toFixed(askPrice >= 100 ? 2 : 5)}</span><em>${qtyA}</em></div>`);
-            bids.push(`<div class="book-row bid"><span>${bidPrice.toFixed(bidPrice >= 100 ? 2 : 5)}</span><em>${qtyB}</em></div>`);
-        }
-        asksWrap.innerHTML = asks.join("");
-        bidsWrap.innerHTML = bids.join("");
-    };
-
-    if (pairSelect) {
-        pairSelect.addEventListener("change", () => {
-            mark = seedBySymbol(pairSelect.value);
-            draw();
+    const state = buildCandleState();
+    if (tfSelect) {
+        state.tf = Number(tfSelect.value || 30);
+        tfSelect.addEventListener("change", () => {
+            state.tf = Number(tfSelect.value || 30);
+            state.candles = [];
         });
     }
-    draw();
-    setInterval(draw, 900);
+
+    const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+    const ws = new WebSocket(`${protocol}://${window.location.host}/ws/market`);
+
+    const subscribe = () => {
+        ws.send(JSON.stringify({ type: "subscribe", symbol: pairSelect.value || "BTC" }));
+    };
+
+    ws.addEventListener("open", () => {
+        subscribe();
+    });
+
+    pairSelect.addEventListener("change", () => {
+        state.candles = [];
+        if (ws.readyState === WebSocket.OPEN) subscribe();
+    });
+
+    ws.addEventListener("message", (event) => {
+        let data = null;
+        try {
+            data = JSON.parse(event.data);
+        } catch (_) {
+            return;
+        }
+        if (!data || data.type !== "market") return;
+
+        markEl.textContent = data.mark;
+        asksWrap.innerHTML = (data.asks || [])
+            .map((r) => `<div class="book-row ask"><span>${r.price}</span><em>${r.qty}</em></div>`)
+            .join("");
+        bidsWrap.innerHTML = (data.bids || [])
+            .map((r) => `<div class="book-row bid"><span>${r.price}</span><em>${r.qty}</em></div>`)
+            .join("");
+
+        pushCandle(state, Number(data.mark), Number(data.ts || Math.floor(Date.now() / 1000)));
+        drawCandles(canvas, state.candles);
+
+        if (data.tick) {
+            const current = document.querySelectorAll("#market-tape-list .row");
+            const wrap = document.getElementById("market-tape-list");
+            if (wrap) {
+                const row = document.createElement("div");
+                row.className = "row mono";
+                const sideClass = data.tick.side === "buy" ? "pos" : "neg";
+                const sideText = data.tick.side === "buy" ? L("js_side_buy", "BUY") : L("js_side_sell", "SELL");
+                row.innerHTML = `<div><b>${data.tick.symbol}</b><small class="${sideClass}">${sideText}</small></div><div>${data.tick.price} • ${data.tick.qty}</div>`;
+                wrap.prepend(row);
+                if (current.length > 22) current[current.length - 1].remove();
+            }
+        }
+    });
+
+    ws.addEventListener("close", () => {
+        setTimeout(bindMarketSocket, 1200);
+    });
 }
 
 function bindLangSwitch() {
@@ -346,6 +435,6 @@ bindExchangeForm();
 bindDepositForm();
 bindLangSwitch();
 bindWorkerPanel();
-bindLiveOrderBook();
+bindMarketSocket();
 refreshTape();
 setInterval(refreshTape, 2200);

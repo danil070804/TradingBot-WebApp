@@ -12,7 +12,7 @@ from urllib.parse import parse_qsl
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -561,6 +561,29 @@ def generate_tape_tick() -> dict:
         "qty": qty,
         "side": side,
     }
+
+
+def build_orderbook(symbol: str, levels: int = 10) -> tuple[list[dict], list[dict], float]:
+    mark = next_symbol_price(symbol)
+    asks = []
+    bids = []
+    for i in range(levels):
+        spread = (i + 1) * max(mark * 0.00035, 0.00001)
+        ask_price = mark + spread + random.uniform(0, spread * 0.35)
+        bid_price = max(0.00001, mark - spread - random.uniform(0, spread * 0.35))
+        asks.append(
+            {
+                "price": round(ask_price, 2 if ask_price >= 1 else 5),
+                "qty": round(random.uniform(0.03, 7.5 + i * 0.22), 3),
+            }
+        )
+        bids.append(
+            {
+                "price": round(bid_price, 2 if bid_price >= 1 else 5),
+                "qty": round(random.uniform(0.03, 7.5 + i * 0.22), 3),
+            }
+        )
+    return asks, bids, mark
 
 
 async def market_feed_loop():
@@ -1209,6 +1232,41 @@ async def api_overview():
 @app.get("/api/market/tape", response_class=JSONResponse)
 async def api_market_tape():
     return JSONResponse({"ok": True, "items": list(MARKET_TAPE)[:25]})
+
+
+@app.websocket("/ws/market")
+async def ws_market(websocket: WebSocket):
+    await websocket.accept()
+    symbol = "BTC"
+    try:
+        while True:
+            try:
+                raw = await asyncio.wait_for(websocket.receive_text(), timeout=0.01)
+                payload = json.loads(raw)
+                if isinstance(payload, dict) and payload.get("type") == "subscribe":
+                    incoming = str(payload.get("symbol") or "").strip()
+                    if incoming:
+                        symbol = symbol_from_asset_name(incoming)
+            except asyncio.TimeoutError:
+                pass
+
+            asks, bids, mark = build_orderbook(symbol, levels=10)
+            tick = generate_tape_tick()
+            MARKET_TAPE.appendleft(tick)
+            await websocket.send_json(
+                {
+                    "type": "market",
+                    "symbol": symbol,
+                    "ts": int(time.time()),
+                    "mark": round(mark, 2 if mark >= 1 else 5),
+                    "asks": asks,
+                    "bids": bids,
+                    "tick": tick,
+                }
+            )
+            await asyncio.sleep(0.85)
+    except WebSocketDisconnect:
+        return
 
 
 async def settle_web_trade(trade_id: str) -> dict | None:

@@ -7,6 +7,19 @@
     <div class="pulse-wrap"><div id="market-pulse" class="pulse-track"></div></div>
 </section>
 
+<section class="card">
+    <div class="chart-top">
+        <div class="section-title">Candle Chart</div>
+        <select id="chart-tf" class="chart-tf">
+            <option value="10">10s</option>
+            <option value="30" selected>30s</option>
+            <option value="60">1m</option>
+            <option value="300">5m</option>
+        </select>
+    </div>
+    <canvas id="candle-canvas" width="430" height="180"></canvas>
+</section>
+
 <section class="card trade-layout">
     <div class="trade-left">
         <form id="trade-form" class="form-grid">
