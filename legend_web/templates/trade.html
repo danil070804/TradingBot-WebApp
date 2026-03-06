@@ -3,7 +3,8 @@
 {% block content %}
 <section class="card hero">
     <h1>{{ labels.trade_title if labels else "Futures Terminal" }}</h1>
-    <div class="hint">{{ labels.trade_balance if labels else "Баланс" }}: {{ "%.2f"|format((user.balance if user else 0) or 0) }} {{ (user.currency if user else "USD") or "USD" }}</div>
+    <div class="hint">{{ labels.trade_balance if labels else "Баланс" }}: <span id="live-balance">{{ "%.2f"|format((user.balance if user else 0) or 0) }}</span> <span id="live-currency">{{ (user.currency if user else "USD") or "USD" }}</span></div>
+    <div class="hint">Open trades: <span id="live-open-trades">0</span></div>
     <div class="pulse-wrap"><div id="market-pulse" class="pulse-track"></div></div>
 </section>
 
@@ -24,6 +25,7 @@
     <div class="trade-left">
         <form id="trade-form" class="form-grid">
             <input type="hidden" name="tg_id" value="{{ tg_id }}">
+            <input type="hidden" id="balance-raw" value="{{ "%.4f"|format((user.balance if user else 0) or 0) }}">
             <label>{{ labels.trade_pair if labels else "Пара" }}
                 <select name="asset_name">
                     {% for a in assets %}
@@ -34,11 +36,20 @@
             <label>{{ labels.trade_amount if labels else "Сумма" }}
                 <input id="trade-amount-input" type="number" step="0.01" min="100" name="amount" value="100">
             </label>
+            <label>Risk %
+                <input id="risk-input" type="number" step="0.1" min="0" max="100" name="risk_percent" value="0">
+            </label>
             <div class="chips">
                 <button type="button" class="chip" data-amt="100">100</button>
                 <button type="button" class="chip" data-amt="500">500</button>
                 <button type="button" class="chip" data-amt="1000">1k</button>
                 <button type="button" class="chip" data-amt="5000">5k</button>
+            </div>
+            <div class="chips">
+                <button type="button" class="chip risk-chip" data-risk="1">1%</button>
+                <button type="button" class="chip risk-chip" data-risk="2">2%</button>
+                <button type="button" class="chip risk-chip" data-risk="5">5%</button>
+                <button type="button" class="chip risk-chip" data-risk="10">10%</button>
             </div>
 
             <label>{{ labels.trade_leverage if labels else "Плечо" }}: <span id="lev-val">10x</span>
@@ -54,6 +65,14 @@
                     <option value="300">5м</option>
                 </select>
             </label>
+            <div class="direction-group">
+                <label>TP %
+                    <input type="number" name="tp_percent" step="0.1" min="0" value="0">
+                </label>
+                <label>SL %
+                    <input type="number" name="sl_percent" step="0.1" min="0" value="0">
+                </label>
+            </div>
 
             <div class="direction-group">
                 <button type="button" class="dir-btn active" data-dir="up">{{ labels.trade_long if labels else "ЛОНГ" }}</button>

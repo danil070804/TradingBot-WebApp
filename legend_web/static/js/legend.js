@@ -28,6 +28,9 @@ function bindTradeForm() {
         body.amount = Number(body.amount);
         body.seconds = Number(body.seconds);
         body.leverage = Number(body.leverage);
+        body.risk_percent = Number(body.risk_percent || 0);
+        body.tp_percent = Number(body.tp_percent || 0);
+        body.sl_percent = Number(body.sl_percent || 0);
         try {
             const resp = await fetch("/api/trade/open", {
                 method: "POST",
@@ -63,8 +66,11 @@ function bindTradeForm() {
                 }
                 if (status.status === "closed") {
                     const cls = status.is_win ? "pos" : "neg";
+                    const reasonMap = { tp: "TP", sl: "SL", time: "TIME" };
+                    const reason = reasonMap[status.close_reason] || "TIME";
                     result.innerHTML =
                         `${L("js_trade_done", "Deal completed")}: <span class="${cls}">${status.profit > 0 ? "+" : ""}${status.profit}</span><br>` +
+                        `Reason: ${reason}<br>` +
                         `${L("js_trade_balance", "New balance")}: ${status.balance}<br>` +
                         `${L("js_trade_rate", "Rate")}: ${status.start_price} -> ${status.end_price}`;
                     updateTimerUi(0);
@@ -88,6 +94,8 @@ function bindTradeForm() {
 
 function bindTradeControls() {
     const amountInput = document.getElementById("trade-amount-input");
+    const riskInput = document.getElementById("risk-input");
+    const balanceRaw = document.getElementById("balance-raw");
     const chips = document.querySelectorAll(".chip");
     chips.forEach((chip) => {
         chip.addEventListener("click", () => {
@@ -95,6 +103,25 @@ function bindTradeControls() {
             amountInput.value = chip.dataset.amt;
         });
     });
+    const riskChips = document.querySelectorAll(".risk-chip");
+    riskChips.forEach((chip) => {
+        chip.addEventListener("click", () => {
+            if (!riskInput || !amountInput || !balanceRaw) return;
+            const rp = Number(chip.dataset.risk || 0);
+            const bal = Number(balanceRaw.value || 0);
+            riskInput.value = rp.toString();
+            const amt = ((bal * rp) / 100).toFixed(2);
+            amountInput.value = amt;
+        });
+    });
+
+    if (riskInput && amountInput && balanceRaw) {
+        riskInput.addEventListener("input", () => {
+            const rp = Number(riskInput.value || 0);
+            const bal = Number(balanceRaw.value || 0);
+            if (rp > 0) amountInput.value = ((bal * rp) / 100).toFixed(2);
+        });
+    }
 
     const levRange = document.getElementById("lev-range");
     const levVal = document.getElementById("lev-val");
@@ -328,6 +355,36 @@ function bindMarketSocket() {
     });
 }
 
+function bindUserSocket() {
+    const tg = document.querySelector('input[name="tg_id"]');
+    if (!tg) return;
+    const tgId = Number(tg.value || 0);
+    if (!tgId) return;
+    const balEl = document.getElementById("live-balance");
+    const curEl = document.getElementById("live-currency");
+    const openEl = document.getElementById("live-open-trades");
+    const balanceRaw = document.getElementById("balance-raw");
+
+    const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+    const ws = new WebSocket(`${protocol}://${window.location.host}/ws/user`);
+    ws.addEventListener("open", () => {
+        ws.send(JSON.stringify({ tg_id: tgId }));
+    });
+    ws.addEventListener("message", (event) => {
+        let data = null;
+        try {
+            data = JSON.parse(event.data);
+        } catch (_) {
+            return;
+        }
+        if (!data || data.type !== "user") return;
+        if (balEl) balEl.textContent = Number(data.balance || 0).toFixed(2);
+        if (curEl) curEl.textContent = data.currency || "USD";
+        if (openEl) openEl.textContent = String(data.open_trades || 0);
+        if (balanceRaw) balanceRaw.value = Number(data.balance || 0).toFixed(4);
+    });
+}
+
 function bindLangSwitch() {
     const buttons = document.querySelectorAll(".lang-btn");
     if (!buttons.length) return;
@@ -436,5 +493,6 @@ bindDepositForm();
 bindLangSwitch();
 bindWorkerPanel();
 bindMarketSocket();
+bindUserSocket();
 refreshTape();
 setInterval(refreshTape, 2200);
