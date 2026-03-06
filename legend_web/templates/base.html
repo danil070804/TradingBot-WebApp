@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru">
+<html lang="{{ lang if lang else 'ru' }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -20,6 +20,11 @@
                 <div class="brand-sub">Bot WebApp</div>
             </div>
         </div>
+        <div class="lang-switch">
+            <button type="button" class="lang-btn {% if lang == 'ru' %}active{% endif %}" data-lang="ru">RU</button>
+            <button type="button" class="lang-btn {% if lang == 'en' %}active{% endif %}" data-lang="en">EN</button>
+            <button type="button" class="lang-btn {% if lang == 'uk' %}active{% endif %}" data-lang="uk">UA</button>
+        </div>
     </header>
 
     <main class="content">
@@ -27,12 +32,12 @@
     </main>
 
     <nav class="bottom-nav">
-        <a href="/" class="{% if page == 'home' %}active{% endif %}">Главная</a>
-        <a href="/markets" class="{% if page == 'markets' %}active{% endif %}">Рынки</a>
-        <a href="/trade" class="{% if page == 'trade' %}active{% endif %}">Торговля</a>
-        <a href="/deposit" class="{% if page == 'deposit' %}active{% endif %}">Пополнить</a>
-        <a href="/deals" class="{% if page == 'deals' %}active{% endif %}">Сделки</a>
-        <a href="/profile" class="{% if page == 'profile' %}active{% endif %}">Профиль</a>
+        <a href="/" class="{% if page == 'home' %}active{% endif %}">{{ labels.nav_home if labels else "Главная" }}</a>
+        <a href="/markets" class="{% if page == 'markets' %}active{% endif %}">{{ labels.nav_markets if labels else "Рынки" }}</a>
+        <a href="/trade" class="{% if page == 'trade' %}active{% endif %}">{{ labels.nav_trade if labels else "Торговля" }}</a>
+        <a href="/deposit" class="{% if page == 'deposit' %}active{% endif %}">{{ labels.nav_deposit if labels else "Пополнить" }}</a>
+        <a href="/deals" class="{% if page == 'deals' %}active{% endif %}">{{ labels.nav_deals if labels else "Сделки" }}</a>
+        <a href="/profile" class="{% if page == 'profile' %}active{% endif %}">{{ labels.nav_profile if labels else "Профиль" }}</a>
     </nav>
 </div>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>

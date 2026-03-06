@@ -8,7 +8,7 @@
 </section>
 {% else %}
 <section class="card hero">
-    <h1>Профиль аккаунта</h1>
+    <h1>{{ labels.profile_title if labels else "Профиль аккаунта" }}</h1>
     <div class="balance">{{ "%.2f"|format((user.balance if user else 0) or 0) }} {{ (user.currency if user else "USD") or "USD" }}</div>
     <div class="hint">TG ID: {{ tg_id }}</div>
 </section>

@@ -47,6 +47,9 @@ body {
     backdrop-filter: blur(10px);
     position: sticky;
     top: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .brand { display: flex; align-items: center; gap: 12px; }
@@ -64,6 +67,26 @@ body {
 }
 .brand-title { font-family: "Oxanium", sans-serif; font-size: 22px; font-weight: 700; }
 .brand-sub { font-size: 12px; color: var(--muted); margin-top: -2px; }
+
+.lang-switch {
+    display: flex;
+    gap: 6px;
+}
+
+.lang-btn {
+    border: 1px solid rgba(143, 255, 79, 0.24);
+    background: rgba(8, 14, 19, 0.85);
+    color: #9db0c5;
+    border-radius: 8px;
+    padding: 6px 7px;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.lang-btn.active {
+    color: #a5ff66;
+    border-color: rgba(143, 255, 79, 0.45);
+}
 
 .content { padding: 14px; display: grid; gap: 12px; }
 
@@ -129,6 +152,9 @@ body {
     border: 1px solid rgba(143, 255, 79, 0.1);
 }
 .row small { display: block; color: var(--muted); margin-top: 2px; font-size: 11px; }
+.row.mono {
+    font-family: "Oxanium", monospace;
+}
 .markets-row .price-block { display: grid; justify-items: end; gap: 4px; }
 
 .form-grid { display: grid; gap: 10px; }

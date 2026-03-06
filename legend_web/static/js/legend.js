@@ -153,9 +153,60 @@ function bindDepositForm() {
     });
 }
 
+function bindLangSwitch() {
+    const buttons = document.querySelectorAll(".lang-btn");
+    if (!buttons.length) return;
+    buttons.forEach((btn) => {
+        btn.addEventListener("click", async () => {
+            const lang = btn.dataset.lang;
+            try {
+                const resp = await fetch("/api/lang", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ lang }),
+                });
+                if (resp.ok) location.reload();
+            } catch (_) {
+                // no-op
+            }
+        });
+    });
+}
+
+function renderTape(items) {
+    const wrap = document.getElementById("market-tape-list");
+    if (!wrap) return;
+    wrap.innerHTML = "";
+    items.forEach((item) => {
+        const row = document.createElement("div");
+        row.className = "row mono";
+        const sideClass = item.side === "buy" ? "pos" : "neg";
+        row.innerHTML = `<div><b>${item.symbol}</b><small class="${sideClass}">${item.side.toUpperCase()}</small></div><div>${item.price} • ${item.qty}</div>`;
+        wrap.appendChild(row);
+    });
+}
+
+async function refreshTape() {
+    const wrap = document.getElementById("market-tape-list");
+    if (!wrap) return;
+    try {
+        const resp = await fetch("/api/market/tape");
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (data.ok && Array.isArray(data.items)) {
+            renderTape(data.items.slice(0, 20));
+        }
+    } catch (_) {
+        // no-op
+    }
+}
+
 initTelegramAuth();
 bindDirectionButtons();
 bindTradeControls();
 bindTradeForm();
 bindExchangeForm();
 bindDepositForm();
+bindLangSwitch();
+refreshTape();
+setInterval(refreshTape, 2200);

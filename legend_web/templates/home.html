@@ -8,10 +8,10 @@
 </section>
 
 <section class="quick-actions">
-    <a class="qa-btn" href="/trade">Открыть сделку</a>
-    <a class="qa-btn" href="/deposit">Пополнить</a>
-    <a class="qa-btn" href="/deals">История сделок</a>
-    <a class="qa-btn" href="/profile">Полный профиль</a>
+    <a class="qa-btn" href="/trade">{{ labels.quick_trade if labels else "Открыть сделку" }}</a>
+    <a class="qa-btn" href="/deposit">{{ labels.quick_deposit if labels else "Пополнить" }}</a>
+    <a class="qa-btn" href="/deals">{{ labels.quick_history if labels else "История сделок" }}</a>
+    <a class="qa-btn" href="/profile">{{ labels.quick_profile if labels else "Полный профиль" }}</a>
 </section>
 
 <section class="metrics">
@@ -55,6 +55,18 @@
         </div>
         {% else %}
         <div class="empty">Сделок пока нет.</div>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="card">
+    <div class="section-title">{{ labels.live_tape if labels else "Лента рынка (live)" }}</div>
+    <div class="list" id="market-tape-list">
+        {% for t in tape %}
+        <div class="row">
+            <div><b>{{ t.symbol }}</b><small>{{ t.side|upper }}</small></div>
+            <div>{{ t.price }} • {{ t.qty }}</div>
+        </div>
         {% endfor %}
     </div>
 </section>

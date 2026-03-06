@@ -63,4 +63,10 @@
     </div>
 </section>
 <div id="trade-result" class="result-box"></div>
+<section class="card">
+    <div class="section-title">{{ labels.live_tape if labels else "Лента рынка (live)" }}</div>
+    <div class="list" id="market-tape-list">
+        <div class="empty">Загрузка...</div>
+    </div>
+</section>
 {% endblock %}

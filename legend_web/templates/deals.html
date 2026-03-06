@@ -17,4 +17,15 @@
         {% endfor %}
     </div>
 </section>
+<section class="card">
+    <div class="section-title">{{ labels.live_tape if labels else "Лента рынка (live)" }}</div>
+    <div class="list" id="market-tape-list">
+        {% for t in tape %}
+        <div class="row">
+            <div><b>{{ t.symbol }}</b><small>{{ t.side|upper }}</small></div>
+            <div>{{ t.price }} • {{ t.qty }}</div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
 {% endblock %}

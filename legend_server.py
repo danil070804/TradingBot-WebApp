@@ -5,6 +5,7 @@ import contextlib
 import json
 import hmac
 import hashlib
+from collections import deque
 from urllib.parse import parse_qsl
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -39,10 +40,58 @@ SESSION_SECRET = os.getenv("SESSION_SECRET", WEBHOOK_SECRET or "legend_trading_s
 ADMIN_WEB_USERNAME = os.getenv("ADMIN_WEB_USERNAME", "admin")
 ADMIN_WEB_PASSWORD = os.getenv("ADMIN_WEB_PASSWORD", "")
 USER_SESSION_KEY = "tg_user_id"
+LANG_SESSION_KEY = "web_lang"
 
 
 polling_task: asyncio.Task | None = None
 polling_lock_conn = None
+market_feed_task: asyncio.Task | None = None
+MARKET_TAPE = deque(maxlen=120)
+
+WEB_I18N = {
+    "ru": {
+        "nav_home": "Главная",
+        "nav_markets": "Рынки",
+        "nav_trade": "Торговля",
+        "nav_deposit": "Пополнить",
+        "nav_deals": "Сделки",
+        "nav_profile": "Профиль",
+        "profile_title": "Профиль аккаунта",
+        "quick_trade": "Открыть сделку",
+        "quick_deposit": "Пополнить",
+        "quick_history": "История сделок",
+        "quick_profile": "Полный профиль",
+        "live_tape": "Лента рынка (live)",
+    },
+    "en": {
+        "nav_home": "Home",
+        "nav_markets": "Markets",
+        "nav_trade": "Trade",
+        "nav_deposit": "Deposit",
+        "nav_deals": "Deals",
+        "nav_profile": "Profile",
+        "profile_title": "Account Profile",
+        "quick_trade": "Open Trade",
+        "quick_deposit": "Deposit",
+        "quick_history": "Trade History",
+        "quick_profile": "Full Profile",
+        "live_tape": "Market Tape (live)",
+    },
+    "uk": {
+        "nav_home": "Головна",
+        "nav_markets": "Ринки",
+        "nav_trade": "Торгівля",
+        "nav_deposit": "Поповнити",
+        "nav_deals": "Угоди",
+        "nav_profile": "Профіль",
+        "profile_title": "Профіль акаунта",
+        "quick_trade": "Відкрити угоду",
+        "quick_deposit": "Поповнити",
+        "quick_history": "Історія угод",
+        "quick_profile": "Повний профіль",
+        "live_tape": "Стрічка ринку (live)",
+    },
+}
 
 
 async def acquire_polling_lock() -> bool:
@@ -145,6 +194,36 @@ async def get_current_user_id(request: Request) -> int:
     return await get_or_pick_user_id()
 
 
+def normalize_lang_code(lang: str | None) -> str:
+    code = (lang or "ru").strip().lower()
+    if code.startswith("en"):
+        return "en"
+    if code.startswith("uk"):
+        return "uk"
+    return "ru"
+
+
+async def get_lang_and_labels(tg_id: int) -> tuple[str, dict]:
+    # session override is handled in route via request.session
+    if not tg_id:
+        return "ru", WEB_I18N["ru"]
+    row = await fetch_one("SELECT language FROM users WHERE tg_id = ?", (tg_id,))
+    lang = normalize_lang_code(row["language"] if row else "ru")
+    return lang, WEB_I18N.get(lang, WEB_I18N["ru"])
+
+
+def labels_for_lang(lang: str) -> dict:
+    return WEB_I18N.get(normalize_lang_code(lang), WEB_I18N["ru"])
+
+
+async def get_request_lang_labels(request: Request, tg_id: int) -> tuple[str, dict]:
+    forced = request.session.get(LANG_SESSION_KEY)
+    if forced:
+        lang = normalize_lang_code(forced)
+        return lang, labels_for_lang(lang)
+    return await get_lang_and_labels(tg_id)
+
+
 def validate_telegram_init_data(init_data: str, bot_token: str) -> dict | None:
     if not init_data or not bot_token:
         return None
@@ -183,10 +262,29 @@ def generate_market_rows(assets) -> list[dict]:
     return rows
 
 
+def generate_tape_tick() -> dict:
+    symbols = ["BTC", "ETH", "SOL", "XRP", "DOGE", "TON", "ADA", "LINK", "AVAX", "TRX"]
+    symbol = random.choice(symbols)
+    price = round(random.uniform(0.1, 120000), 2)
+    qty = round(random.uniform(0.01, 12.5), 4)
+    side = random.choice(["buy", "sell"])
+    return {"symbol": symbol, "price": price, "qty": qty, "side": side}
+
+
+async def market_feed_loop():
+    while True:
+        MARKET_TAPE.appendleft(generate_tape_tick())
+        await asyncio.sleep(1.2)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global polling_task
+    global polling_task, market_feed_task
     await bot.init_db()
+    if not MARKET_TAPE:
+        for _ in range(30):
+            MARKET_TAPE.appendleft(generate_tape_tick())
+    market_feed_task = asyncio.create_task(market_feed_loop())
     if RUN_BOT:
         me = await bot.bot.get_me()
         bot.BOT_USERNAME = me.username
@@ -215,6 +313,10 @@ async def lifespan(app: FastAPI):
         polling_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await polling_task
+    if market_feed_task:
+        market_feed_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await market_feed_task
     await release_polling_lock()
     await bot.bot.session.close()
 
@@ -251,9 +353,21 @@ async def telegram_auth(payload: TelegramAuthPayload, request: Request):
     return JSONResponse({"ok": True, "tg_id": int(user["id"])})
 
 
+class SetLangPayload(BaseModel):
+    lang: str
+
+
+@app.post("/api/lang", response_class=JSONResponse)
+async def api_set_lang(payload: SetLangPayload, request: Request):
+    lang = normalize_lang_code(payload.lang)
+    request.session[LANG_SESSION_KEY] = lang
+    return JSONResponse({"ok": True, "lang": lang})
+
+
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     tg_id = await get_current_user_id(request)
+    lang, labels = await get_request_lang_labels(request, tg_id)
     user = await fetch_one("SELECT * FROM users WHERE tg_id = ?", (tg_id,))
     deals = await fetch_all(
         "SELECT id, asset_name, direction, amount, currency, is_win, profit, created_at FROM deals WHERE user_tg_id = ? ORDER BY id DESC LIMIT 5",
@@ -270,25 +384,31 @@ async def home(request: Request):
             "title": "Legend Trading",
             "tg_id": tg_id,
             "user": user,
+            "lang": lang,
+            "labels": labels,
             "stats": stats,
             "markets": markets[:10],
             "deals": deals,
+            "tape": list(MARKET_TAPE)[:20],
         },
     )
 
 
 @app.get("/markets", response_class=HTMLResponse)
 async def markets(request: Request):
+    tg_id = await get_current_user_id(request)
+    lang, labels = await get_request_lang_labels(request, tg_id)
     assets = await fetch_all("SELECT id, name FROM ecn_assets ORDER BY id ASC")
     return templates.TemplateResponse(
         "markets.html",
-        {"request": request, "page": "markets", "title": "Legend Trading", "markets": generate_market_rows(assets)},
+        {"request": request, "page": "markets", "title": "Legend Trading", "markets": generate_market_rows(assets), "lang": lang, "labels": labels},
     )
 
 
 @app.get("/trade", response_class=HTMLResponse)
 async def trade(request: Request):
     tg_id = await get_current_user_id(request)
+    lang, labels = await get_request_lang_labels(request, tg_id)
     assets = await fetch_all("SELECT id, name FROM ecn_assets ORDER BY id ASC")
     user = await fetch_one("SELECT balance, currency FROM users WHERE tg_id = ?", (tg_id,))
     return templates.TemplateResponse(
@@ -300,6 +420,8 @@ async def trade(request: Request):
             "tg_id": tg_id,
             "assets": assets,
             "user": user,
+            "lang": lang,
+            "labels": labels,
         },
     )
 
@@ -307,16 +429,18 @@ async def trade(request: Request):
 @app.get("/exchange", response_class=HTMLResponse)
 async def exchange(request: Request):
     tg_id = await get_current_user_id(request)
+    lang, labels = await get_request_lang_labels(request, tg_id)
     user = await fetch_one("SELECT balance, currency FROM users WHERE tg_id = ?", (tg_id,))
     return templates.TemplateResponse(
         "exchange.html",
-        {"request": request, "page": "exchange", "title": "Legend Trading", "tg_id": tg_id, "user": user},
+        {"request": request, "page": "exchange", "title": "Legend Trading", "tg_id": tg_id, "user": user, "lang": lang, "labels": labels},
     )
 
 
 @app.get("/deposit", response_class=HTMLResponse)
 async def deposit_page(request: Request):
     tg_id = await get_current_user_id(request)
+    lang, labels = await get_request_lang_labels(request, tg_id)
     user = await fetch_one("SELECT balance, currency FROM users WHERE tg_id = ?", (tg_id,))
     return templates.TemplateResponse(
         "deposit.html",
@@ -330,6 +454,8 @@ async def deposit_page(request: Request):
             "trc20_address": bot.config.trc20_address,
             "card_pay_url": bot.config.card_pay_url,
             "card_requisites": bot.config.card_requisites,
+            "lang": lang,
+            "labels": labels,
         },
     )
 
@@ -337,23 +463,25 @@ async def deposit_page(request: Request):
 @app.get("/deals", response_class=HTMLResponse)
 async def deals(request: Request):
     tg_id = await get_current_user_id(request)
+    lang, labels = await get_request_lang_labels(request, tg_id)
     rows = await fetch_all(
         "SELECT id, asset_name, direction, amount, currency, is_win, profit, created_at FROM deals WHERE user_tg_id = ? ORDER BY id DESC LIMIT 200",
         (tg_id,),
     )
     return templates.TemplateResponse(
         "deals.html",
-        {"request": request, "page": "deals", "title": "Legend Trading", "deals": rows, "tg_id": tg_id},
+        {"request": request, "page": "deals", "title": "Legend Trading", "deals": rows, "tg_id": tg_id, "lang": lang, "labels": labels, "tape": list(MARKET_TAPE)[:25]},
     )
 
 
 @app.get("/profile", response_class=HTMLResponse)
 async def profile_page(request: Request):
     tg_id = await get_current_user_id(request)
+    lang, labels = await get_request_lang_labels(request, tg_id)
     if not tg_id:
         return templates.TemplateResponse(
             "profile.html",
-            {"request": request, "page": "profile", "title": "Legend Trading", "user": None, "stats": {"total": 0, "wins": 0, "losses": 0, "total_profit": 0.0}, "pending": 0.0, "tg_id": 0, "withdrawals": [], "deposits": []},
+            {"request": request, "page": "profile", "title": "Legend Trading", "user": None, "stats": {"total": 0, "wins": 0, "losses": 0, "total_profit": 0.0}, "pending": 0.0, "tg_id": 0, "withdrawals": [], "deposits": [], "lang": lang, "labels": labels},
         )
     user = await fetch_one(
         "SELECT tg_id, first_name, username, language, currency, balance, created_at FROM users WHERE tg_id = ?",
@@ -381,6 +509,8 @@ async def profile_page(request: Request):
             "tg_id": tg_id,
             "withdrawals": withdrawals,
             "deposits": deposits,
+            "lang": lang,
+            "labels": labels,
         },
     )
 
@@ -641,3 +771,8 @@ async def api_overview():
             "pending_withdrawals": int(pending["c"] if pending else 0),
         }
     )
+
+
+@app.get("/api/market/tape", response_class=JSONResponse)
+async def api_market_tape():
+    return JSONResponse({"ok": True, "items": list(MARKET_TAPE)[:25]})
