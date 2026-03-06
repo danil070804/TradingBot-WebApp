@@ -150,7 +150,9 @@ class BinanceMarketService:
         if self._running:
             return
         self._running = True
-        self._session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20))
+        self._session = aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=8, connect=2, sock_connect=2, sock_read=4)
+        )
         await self._refresh_24h_stats()
         self._tasks = [
             asyncio.create_task(self._ws_loop()),
@@ -169,12 +171,13 @@ class BinanceMarketService:
             await self._session.close()
             self._session = None
 
-    async def _fetch_json(self, path: str, params: dict[str, Any] | None = None) -> Any:
+    async def _fetch_json(self, path: str, params: dict[str, Any] | None = None, max_wait: float | None = None) -> Any:
         if not self._session:
             return None
         url = f"{self.REST_BASE}{path}"
         try:
-            async with self._session.get(url, params=params) as resp:
+            req_timeout = aiohttp.ClientTimeout(total=float(max_wait)) if max_wait and max_wait > 0 else None
+            async with self._session.get(url, params=params, timeout=req_timeout) as resp:
                 if resp.status != 200:
                     return None
                 return await resp.json()
@@ -191,7 +194,7 @@ class BinanceMarketService:
             return
         now = int(time.time())
         for ticker in sorted(self.tickers):
-            row = await self._fetch_json("/api/v3/ticker/24hr", {"symbol": ticker})
+            row = await self._fetch_json("/api/v3/ticker/24hr", {"symbol": ticker}, max_wait=1.6)
             if not isinstance(row, dict):
                 continue
             bid = float(row.get("bidPrice") or 0)
@@ -325,7 +328,11 @@ class BinanceMarketService:
         cached = self.depth_cache.get(ticker)
         if cached and now - float(cached.get("ts", 0)) < max_age:
             return
-        payload = await self._fetch_json("/api/v3/depth", {"symbol": ticker, "limit": max(5, min(20, levels))})
+        payload = await self._fetch_json(
+            "/api/v3/depth",
+            {"symbol": ticker, "limit": max(5, min(20, levels))},
+            max_wait=1.8,
+        )
         if not isinstance(payload, dict):
             return
         asks_raw = payload.get("asks") if isinstance(payload.get("asks"), list) else []
@@ -361,6 +368,7 @@ class BinanceMarketService:
         payload = await self._fetch_json(
             "/api/v3/klines",
             {"symbol": ticker, "interval": interval, "limit": max(20, min(1000, int(limit)))},
+            max_wait=2.2,
         )
         if not isinstance(payload, list):
             return

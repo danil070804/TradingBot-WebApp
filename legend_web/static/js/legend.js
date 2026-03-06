@@ -1,5 +1,6 @@
 const LEGEND_LABELS = window.LEGEND_LABELS || {};
 const L = (key, fallback) => LEGEND_LABELS[key] || fallback;
+let MARKET_SOCKET_RUNTIME = null;
 
 function reasonLabel(reason) {
     if (reason === "tp") return L("js_reason_tp", "Take Profit");
@@ -307,14 +308,19 @@ function drawCandles(canvas, candles) {
 }
 
 function updateMarketStats(data) {
+    const setStatValue = (el, value) => {
+        if (!el) return;
+        el.textContent = `${value ?? "--"}`;
+        el.classList.remove("loading");
+    };
     const m = document.getElementById("stat-mark");
     const s = document.getElementById("stat-spread");
     const h = document.getElementById("stat-high");
     const l = document.getElementById("stat-low");
-    if (m) m.textContent = `${data.mark ?? "--"}`;
-    if (s) s.textContent = `${data.spread ?? "--"}`;
-    if (h) h.textContent = `${data.high ?? "--"}`;
-    if (l) l.textContent = `${data.low ?? "--"}`;
+    setStatValue(m, data.mark);
+    setStatValue(s, data.spread);
+    setStatValue(h, data.high);
+    setStatValue(l, data.low);
 }
 
 function pushMiniTapeTick(tick) {
@@ -344,6 +350,15 @@ function bindMarketSocket() {
     const canvas = document.getElementById("candle-canvas");
     const tfSelect = document.getElementById("chart-tf");
     if (!asksWrap || !bidsWrap || !markEl || !pairSelect) return;
+    if (MARKET_SOCKET_RUNTIME && typeof MARKET_SOCKET_RUNTIME.cleanup === "function") {
+        MARKET_SOCKET_RUNTIME.cleanup(true);
+    }
+
+    [markEl, document.getElementById("stat-mark"), document.getElementById("stat-spread"), document.getElementById("stat-high"), document.getElementById("stat-low")]
+        .filter(Boolean)
+        .forEach((el) => {
+            if ((el.textContent || "").includes("--")) el.classList.add("loading");
+        });
 
     const state = buildCandleState();
     if (tfSelect) {
@@ -367,6 +382,8 @@ function bindMarketSocket() {
     let lwChart = null;
     let candleSeries = null;
     let volumeSeries = null;
+    let brandingTimer = null;
+    let onResize = null;
     if (hasLW) {
         lwChart = window.LightweightCharts.createChart(tvChartEl, {
             width: tvChartEl.clientWidth || 430,
@@ -393,7 +410,7 @@ function bindMarketSocket() {
             priceScaleId: "",
             scaleMargins: { top: 0.76, bottom: 0 },
         });
-        const onResize = () => {
+        onResize = () => {
             lwChart.applyOptions({ width: tvChartEl.clientWidth || 430 });
         };
         window.addEventListener("resize", onResize);
@@ -409,7 +426,13 @@ function bindMarketSocket() {
             });
         };
         scrubBranding();
-        setInterval(scrubBranding, 1500);
+        brandingTimer = setInterval(scrubBranding, 2500);
+        setTimeout(() => {
+            if (brandingTimer) {
+                clearInterval(brandingTimer);
+                brandingTimer = null;
+            }
+        }, 14000);
     } else if (canvas) {
         canvas.style.display = "block";
     }
@@ -588,25 +611,43 @@ function bindMarketSocket() {
     const protocol = window.location.protocol === "https:" ? "wss" : "ws";
     const ws = new WebSocket(`${protocol}://${window.location.host}/ws/market`);
     let fallbackTimer = null;
+    let silenceTimer = null;
+    let reconnectTimer = null;
     let lastCandleUpdateMs = 0;
     let lastBookUpdateMs = 0;
     let lastHistorySyncMs = 0;
     let lastMarketMessageMs = 0;
+    let disposed = false;
 
     const setFeedState = (live) => {
         if (liveDot) liveDot.classList.toggle("live", !!live);
         if (liveText) liveText.textContent = live ? "Market Feed: live" : "Market Feed: reconnecting";
     };
-
-    const updateActivityFromTape = (items) => {
-        if (!Array.isArray(items) || !items.length) return;
-        const nowSec = Math.floor(Date.now() / 1000);
-        const inMin = items.filter((x) => Math.abs(nowSec - Number(x.ts || nowSec)) <= 60);
-        const tpm = inMin.length || Math.min(20, items.length);
-        const symbols = new Set(items.map((x) => String(x.symbol || "").toUpperCase()).filter(Boolean)).size;
-        if (flowText) flowText.textContent = `${tpm} trades/min`;
-        if (participantsText) participantsText.textContent = `${symbols} symbols active`;
+    const stopTimer = (id) => {
+        if (!id) return null;
+        clearInterval(id);
+        clearTimeout(id);
+        return null;
     };
+    const cleanup = (closeSocket = false) => {
+        disposed = true;
+        fallbackTimer = stopTimer(fallbackTimer);
+        silenceTimer = stopTimer(silenceTimer);
+        reconnectTimer = stopTimer(reconnectTimer);
+        brandingTimer = stopTimer(brandingTimer);
+        if (onResize) {
+            window.removeEventListener("resize", onResize);
+            onResize = null;
+        }
+        if (closeSocket && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+            try {
+                ws.close();
+            } catch (_) {
+                // no-op
+            }
+        }
+    };
+    MARKET_SOCKET_RUNTIME = { cleanup };
 
     const ensureBookRows = (wrap, type, count) => {
         while (wrap.children.length < count) {
@@ -637,13 +678,16 @@ function bindMarketSocket() {
     };
 
     const subscribe = () => {
+        if (disposed || ws.readyState !== WebSocket.OPEN) return;
         ws.send(JSON.stringify({ type: "subscribe", symbol: getActiveSymbol() }));
     };
 
     const applyMarketData = (data) => {
+        if (disposed) return;
         lastMarketMessageMs = Date.now();
         setFeedState(true);
         markEl.textContent = data.mark;
+        markEl.classList.remove("loading");
         updateMarketStats(data);
         const nowMs = Date.now();
         if (nowMs - lastBookUpdateMs >= 4500) {
@@ -663,7 +707,7 @@ function bindMarketSocket() {
     };
 
     const startFallback = () => {
-        if (fallbackTimer) return;
+        if (disposed || fallbackTimer) return;
         fallbackTimer = setInterval(async () => {
             try {
                 const sym = encodeURIComponent(getActiveSymbol());
@@ -678,6 +722,7 @@ function bindMarketSocket() {
     };
 
     const bootstrapSnapshot = async () => {
+        if (disposed) return;
         try {
             const sym = encodeURIComponent(getActiveSymbol());
             const resp = await fetch(`/api/market/snapshot?symbol=${sym}`);
@@ -690,6 +735,7 @@ function bindMarketSocket() {
     };
 
     ws.addEventListener("open", () => {
+        if (disposed) return;
         subscribe();
         setFeedState(true);
         lastMarketMessageMs = Date.now();
@@ -702,12 +748,14 @@ function bindMarketSocket() {
     });
 
     pairSelect.addEventListener("change", () => {
+        if (disposed) return;
         if (chartSymbolSelect && chartSymbolSelect !== pairSelect) chartSymbolSelect.value = pairSelect.value;
         primeCandleHistory();
         if (ws.readyState === WebSocket.OPEN) subscribe();
     });
     if (chartSymbolSelect && chartSymbolSelect !== pairSelect) {
         chartSymbolSelect.addEventListener("change", () => {
+            if (disposed) return;
             if (pairSelect) pairSelect.value = chartSymbolSelect.value;
             primeCandleHistory();
             if (ws.readyState === WebSocket.OPEN) subscribe();
@@ -726,18 +774,21 @@ function bindMarketSocket() {
     });
 
     ws.addEventListener("close", () => {
+        if (disposed) return;
         setFeedState(false);
         startFallback();
-        setTimeout(bindMarketSocket, 1200);
+        reconnectTimer = setTimeout(() => bindMarketSocket(), 1200);
     });
 
     ws.addEventListener("error", () => {
+        if (disposed) return;
         setFeedState(false);
         startFallback();
     });
 
     // If WS is open but silent for too long, automatically rely on snapshot polling.
-    setInterval(() => {
+    silenceTimer = setInterval(() => {
+        if (disposed) return;
         if (!lastMarketMessageMs) return;
         if (Date.now() - lastMarketMessageMs > 9000) {
             setFeedState(false);
@@ -1037,9 +1088,23 @@ bindMarketSocket();
 bindUserSocket();
 bindOpenPositionsActions();
 bindMarketMiniCharts();
-refreshTape();
-refreshOpenPositions();
-setInterval(refreshTape, 2200);
-setInterval(refreshOpenPositions, 2200);
-refreshMarketsLive();
-setInterval(refreshMarketsLive, 1700);
+
+const tapeWrap = document.getElementById("market-tape-list");
+if (tapeWrap) {
+    refreshTape();
+    setInterval(refreshTape, 4200);
+}
+
+const openPosWrap = document.getElementById("open-positions-list");
+if (openPosWrap) {
+    refreshOpenPositions();
+    setInterval(refreshOpenPositions, 3000);
+}
+
+const hasMarketRows = document.querySelector(".m-price[data-symbol], .m-change[data-symbol]");
+if (hasMarketRows) {
+    refreshMarketsLive();
+    setInterval(refreshMarketsLive, 2400);
+}
+
+requestAnimationFrame(() => document.body.classList.add("app-ready"));

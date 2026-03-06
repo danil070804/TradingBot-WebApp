@@ -60,6 +60,7 @@ MARKET_SERVICE = BinanceMarketService()
 ASSET_TICKER_MAP: dict[str, str] = {}
 MARKET_TAPE = deque(maxlen=120)
 MARKET_TAPE_NEXT_TS = 0.0
+MARKET_DEPTH_REFRESH_AT: dict[str, float] = {}
 ACTIVE_WEB_TRADES: dict[str, dict] = {}
 MARKET_BOOK_STATE: dict[str, dict] = {}
 MARKET_HISTORY_MAXLEN = 12000
@@ -584,12 +585,40 @@ def legacy_symbol_from_symbol_or_ticker(symbol_or_asset: str) -> str:
     return symbol_from_asset_name(raw)
 
 
+def schedule_depth_refresh(ticker: str, levels: int = 10, min_interval: float = 2.0):
+    now = time.time()
+    due = float(MARKET_DEPTH_REFRESH_AT.get(ticker, 0.0))
+    if now < due:
+        return
+    MARKET_DEPTH_REFRESH_AT[ticker] = now + max(0.2, float(min_interval))
+
+    async def _runner():
+        with contextlib.suppress(Exception):
+            await MARKET_SERVICE.ensure_depth(ticker, levels=levels, max_age=min_interval)
+
+    with contextlib.suppress(RuntimeError):
+        asyncio.create_task(_runner())
+
+
+async def refresh_depth_quick(ticker: str, levels: int = 10, min_interval: float = 2.0, wait_sec: float = 0.85):
+    now = time.time()
+    due = float(MARKET_DEPTH_REFRESH_AT.get(ticker, 0.0))
+    if now < due:
+        return
+    MARKET_DEPTH_REFRESH_AT[ticker] = now + max(0.2, float(min_interval))
+    with contextlib.suppress(Exception):
+        await asyncio.wait_for(
+            MARKET_SERVICE.ensure_depth(ticker, levels=levels, max_age=min_interval),
+            timeout=max(0.2, float(wait_sec)),
+        )
+
+
 async def fetch_live_mark_or_none(symbol_or_asset: str) -> float | None:
     ticker = ticker_from_symbol_input(symbol_or_asset)
     quote = MARKET_SERVICE.get_quote(ticker)
     if quote and float(quote.get("mark") or 0) > 0:
         return float(quote["mark"])
-    await MARKET_SERVICE.ensure_depth(ticker, levels=10, max_age=0)
+    await refresh_depth_quick(ticker, levels=10, min_interval=0.8, wait_sec=1.1)
     quote = MARKET_SERVICE.get_quote(ticker)
     if quote and float(quote.get("mark") or 0) > 0:
         return float(quote["mark"])
@@ -673,12 +702,13 @@ def next_symbol_price(symbol: str, ts: int | None = None) -> float:
 
 async def generate_market_rows(assets) -> list[dict]:
     rows = []
+    prewarm_left = 5
     for asset in assets:
         ticker = ticker_from_asset_name(asset["name"])
         quote = MARKET_SERVICE.get_quote(ticker) or {}
-        if not quote:
-            await MARKET_SERVICE.ensure_depth(ticker, levels=10, max_age=0.0)
-            quote = MARKET_SERVICE.get_quote(ticker) or {}
+        if not quote and prewarm_left > 0:
+            schedule_depth_refresh(ticker, levels=8, min_interval=1.5)
+            prewarm_left -= 1
         price = float(quote.get("mark") or 0)
         day_change = float(quote.get("day_change") or 0.0)
         if price <= 0:
@@ -1646,7 +1676,7 @@ async def api_market_tape():
 @app.get("/api/market/snapshot", response_class=JSONResponse)
 async def api_market_snapshot(symbol: str = "BTC"):
     ticker = ticker_from_symbol_input(symbol)
-    await MARKET_SERVICE.ensure_depth(ticker, levels=10, max_age=2.0)
+    await refresh_depth_quick(ticker, levels=10, min_interval=2.0, wait_sec=0.8)
     quote = MARKET_SERVICE.get_quote(ticker) or {}
     asks, bids = MARKET_SERVICE.get_depth(ticker, levels=10)
     mark = float(quote.get("mark") or 0)
@@ -1682,7 +1712,11 @@ async def api_market_snapshot(symbol: str = "BTC"):
 @app.get("/api/market/candles", response_class=JSONResponse)
 async def api_market_candles(symbol: str = "BTC", tf: int = 60, limit: int = 300):
     ticker = ticker_from_symbol_input(symbol)
-    await MARKET_SERVICE.ensure_candles(ticker, tf_sec=tf, limit=limit)
+    with contextlib.suppress(Exception):
+        await asyncio.wait_for(
+            MARKET_SERVICE.ensure_candles(ticker, tf_sec=tf, limit=limit),
+            timeout=1.1,
+        )
     candles = MARKET_SERVICE.get_candles(ticker, tf_sec=tf, limit=limit)
     if not candles or len(candles) < max(20, min(int(limit), 300) // 3):
         sym = legacy_symbol_from_symbol_or_ticker(symbol)
@@ -1708,7 +1742,7 @@ async def ws_market(websocket: WebSocket):
             except asyncio.TimeoutError:
                 pass
 
-            await MARKET_SERVICE.ensure_depth(symbol, levels=10, max_age=2.5)
+            await refresh_depth_quick(symbol, levels=10, min_interval=2.3, wait_sec=0.45)
             quote = MARKET_SERVICE.get_quote(symbol) or {}
             asks, bids = MARKET_SERVICE.get_depth(symbol, levels=10)
             mark = float(quote.get("mark") or 0)
