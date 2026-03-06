@@ -10,6 +10,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
+from aiogram.types import Update
 
 import bot
 import db_compat as db
@@ -24,7 +25,10 @@ BASE_DIR = Path(__file__).resolve().parent
 WEB_DIR = BASE_DIR / "legend_web"
 DEFAULT_TG_ID = int(os.getenv("WEBAPP_DEFAULT_TG_ID", "0"))
 RUN_BOT = os.getenv("RUN_BOT", "1") == "1"
+BOT_MODE = os.getenv("BOT_MODE", "webhook").strip().lower()
 POLLING_LOCK_KEY = int(os.getenv("BOT_POLLING_LOCK_KEY", "8598101146"))
+WEBHOOK_PATH = os.getenv("WEBHOOK_PATH", "/telegram/webhook")
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")
 
 
 polling_task: asyncio.Task | None = None
@@ -52,6 +56,24 @@ async def release_polling_lock():
         pass
     await polling_lock_conn.close()
     polling_lock_conn = None
+
+
+def resolve_public_base_url() -> str:
+    explicit = os.getenv("WEBHOOK_BASE_URL", "").strip().rstrip("/")
+    if explicit:
+        return explicit
+
+    static_url = os.getenv("RAILWAY_STATIC_URL", "").strip().rstrip("/")
+    if static_url:
+        if static_url.startswith("http://") or static_url.startswith("https://"):
+            return static_url
+        return f"https://{static_url}"
+
+    public_domain = os.getenv("RAILWAY_PUBLIC_DOMAIN", "").strip().rstrip("/")
+    if public_domain:
+        return f"https://{public_domain}"
+
+    return ""
 
 
 async def fetch_all(query: str, params: tuple = ()):
@@ -97,15 +119,28 @@ async def lifespan(app: FastAPI):
     global polling_task
     await bot.init_db()
     if RUN_BOT:
-        can_start_polling = await acquire_polling_lock()
-        if can_start_polling:
-            await bot.bot.delete_webhook(drop_pending_updates=True)
-            me = await bot.bot.get_me()
-            bot.BOT_USERNAME = me.username
-            print(f"Bot polling started as @{bot.BOT_USERNAME}")
-            polling_task = asyncio.create_task(bot.dp.start_polling(bot.bot))
+        me = await bot.bot.get_me()
+        bot.BOT_USERNAME = me.username
+
+        if BOT_MODE == "webhook":
+            base_url = resolve_public_base_url()
+            if not base_url:
+                raise RuntimeError("Webhook mode enabled, but WEBHOOK_BASE_URL/RAILWAY_STATIC_URL is not set")
+            webhook_url = f"{base_url}{WEBHOOK_PATH}"
+            await bot.bot.set_webhook(
+                url=webhook_url,
+                secret_token=WEBHOOK_SECRET if WEBHOOK_SECRET else None,
+                drop_pending_updates=True,
+            )
+            print(f"Bot webhook set: {webhook_url}")
         else:
-            print("Polling lock is busy: another instance already runs bot polling. Starting web only.")
+            can_start_polling = await acquire_polling_lock()
+            if can_start_polling:
+                await bot.bot.delete_webhook(drop_pending_updates=True)
+                print(f"Bot polling started as @{bot.BOT_USERNAME}")
+                polling_task = asyncio.create_task(bot.dp.start_polling(bot.bot))
+            else:
+                print("Polling lock is busy: another instance already runs bot polling. Starting web only.")
     yield
     if polling_task:
         polling_task.cancel()
@@ -118,6 +153,18 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Legend Trading", lifespan=lifespan)
 templates = Jinja2Templates(directory=str(WEB_DIR / "templates"))
 app.mount("/static", StaticFiles(directory=str(WEB_DIR / "static")), name="static")
+
+
+@app.post(WEBHOOK_PATH, response_class=JSONResponse)
+async def telegram_webhook(request: Request):
+    if WEBHOOK_SECRET:
+        incoming_secret = request.headers.get("x-telegram-bot-api-secret-token", "")
+        if incoming_secret != WEBHOOK_SECRET:
+            return JSONResponse({"ok": False, "error": "invalid secret"}, status_code=403)
+    update_data = await request.json()
+    update = Update.model_validate(update_data)
+    await bot.dp.feed_update(bot.bot, update)
+    return JSONResponse({"ok": True})
 
 
 @app.get("/", response_class=HTMLResponse)

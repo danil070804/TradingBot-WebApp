@@ -26,7 +26,10 @@ uvicorn legend_server:app --reload --port 8080
 - `ADMIN_IDS`
 - `DATABASE_URL` (PostgreSQL)
 - `RUN_BOT=1`
+- `BOT_MODE=webhook` (рекомендуется для Railway)
 - `WEBAPP_DEFAULT_TG_ID=<ваш tg_id>`
+- `WEBHOOK_BASE_URL=https://<ваш-railway-домен>`
+- `WEBHOOK_SECRET=<случайная_строка>`
 - опционально: `LOG_CHAT_ID`, `CRYPTO_BOT_URL`, `TRC20_ADDRESS`, `SUPPORT_URL`
 
 ### Быстрый деплой (без ручной настройки команды запуска)
