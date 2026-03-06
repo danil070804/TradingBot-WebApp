@@ -1091,6 +1091,13 @@ async def api_trade_open(
     seconds = payload.seconds
     leverage = payload.leverage
 
+    if direction not in {"up", "down"}:
+        return JSONResponse({"ok": False, "error": "Некорректное направление сделки"}, status_code=400)
+    if seconds not in {10, 30, 60, 300}:
+        return JSONResponse({"ok": False, "error": "Некорректная экспирация"}, status_code=400)
+    if leverage < 1 or leverage > 50:
+        return JSONResponse({"ok": False, "error": "Плечо должно быть от 1 до 50"}, status_code=400)
+
     user = await fetch_one("SELECT balance, currency FROM users WHERE tg_id = ?", (tg_id,))
     if not user:
         return JSONResponse({"ok": False, "error": "Пользователь не найден"}, status_code=404)
@@ -1107,7 +1114,9 @@ async def api_trade_open(
         return JSONResponse({"ok": False, "error": "Недостаточно средств"}, status_code=400)
 
     await bot.change_balance(tg_id, -amount)
-    start_price = round(random.uniform(10, 100_000), 2)
+    symbol = symbol_from_asset_name(asset_name)
+    open_mark = next_symbol_price(symbol)
+    start_price = round(open_mark, 2 if open_mark >= 1 else 5)
     tp_percent = max(0.0, float(payload.tp_percent or 0.0))
     sl_percent = max(0.0, float(payload.sl_percent or 0.0))
     tp_price = None
@@ -1214,6 +1223,7 @@ async def api_exchange(
 
 @app.get("/api/trade/open_positions", response_class=JSONResponse)
 async def api_trade_open_positions(tg_id: int):
+    await settle_user_open_trades(int(tg_id))
     items = []
     now = time.time()
     for tr in ACTIVE_WEB_TRADES.values():
@@ -1414,9 +1424,6 @@ async def settle_web_trade(trade_id: str) -> dict | None:
         return None
     if trade["status"] == "closed":
         return trade
-    if time.time() < trade["close_ts"]:
-        return trade
-
     tg_id = trade["tg_id"]
     direction = trade["direction"]
     amount = trade["amount"]
@@ -1427,14 +1434,18 @@ async def settle_web_trade(trade_id: str) -> dict | None:
     symbol = symbol_from_asset_name(asset_name)
     live_mark = next_symbol_price(symbol)
 
+    now_ts = time.time()
+
     if trade.get("close_reason") != "manual" and trade.get("tp_price"):
         if (direction == "up" and live_mark >= trade["tp_price"]) or (direction == "down" and live_mark <= trade["tp_price"]):
-            trade["close_ts"] = time.time()
+            trade["close_ts"] = now_ts
             trade["close_reason"] = "tp"
     if trade.get("close_reason") != "manual" and trade.get("sl_price"):
         if (direction == "up" and live_mark <= trade["sl_price"]) or (direction == "down" and live_mark >= trade["sl_price"]):
-            trade["close_ts"] = time.time()
+            trade["close_ts"] = now_ts
             trade["close_reason"] = "sl"
+    if now_ts < float(trade.get("close_ts", now_ts)):
+        return trade
 
     luck_percent = await bot.get_luck_percent_for_client(tg_id)
     win_prob = max(0.0, min(1.0, (luck_percent / 100.0) if luck_percent is not None else 0.5))
@@ -1494,6 +1505,16 @@ async def settle_web_trade(trade_id: str) -> dict | None:
     return trade
 
 
+async def settle_user_open_trades(tg_id: int):
+    to_check = [
+        tr["id"]
+        for tr in ACTIVE_WEB_TRADES.values()
+        if int(tr.get("tg_id", 0)) == int(tg_id) and tr.get("status") == "open"
+    ]
+    for trade_id in to_check:
+        await settle_web_trade(trade_id)
+
+
 @app.websocket("/ws/user")
 async def ws_user(websocket: WebSocket):
     await websocket.accept()
@@ -1512,6 +1533,7 @@ async def ws_user(websocket: WebSocket):
 
     try:
         while True:
+            await settle_user_open_trades(tg_id)
             user = await fetch_one("SELECT balance, currency FROM users WHERE tg_id = ?", (tg_id,))
             now = time.time()
             open_positions = []

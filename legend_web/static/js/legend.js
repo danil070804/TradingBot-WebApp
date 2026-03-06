@@ -26,9 +26,14 @@ function bindTradeForm() {
     const result = document.getElementById("trade-result");
     const timer = document.getElementById("trade-timer");
     const progress = document.getElementById("trade-progress");
+    const submitBtn = form ? form.querySelector('button[type="submit"]') : null;
     if (!form || !result) return;
+    let busy = false;
     form.addEventListener("submit", async (e) => {
         e.preventDefault();
+        if (busy) return;
+        busy = true;
+        if (submitBtn) submitBtn.disabled = true;
         result.textContent = L("js_trade_opening", "Opening trade...");
         const body = Object.fromEntries(new FormData(form).entries());
         body.tg_id = Number(body.tg_id);
@@ -47,6 +52,8 @@ function bindTradeForm() {
             const data = await resp.json();
             if (!resp.ok || !data.ok) {
                 result.innerHTML = `<span class="neg">Error: ${data.error || L("js_trade_error", "failed to open trade")}</span>`;
+                busy = false;
+                if (submitBtn) submitBtn.disabled = false;
                 return;
             }
             result.innerHTML = `<span class="pos">${L("js_trade_started", "Trade opened, countdown started")}</span>`;
@@ -65,12 +72,15 @@ function bindTradeForm() {
             const poll = async () => {
                 const now = Math.floor(Date.now() / 1000);
                 updateTimerUi(Math.max(0, closeAt - now));
-                const statusResp = await fetch(`/api/trade/status?trade_id=${encodeURIComponent(data.trade_id)}&tg_id=${body.tg_id}`);
-                const status = await statusResp.json();
-                if (!statusResp.ok || !status.ok) {
-                    result.innerHTML = `<span class="neg">Error: ${status.error || L("js_trade_error", "failed to open trade")}</span>`;
-                    return true;
+                let statusResp = null;
+                let status = null;
+                try {
+                    statusResp = await fetch(`/api/trade/status?trade_id=${encodeURIComponent(data.trade_id)}&tg_id=${body.tg_id}`);
+                    status = await statusResp.json();
+                } catch (_) {
+                    return false;
                 }
+                if (!statusResp.ok || !status.ok) return false;
                 if (status.status === "closed") {
                     const cls = status.is_win ? "pos" : "neg";
                     const reason = reasonLabel(status.close_reason);
@@ -86,14 +96,23 @@ function bindTradeForm() {
             };
 
             let done = false;
+            const hardStopAt = closeAt + 25;
             while (!done) {
                 done = await poll();
+                if (!done && Math.floor(Date.now() / 1000) > hardStopAt) {
+                    result.innerHTML = `<span class="neg">${L("js_trade_error", "failed to open trade")}</span>`;
+                    break;
+                }
                 if (!done) {
                     await new Promise((resolve) => setTimeout(resolve, 1000));
                 }
             }
+            busy = false;
+            if (submitBtn) submitBtn.disabled = false;
         } catch (_) {
             result.innerHTML = `<span class="neg">${L("js_network_error", "Network error")}</span>`;
+            busy = false;
+            if (submitBtn) submitBtn.disabled = false;
         }
     });
 }
