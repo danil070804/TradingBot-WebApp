@@ -691,17 +691,28 @@ def build_candles_from_history(symbol: str, tf_sec: int, limit: int = 80) -> lis
         b = (t // tf) * tf
         c = buckets.get(b)
         if c is None:
-            buckets[b] = {"t": b, "o": p, "h": p, "l": p, "c": p}
+            buckets[b] = {"t": b, "o": p, "h": p, "l": p, "c": p, "v": 0.0}
         else:
             c["h"] = max(c["h"], p)
             c["l"] = min(c["l"], p)
+            c["v"] += abs(p - c["c"])
             c["c"] = p
 
     ordered = [buckets[k] for k in sorted(buckets.keys())]
     if not ordered:
         return []
     out = ordered[-n:]
-    return [{"t": c["t"], "o": round(c["o"], 6), "h": round(c["h"], 6), "l": round(c["l"], 6), "c": round(c["c"], 6)} for c in out]
+    return [
+        {
+            "t": c["t"],
+            "o": round(c["o"], 6),
+            "h": round(c["h"], 6),
+            "l": round(c["l"], 6),
+            "c": round(c["c"], 6),
+            "v": round(max(1.0, c["v"] * 1000.0), 2),
+        }
+        for c in out
+    ]
 
 
 async def market_feed_loop():

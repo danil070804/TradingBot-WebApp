@@ -37,7 +37,8 @@
             <option value="300">5m</option>
         </select>
     </div>
-    <canvas id="candle-canvas" width="430" height="180"></canvas>
+    <div id="tv-chart" class="tv-chart"></div>
+    <canvas id="candle-canvas" width="430" height="180" style="display:none;"></canvas>
 </section>
 
 <section class="card trade-layout">
@@ -140,4 +141,5 @@
         <div class="empty">{{ labels.js_loading if labels else "Загрузка..." }}</div>
     </div>
 </section>
+<script src="https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
 {% endblock %}

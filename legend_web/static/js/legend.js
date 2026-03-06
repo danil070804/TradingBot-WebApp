@@ -334,6 +334,7 @@ function bindMarketSocket() {
     const bidsWrap = document.getElementById("orderbook-bids");
     const markEl = document.getElementById("orderbook-mark");
     const pairSelect = document.querySelector('select[name="asset_name"]');
+    const tvChartEl = document.getElementById("tv-chart");
     const canvas = document.getElementById("candle-canvas");
     const tfSelect = document.getElementById("chart-tf");
     if (!asksWrap || !bidsWrap || !markEl || !pairSelect) return;
@@ -342,6 +343,131 @@ function bindMarketSocket() {
     if (tfSelect) {
         state.tf = Number(tfSelect.value || 30);
     }
+    state.lastBar = null;
+
+    const hasLW = Boolean(window.LightweightCharts && tvChartEl);
+    let lwChart = null;
+    let candleSeries = null;
+    let volumeSeries = null;
+    if (hasLW) {
+        lwChart = window.LightweightCharts.createChart(tvChartEl, {
+            width: tvChartEl.clientWidth || 430,
+            height: 360,
+            layout: { background: { color: "#06090d" }, textColor: "#9aa3ad" },
+            rightPriceScale: { borderColor: "rgba(255,255,255,0.08)" },
+            timeScale: { borderColor: "rgba(255,255,255,0.08)", timeVisible: true, secondsVisible: true },
+            grid: {
+                vertLines: { color: "rgba(255,255,255,0.06)" },
+                horzLines: { color: "rgba(255,255,255,0.06)" },
+            },
+            crosshair: { mode: 1 },
+        });
+        candleSeries = lwChart.addCandlestickSeries({
+            upColor: "#00d2c9",
+            downColor: "#ff375f",
+            wickUpColor: "#00d2c9",
+            wickDownColor: "#ff375f",
+            borderVisible: false,
+            priceLineColor: "#ff375f",
+        });
+        volumeSeries = lwChart.addHistogramSeries({
+            priceFormat: { type: "volume" },
+            priceScaleId: "",
+            scaleMargins: { top: 0.76, bottom: 0 },
+        });
+        const onResize = () => {
+            lwChart.applyOptions({ width: tvChartEl.clientWidth || 430 });
+        };
+        window.addEventListener("resize", onResize);
+    } else if (canvas) {
+        canvas.style.display = "block";
+    }
+
+    const normalizeCandles = (candlesRaw) =>
+        (candlesRaw || []).map((c) => ({
+            time: Number(c.t),
+            open: Number(c.o),
+            high: Number(c.h),
+            low: Number(c.l),
+            close: Number(c.c),
+            volume: Number(c.v || 0),
+        }));
+
+    const setChartData = (candles) => {
+        if (!Array.isArray(candles) || !candles.length) return;
+        state.candles = candles;
+        state.lastBar = candles[candles.length - 1];
+        if (lwChart && candleSeries && volumeSeries) {
+            candleSeries.setData(
+                candles.map((c) => ({
+                    time: c.time,
+                    open: c.open,
+                    high: c.high,
+                    low: c.low,
+                    close: c.close,
+                }))
+            );
+            volumeSeries.setData(
+                candles.map((c) => ({
+                    time: c.time,
+                    value: c.volume || 0,
+                    color: c.close >= c.open ? "rgba(0,210,201,0.45)" : "rgba(255,55,95,0.45)",
+                }))
+            );
+            lwChart.timeScale().fitContent();
+            return;
+        }
+        drawCandles(
+            canvas,
+            candles.map((c) => ({ bucket: c.time, open: c.open, high: c.high, low: c.low, close: c.close }))
+        );
+    };
+
+    const updateLiveBar = (mark, ts) => {
+        const tf = Number(state.tf || 30);
+        const bucket = Math.floor(ts / tf) * tf;
+        const prev = state.lastBar;
+        if (!prev) {
+            state.lastBar = { time: bucket, open: mark, high: mark, low: mark, close: mark, volume: 0 };
+        } else if (prev.time !== bucket) {
+            state.lastBar = {
+                time: bucket,
+                open: prev.close,
+                high: mark,
+                low: mark,
+                close: mark,
+                volume: Math.max(1, Math.abs(mark - prev.close) * 1000),
+            };
+            state.candles.push(state.lastBar);
+            if (state.candles.length > 120) state.candles.shift();
+        } else {
+            prev.high = Math.max(prev.high, mark);
+            prev.low = Math.min(prev.low, mark);
+            prev.close = mark;
+            prev.volume = (prev.volume || 0) + Math.max(0.5, Math.abs(mark - prev.open) * 100);
+            state.lastBar = prev;
+        }
+
+        if (lwChart && candleSeries && volumeSeries) {
+            candleSeries.update({
+                time: state.lastBar.time,
+                open: state.lastBar.open,
+                high: state.lastBar.high,
+                low: state.lastBar.low,
+                close: state.lastBar.close,
+            });
+            volumeSeries.update({
+                time: state.lastBar.time,
+                value: state.lastBar.volume || 0,
+                color: state.lastBar.close >= state.lastBar.open ? "rgba(0,210,201,0.45)" : "rgba(255,55,95,0.45)",
+            });
+        } else {
+            drawCandles(
+                canvas,
+                state.candles.map((c) => ({ bucket: c.time, open: c.open, high: c.high, low: c.low, close: c.close }))
+            );
+        }
+    };
 
     const primeCandleHistory = async () => {
         const sym = encodeURIComponent(pairSelect.value || "BTC");
@@ -350,14 +476,7 @@ function bindMarketSocket() {
             const resp = await fetch(`/api/market/candles?symbol=${sym}&tf=${tf}&limit=80`);
             const data = await resp.json();
             if (!resp.ok || !data.ok || !Array.isArray(data.candles)) return;
-            state.candles = data.candles.map((c) => ({
-                bucket: Number(c.t),
-                open: Number(c.o),
-                high: Number(c.h),
-                low: Number(c.l),
-                close: Number(c.c),
-            }));
-            drawCandles(canvas, state.candles);
+            setChartData(normalizeCandles(data.candles));
         } catch (_) {
             // no-op
         }
@@ -375,6 +494,7 @@ function bindMarketSocket() {
     let fallbackTimer = null;
     let lastCandleUpdateMs = 0;
     let lastBookUpdateMs = 0;
+    let lastHistorySyncMs = 0;
 
     const ensureBookRows = (wrap, type, count) => {
         while (wrap.children.length < count) {
@@ -417,10 +537,13 @@ function bindMarketSocket() {
             patchBookRows(bidsWrap, data.bids || []);
             lastBookUpdateMs = nowMs;
         }
-        if (nowMs - lastCandleUpdateMs >= 3500) {
-            pushCandle(state, Number(data.mark), Number(data.ts || Math.floor(Date.now() / 1000)));
-            drawCandles(canvas, state.candles);
+        if (nowMs - lastCandleUpdateMs >= 2200) {
+            updateLiveBar(Number(data.mark), Number(data.ts || Math.floor(Date.now() / 1000)));
             lastCandleUpdateMs = nowMs;
+        }
+        if (nowMs - lastHistorySyncMs >= 18000) {
+            primeCandleHistory();
+            lastHistorySyncMs = nowMs;
         }
         pushMiniTapeTick(data.tick);
     };
@@ -437,7 +560,7 @@ function bindMarketSocket() {
             } catch (_) {
                 // no-op
             }
-        }, 3200);
+        }, 4200);
     };
 
     ws.addEventListener("open", () => {
