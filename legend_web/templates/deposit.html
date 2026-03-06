@@ -38,8 +38,10 @@
         <div class="method-card" data-method-card="card">
             <b>{{ labels.pay_card if labels else "Банковская карта" }}</b>
             <small>{{ labels.deposit_card_hint if labels else "Для карты подтверждение только через поддержку." }}</small>
+            <small>Support: {{ support_contact }}</small>
             {% if card_requisites %}<code>{{ card_requisites }}</code>{% endif %}
             {% if card_pay_url %}<a class="qa-btn" href="{{ card_pay_url }}" target="_blank">{{ labels.deposit_open_card if labels else "Открыть оплату картой" }}</a>{% endif %}
+            {% if support_url %}<a class="qa-btn" href="{{ support_url }}" target="_blank">{{ labels.js_support_btn if labels else "Перейти в поддержку" }}</a>{% endif %}
         </div>
     </div>
     <div id="deposit-result" class="result-box"></div>

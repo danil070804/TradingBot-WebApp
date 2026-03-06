@@ -181,10 +181,10 @@ function bindDepositForm() {
                 return;
             }
             if (data.requires_support) {
-                result.innerHTML = `<span class="pos">${data.message}</span>`;
-                if (data.support_url) {
-                    window.open(data.support_url, "_blank");
-                }
+                const button = data.support_url
+                    ? `<div style="margin-top:8px"><a class="qa-btn" href="${data.support_url}" target="_blank">${L("js_support_btn", "Open Support")}</a></div>`
+                    : "";
+                result.innerHTML = `<span class="pos">${data.message || L("js_card_support_msg", "For bank card payment, contact support.")}</span>${button}`;
                 return;
             }
             result.innerHTML = `<span class="pos">${L("js_deposit_sent", "Request #{id} sent to admin").replace("{id}", data.deposit_id)}</span>`;
@@ -192,6 +192,51 @@ function bindDepositForm() {
             result.innerHTML = `<span class="neg">${L("js_network_error", "Network error")}</span>`;
         }
     });
+}
+
+function bindLiveOrderBook() {
+    const asksWrap = document.getElementById("orderbook-asks");
+    const bidsWrap = document.getElementById("orderbook-bids");
+    const markEl = document.getElementById("orderbook-mark");
+    const pairSelect = document.querySelector('select[name="asset_name"]');
+    if (!asksWrap || !bidsWrap || !markEl) return;
+
+    const seedBySymbol = (symbol) => {
+        const s = (symbol || "BTC").toUpperCase();
+        let h = 0;
+        for (let i = 0; i < s.length; i += 1) h = (h * 31 + s.charCodeAt(i)) % 100000;
+        return 100 + h * 7.3;
+    };
+
+    let mark = seedBySymbol(pairSelect ? pairSelect.value : "BTC");
+
+    const draw = () => {
+        mark += (Math.random() - 0.5) * Math.max(1, mark * 0.0009);
+        mark = Math.max(0.0001, mark);
+        markEl.textContent = mark.toFixed(mark >= 100 ? 2 : 5);
+        const asks = [];
+        const bids = [];
+        for (let i = 0; i < 10; i += 1) {
+            const spread = (i + 1) * (mark * 0.00035);
+            const askPrice = mark + spread + (Math.random() * spread * 0.4);
+            const bidPrice = mark - spread - (Math.random() * spread * 0.4);
+            const qtyA = (Math.random() * (4 + i * 0.2) + 0.06).toFixed(3);
+            const qtyB = (Math.random() * (4 + i * 0.2) + 0.06).toFixed(3);
+            asks.push(`<div class="book-row ask"><span>${askPrice.toFixed(askPrice >= 100 ? 2 : 5)}</span><em>${qtyA}</em></div>`);
+            bids.push(`<div class="book-row bid"><span>${bidPrice.toFixed(bidPrice >= 100 ? 2 : 5)}</span><em>${qtyB}</em></div>`);
+        }
+        asksWrap.innerHTML = asks.join("");
+        bidsWrap.innerHTML = bids.join("");
+    };
+
+    if (pairSelect) {
+        pairSelect.addEventListener("change", () => {
+            mark = seedBySymbol(pairSelect.value);
+            draw();
+        });
+    }
+    draw();
+    setInterval(draw, 900);
 }
 
 function bindLangSwitch() {
@@ -260,8 +305,10 @@ function bindWorkerPanel() {
 
 function renderTape(items) {
     const wrap = document.getElementById("market-tape-list");
+    const pulse = document.getElementById("market-pulse");
     if (!wrap) return;
     wrap.innerHTML = "";
+    const pulseItems = [];
     items.forEach((item) => {
         const row = document.createElement("div");
         row.className = "row mono";
@@ -269,7 +316,11 @@ function renderTape(items) {
         const sideText = item.side === "buy" ? L("js_side_buy", "BUY") : L("js_side_sell", "SELL");
         row.innerHTML = `<div><b>${item.symbol}</b><small class="${sideClass}">${sideText}</small></div><div>${item.price} • ${item.qty}</div>`;
         wrap.appendChild(row);
+        pulseItems.push(`<span class="${sideClass}">${item.symbol} ${item.price}</span>`);
     });
+    if (pulse) {
+        pulse.innerHTML = pulseItems.concat(pulseItems).join("");
+    }
 }
 
 async function refreshTape() {
@@ -295,5 +346,6 @@ bindExchangeForm();
 bindDepositForm();
 bindLangSwitch();
 bindWorkerPanel();
+bindLiveOrderBook();
 refreshTape();
 setInterval(refreshTape, 2200);

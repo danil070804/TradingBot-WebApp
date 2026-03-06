@@ -4,6 +4,7 @@
 <section class="card hero">
     <h1>{{ labels.trade_title if labels else "Futures Terminal" }}</h1>
     <div class="hint">{{ labels.trade_balance if labels else "Баланс" }}: {{ "%.2f"|format((user.balance if user else 0) or 0) }} {{ (user.currency if user else "USD") or "USD" }}</div>
+    <div class="pulse-wrap"><div id="market-pulse" class="pulse-track"></div></div>
 </section>
 
 <section class="card trade-layout">
@@ -52,13 +53,9 @@
     <div class="trade-right">
         <div class="section-title">{{ labels.trade_order_book if labels else "Order Book" }}</div>
         <div class="book">
-            {% for i in range(8) %}
-            <div class="book-row ask"><span>{{ 55000 + i * 7 }}</span><em>{{ "%.3f"|format(0.3 + i * 0.21) }}</em></div>
-            {% endfor %}
-            <div class="book-mid">MARK</div>
-            {% for i in range(8) %}
-            <div class="book-row bid"><span>{{ 54990 - i * 7 }}</span><em>{{ "%.3f"|format(0.5 + i * 0.17) }}</em></div>
-            {% endfor %}
+            <div id="orderbook-asks"></div>
+            <div class="book-mid">MARK <span id="orderbook-mark">--</span></div>
+            <div id="orderbook-bids"></div>
         </div>
     </div>
 </section>

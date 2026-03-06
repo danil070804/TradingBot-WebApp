@@ -163,6 +163,25 @@ body {
     pointer-events: none;
 }
 
+.pulse-wrap {
+    margin-top: 10px;
+    overflow: hidden;
+    border: 1px solid rgba(143, 255, 79, 0.18);
+    border-radius: 10px;
+    background: rgba(5, 10, 15, 0.72);
+}
+
+.pulse-track {
+    display: inline-flex;
+    gap: 16px;
+    white-space: nowrap;
+    padding: 7px 10px;
+    min-width: max-content;
+    font-family: "Oxanium", monospace;
+    font-size: 12px;
+    animation: ticker 18s linear infinite;
+}
+
 .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .metric h3 { margin: 0; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
 .metric p { margin: 8px 0 0; font-size: 20px; font-weight: 800; }
@@ -283,6 +302,7 @@ select, input {
     justify-content: space-between;
     font-size: 12px;
     padding: 6px 8px;
+    animation: rise .24s ease;
 }
 .book-row.ask { background: linear-gradient(90deg, rgba(255, 111, 123, 0.08), transparent); color: #ff9aa2; }
 .book-row.bid { background: linear-gradient(90deg, rgba(125, 255, 133, 0.08), transparent); color: #9ff7a5; }
@@ -401,6 +421,11 @@ select, input {
 @keyframes drift {
     0% { filter: saturate(95%); transform: scale(1); }
     100% { filter: saturate(110%); transform: scale(1.03); }
+}
+
+@keyframes ticker {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
 }
 
 @media (max-width: 860px) {
