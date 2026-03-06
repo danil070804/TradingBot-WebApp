@@ -1,6 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Профиль | Legend Trading{% endblock %}
 {% block content %}
+{% if not user %}
+<section class="card">
+    <div class="section-title">Профиль не инициализирован</div>
+    <div class="empty">Откройте WebApp напрямую из Telegram-кнопки бота, чтобы загрузить ваш профиль.</div>
+</section>
+{% else %}
 <section class="card hero">
     <h1>Профиль аккаунта</h1>
     <div class="balance">{{ "%.2f"|format((user.balance if user else 0) or 0) }} {{ (user.currency if user else "USD") or "USD" }}</div>
@@ -32,4 +38,31 @@
         <p class="{{ 'pos' if stats.total_profit >= 0 else 'neg' }}">{{ "%+.2f"|format(stats.total_profit) }}</p>
     </article>
 </section>
+<section class="card">
+    <div class="section-title">Последние пополнения</div>
+    <div class="list">
+        {% for d in deposits %}
+        <div class="row">
+            <div><b>{{ d.method }}</b><small>{{ d.created_at }}</small></div>
+            <div>{{ "%.2f"|format(d.amount) }} {{ d.currency }} • {{ d.status }}</div>
+        </div>
+        {% else %}
+        <div class="empty">Пополнений пока нет.</div>
+        {% endfor %}
+    </div>
+</section>
+<section class="card">
+    <div class="section-title">Последние выводы</div>
+    <div class="list">
+        {% for w in withdrawals %}
+        <div class="row">
+            <div><b>{{ w.method }}</b><small>{{ w.created_at }}</small></div>
+            <div>{{ "%.2f"|format(w.amount) }} {{ w.currency }} • {{ w.status }}</div>
+        </div>
+        {% else %}
+        <div class="empty">Выводов пока нет.</div>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
 {% endblock %}

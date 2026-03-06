@@ -21,13 +21,26 @@
                 <option value="card">Банковская карта</option>
             </select>
         </label>
-        <button class="submit" type="submit">Отправить заявку админу</button>
+        <button class="submit" type="submit">Продолжить</button>
     </form>
-    <div id="deposit-hints" class="hint">
-        {% if crypto_url %}Crypto URL: {{ crypto_url }}<br>{% endif %}
-        {% if trc20_address %}TRC20: {{ trc20_address }}<br>{% endif %}
-        {% if card_pay_url %}Card URL: {{ card_pay_url }}<br>{% endif %}
-        {% if card_requisites %}Реквизиты карты: {{ card_requisites }}{% endif %}
+
+    <div class="deposit-methods">
+        <div class="method-card" data-method-card="crypto">
+            <b>Crypto bot</b>
+            <small>Оплата по ссылке, затем заявка верификации админу.</small>
+            {% if crypto_url %}<a class="qa-btn" href="{{ crypto_url }}" target="_blank">Открыть Crypto Bot</a>{% endif %}
+        </div>
+        <div class="method-card" data-method-card="trc20">
+            <b>TRC20 USDT</b>
+            <small>Адрес для перевода:</small>
+            <code>{{ trc20_address if trc20_address else "Не задан админом" }}</code>
+        </div>
+        <div class="method-card" data-method-card="card">
+            <b>Банковская карта</b>
+            <small>Для карты подтверждение только через поддержку.</small>
+            {% if card_requisites %}<code>{{ card_requisites }}</code>{% endif %}
+            {% if card_pay_url %}<a class="qa-btn" href="{{ card_pay_url }}" target="_blank">Открыть оплату картой</a>{% endif %}
+        </div>
     </div>
     <div id="deposit-result" class="result-box"></div>
 </section>

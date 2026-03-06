@@ -45,6 +45,29 @@ function bindTradeForm() {
     });
 }
 
+function bindTradeControls() {
+    const amountInput = document.getElementById("trade-amount-input");
+    const chips = document.querySelectorAll(".chip");
+    chips.forEach((chip) => {
+        chip.addEventListener("click", () => {
+            if (!amountInput) return;
+            amountInput.value = chip.dataset.amt;
+        });
+    });
+
+    const levRange = document.getElementById("lev-range");
+    const levVal = document.getElementById("lev-val");
+    const levHidden = document.getElementById("lev-hidden");
+    if (levRange && levVal && levHidden) {
+        const sync = () => {
+            levVal.textContent = `${levRange.value}x`;
+            levHidden.value = levRange.value;
+        };
+        levRange.addEventListener("input", sync);
+        sync();
+    }
+}
+
 function bindExchangeForm() {
     const form = document.getElementById("exchange-form");
     const result = document.getElementById("exchange-result");
@@ -101,7 +124,7 @@ function bindDepositForm() {
     if (!form || !result) return;
     form.addEventListener("submit", async (e) => {
         e.preventDefault();
-        result.textContent = "Отправляем заявку...";
+        result.textContent = "Обрабатываем...";
         const body = Object.fromEntries(new FormData(form).entries());
         body.tg_id = Number(body.tg_id);
         body.amount = Number(body.amount);
@@ -116,6 +139,13 @@ function bindDepositForm() {
                 result.innerHTML = `<span class="neg">Ошибка: ${data.error || "не удалось отправить"}</span>`;
                 return;
             }
+            if (data.requires_support) {
+                result.innerHTML = `<span class="pos">${data.message}</span>`;
+                if (data.support_url) {
+                    window.open(data.support_url, "_blank");
+                }
+                return;
+            }
             result.innerHTML = `<span class="pos">Заявка #${data.deposit_id} отправлена админу</span>`;
         } catch (_) {
             result.innerHTML = `<span class="neg">Сетевая ошибка</span>`;
@@ -125,6 +155,7 @@ function bindDepositForm() {
 
 initTelegramAuth();
 bindDirectionButtons();
+bindTradeControls();
 bindTradeForm();
 bindExchangeForm();
 bindDepositForm();

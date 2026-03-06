@@ -29,6 +29,7 @@ except Exception:
 BASE_DIR = Path(__file__).resolve().parent
 WEB_DIR = BASE_DIR / "legend_web"
 DEFAULT_TG_ID = int(os.getenv("WEBAPP_DEFAULT_TG_ID", "0"))
+ALLOW_DEFAULT_TG_FALLBACK = os.getenv("ALLOW_DEFAULT_TG_FALLBACK", "0") == "1"
 RUN_BOT = os.getenv("RUN_BOT", "1") == "1"
 BOT_MODE = os.getenv("BOT_MODE", "webhook").strip().lower()
 POLLING_LOCK_KEY = int(os.getenv("BOT_POLLING_LOCK_KEY", "8598101146"))
@@ -99,6 +100,22 @@ async def fetch_one(query: str, params: tuple = ()):
         return await cur.fetchone()
 
 
+async def ensure_webapp_user(user_data: dict):
+    tg_id = int(user_data["id"])
+    first_name = user_data.get("first_name")
+    username = user_data.get("username")
+    async with db.connect(bot.DB_PATH) as conn:
+        await conn.execute(
+            "INSERT OR IGNORE INTO users(tg_id, first_name, username) VALUES (?, ?, ?)",
+            (tg_id, first_name, username),
+        )
+        await conn.execute(
+            "UPDATE users SET first_name = ?, username = ? WHERE tg_id = ?",
+            (first_name, username, tg_id),
+        )
+        await conn.commit()
+
+
 async def get_settings_map() -> dict:
     rows = await fetch_all("SELECT key, value FROM settings")
     data = {row["key"]: row["value"] for row in rows}
@@ -116,10 +133,9 @@ def is_admin_session(request: Request) -> bool:
 
 
 async def get_or_pick_user_id() -> int:
-    if DEFAULT_TG_ID:
+    if ALLOW_DEFAULT_TG_FALLBACK and DEFAULT_TG_ID:
         return DEFAULT_TG_ID
-    row = await fetch_one("SELECT tg_id FROM users ORDER BY id DESC LIMIT 1")
-    return int(row["tg_id"]) if row else 0
+    return 0
 
 
 async def get_current_user_id(request: Request) -> int:
@@ -132,7 +148,10 @@ async def get_current_user_id(request: Request) -> int:
 def validate_telegram_init_data(init_data: str, bot_token: str) -> dict | None:
     if not init_data or not bot_token:
         return None
-    pairs = dict(parse_qsl(init_data, strict_parsing=True))
+    try:
+        pairs = dict(parse_qsl(init_data, strict_parsing=False))
+    except Exception:
+        return None
     incoming_hash = pairs.pop("hash", None)
     if not incoming_hash:
         return None
@@ -227,6 +246,7 @@ async def telegram_auth(payload: TelegramAuthPayload, request: Request):
     user = validate_telegram_init_data(payload.init_data, bot.config.bot_token)
     if not user:
         return JSONResponse({"ok": False, "error": "Invalid initData"}, status_code=401)
+    await ensure_webapp_user(user)
     request.session[USER_SESSION_KEY] = int(user["id"])
     return JSONResponse({"ok": True, "tg_id": int(user["id"])})
 
@@ -330,12 +350,25 @@ async def deals(request: Request):
 @app.get("/profile", response_class=HTMLResponse)
 async def profile_page(request: Request):
     tg_id = await get_current_user_id(request)
+    if not tg_id:
+        return templates.TemplateResponse(
+            "profile.html",
+            {"request": request, "page": "profile", "title": "Legend Trading", "user": None, "stats": {"total": 0, "wins": 0, "losses": 0, "total_profit": 0.0}, "pending": 0.0, "tg_id": 0, "withdrawals": [], "deposits": []},
+        )
     user = await fetch_one(
         "SELECT tg_id, first_name, username, language, currency, balance, created_at FROM users WHERE tg_id = ?",
         (tg_id,),
     )
     stats = await bot.get_user_deal_stats(tg_id) if tg_id else {"wins": 0, "losses": 0, "total": 0, "total_profit": 0.0}
     pending = await bot.get_user_pending_withdraw_sum(tg_id) if tg_id else 0.0
+    withdrawals = await fetch_all(
+        "SELECT amount, currency, method, status, created_at FROM withdrawals WHERE user_tg_id = ? ORDER BY id DESC LIMIT 8",
+        (tg_id,),
+    )
+    deposits = await fetch_all(
+        "SELECT amount, currency, method, status, created_at FROM deposit_requests WHERE user_tg_id = ? ORDER BY id DESC LIMIT 8",
+        (tg_id,),
+    )
     return templates.TemplateResponse(
         "profile.html",
         {
@@ -346,6 +379,8 @@ async def profile_page(request: Request):
             "stats": stats,
             "pending": pending,
             "tg_id": tg_id,
+            "withdrawals": withdrawals,
+            "deposits": deposits,
         },
     )
 
@@ -555,6 +590,16 @@ async def api_deposit_request(payload: DepositRequestPayload):
     method = payload.method.strip().lower()
     if method not in {"crypto", "trc20", "card"}:
         return JSONResponse({"ok": False, "error": "Неподдерживаемый метод"}, status_code=400)
+
+    if method == "card":
+        return JSONResponse(
+            {
+                "ok": True,
+                "requires_support": True,
+                "support_url": bot.config.support_url,
+                "message": "Для оплаты картой свяжитесь с поддержкой.",
+            }
+        )
 
     dep_id = await bot.create_deposit_request(payload.tg_id, payload.amount, currency, method)
     worker_id = await bot.get_worker_for_client(payload.tg_id)

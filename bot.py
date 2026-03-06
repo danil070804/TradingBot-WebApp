@@ -986,7 +986,7 @@ def card_payment_keyboard():
     kb = InlineKeyboardBuilder()
     if config.card_pay_url:
         kb.button(text="💳 Перейти к оплате картой", url=config.card_pay_url)
-    kb.button(text="✅ Я оплатил картой", callback_data="check_payment_card")
+    kb.button(text="🛟 Связаться с поддержкой", url=config.support_url)
     kb.adjust(1)
     return kb.as_markup()
 
@@ -1666,10 +1666,12 @@ async def on_pay_card(callback: CallbackQuery, state: FSMContext):
     text = (
         "💳 Способ оплаты: <b>Банковская карта</b>\n\n"
         f"Сумма к оплате: <b>{amount:.2f} {currency}</b>\n\n"
-        "Оплатите по реквизитам и нажмите подтверждение:\n"
-        f"<code>{requisites}</code>"
+        "Для оплаты картой и подтверждения платежа свяжитесь с поддержкой.\n"
+        f"Реквизиты: <code>{requisites}</code>\n\n"
+        f"Поддержка: {config.support_url}"
     )
     await callback.message.answer(text, reply_markup=card_payment_keyboard())
+    await state.clear()
     await callback.answer()
 
 @dp.callback_query(F.data == "check_payment")
@@ -1725,42 +1727,7 @@ async def on_check_payment(callback: CallbackQuery, state: FSMContext):
 
 @dp.callback_query(F.data == "check_payment_card")
 async def on_check_payment_card(callback: CallbackQuery, state: FSMContext):
-    data = await state.get_data()
-    amount = data.get("deposit_amount")
-    user_row = await get_user_row(callback.from_user)
-    currency = user_row["currency"] or "USD"
-    if amount is None:
-        await callback.message.answer("Сумма не найдена. Начните пополнение заново.")
-        await callback.answer()
-        return
-
-    worker_id = await get_worker_for_client(callback.from_user.id)
-    worker_info_line = f"Реферал воркера: <code>{worker_id}</code>\n" if worker_id else "Реферал воркера: нет данных\n"
-    dep_id = await create_deposit_request(callback.from_user.id, amount, currency, "card")
-    text_admin = (
-        "🔔 <b>Заявка на проверку оплаты</b>\n\n"
-        f"ID заявки: <b>{dep_id}</b>\n"
-        f"Пользователь: <a href='tg://user?id={callback.from_user.id}'>{callback.from_user.full_name}</a>\n"
-        f"ID: <code>{callback.from_user.id}</code>\n"
-        f"Сумма: {amount:.2f} {currency}\n"
-        "Метод: Банковская карта\n"
-        f"{worker_info_line}"
-    )
-    for admin_id in config.admin_ids:
-        try:
-            await bot.send_message(
-                admin_id,
-                text_admin,
-                reply_markup=admin_deposit_check_keyboard(dep_id),
-            )
-        except Exception:
-            pass
-
-    await callback.message.answer(
-        "✅ Заявка на проверку оплаты картой отправлена администратору. "
-        "После проверки средства зачислятся на баланс."
-    )
-    await state.clear()
+    await callback.message.answer("Для пополнения картой используйте кнопку поддержки и отправьте подтверждение оператору.")
     await callback.answer()
 
 
