@@ -70,6 +70,7 @@ ASSET_SPECS = {
 MARKET_PRICE_STATE = {k: v["start"] for k, v in ASSET_SPECS.items()}
 MARKET_DAY_STATS = {k: {"open": v["start"], "high": v["start"], "low": v["start"]} for k, v in ASSET_SPECS.items()}
 MARKET_MOMENTUM_STATE = {k: 0.0 for k in ASSET_SPECS.keys()}
+MARKET_REGIME_STATE = {k: {"drift": 0.0, "until": 0} for k in ASSET_SPECS.keys()}
 MARKET_PRICE_HISTORY = {k: deque(maxlen=6000) for k in ASSET_SPECS.keys()}
 
 WEB_I18N = {
@@ -551,11 +552,18 @@ def next_symbol_price(symbol: str, ts: int | None = None) -> float:
         vol = spec["vol"]
         anchor = spec["start"]
 
+    tick_ts = int(ts or time.time())
+    regime = MARKET_REGIME_STATE.setdefault(symbol, {"drift": 0.0, "until": 0})
+    if tick_ts >= int(regime.get("until", 0)):
+        regime["drift"] = random.uniform(-vol * 0.08, vol * 0.08)
+        regime["until"] = tick_ts + random.randint(40, 140)
+
     momentum = MARKET_MOMENTUM_STATE.get(symbol, 0.0)
-    noise = (random.random() - 0.5) * 2 * (vol * 0.22)
-    mean_reversion = ((anchor - base) / max(anchor, 0.00001)) * 0.02
-    momentum = momentum * 0.72 + noise + mean_reversion
-    max_step = max(0.00002, vol * 0.24)
+    regime_drift = float(regime.get("drift", 0.0))
+    noise = random.uniform(-vol * 0.08, vol * 0.08)
+    mean_reversion = ((anchor - base) / max(anchor, 0.00001)) * 0.006
+    momentum = momentum * 0.86 + regime_drift + noise + mean_reversion
+    max_step = max(0.00002, vol * 0.14)
     momentum = max(-max_step, min(max_step, momentum))
     MARKET_MOMENTUM_STATE[symbol] = momentum
 
@@ -564,7 +572,6 @@ def next_symbol_price(symbol: str, ts: int | None = None) -> float:
     stats = MARKET_DAY_STATS.setdefault(symbol, {"open": updated, "high": updated, "low": updated})
     stats["high"] = max(stats["high"], updated)
     stats["low"] = min(stats["low"], updated)
-    tick_ts = int(ts or time.time())
     hist = MARKET_PRICE_HISTORY.setdefault(symbol, deque(maxlen=6000))
     if hist and hist[-1]["t"] == tick_ts:
         hist[-1]["p"] = updated
@@ -1544,7 +1551,7 @@ async def ws_market(websocket: WebSocket):
                     "tick": tick,
                 }
             )
-            await asyncio.sleep(3.5)
+            await asyncio.sleep(2.2)
     except WebSocketDisconnect:
         return
 

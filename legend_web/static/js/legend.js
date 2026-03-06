@@ -247,7 +247,7 @@ function bindDepositForm() {
 }
 
 function buildCandleState() {
-    return { tf: 30, candles: [] };
+    return { tf: 60, candles: [] };
 }
 
 function pushCandle(state, price, ts) {
@@ -341,7 +341,7 @@ function bindMarketSocket() {
 
     const state = buildCandleState();
     if (tfSelect) {
-        state.tf = Number(tfSelect.value || 30);
+        state.tf = Number(tfSelect.value || 60);
     }
     state.lastBar = null;
 
@@ -355,7 +355,7 @@ function bindMarketSocket() {
             height: 360,
             layout: { background: { color: "#06090d" }, textColor: "#9aa3ad" },
             rightPriceScale: { borderColor: "rgba(255,255,255,0.08)" },
-            timeScale: { borderColor: "rgba(255,255,255,0.08)", timeVisible: true, secondsVisible: true },
+            timeScale: { borderColor: "rgba(255,255,255,0.08)", timeVisible: true, secondsVisible: false },
             grid: {
                 vertLines: { color: "rgba(255,255,255,0.06)" },
                 horzLines: { color: "rgba(255,255,255,0.06)" },
@@ -424,7 +424,7 @@ function bindMarketSocket() {
     };
 
     const updateLiveBar = (mark, ts) => {
-        const tf = Number(state.tf || 30);
+        const tf = Number(state.tf || 60);
         const bucket = Math.floor(ts / tf) * tf;
         const prev = state.lastBar;
         if (!prev) {
@@ -471,12 +471,21 @@ function bindMarketSocket() {
 
     const primeCandleHistory = async () => {
         const sym = encodeURIComponent(pairSelect.value || "BTC");
-        const tf = Number(state.tf || 30);
+        const tf = Number(state.tf || 60);
         try {
             const resp = await fetch(`/api/market/candles?symbol=${sym}&tf=${tf}&limit=80`);
             const data = await resp.json();
             if (!resp.ok || !data.ok || !Array.isArray(data.candles)) return;
             setChartData(normalizeCandles(data.candles));
+            if (lwChart) {
+                lwChart.applyOptions({
+                    timeScale: {
+                        borderColor: "rgba(255,255,255,0.08)",
+                        timeVisible: true,
+                        secondsVisible: tf < 60,
+                    },
+                });
+            }
         } catch (_) {
             // no-op
         }
@@ -484,7 +493,7 @@ function bindMarketSocket() {
 
     if (tfSelect) {
         tfSelect.addEventListener("change", () => {
-            state.tf = Number(tfSelect.value || 30);
+            state.tf = Number(tfSelect.value || 60);
             primeCandleHistory();
         });
     }
@@ -537,7 +546,7 @@ function bindMarketSocket() {
             patchBookRows(bidsWrap, data.bids || []);
             lastBookUpdateMs = nowMs;
         }
-        if (nowMs - lastCandleUpdateMs >= 2200) {
+        if (nowMs - lastCandleUpdateMs >= 2000) {
             updateLiveBar(Number(data.mark), Number(data.ts || Math.floor(Date.now() / 1000)));
             lastCandleUpdateMs = nowMs;
         }
