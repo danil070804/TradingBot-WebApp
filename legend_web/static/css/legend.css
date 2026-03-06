@@ -248,6 +248,14 @@ body {
     letter-spacing: 0.02em;
 }
 .markets-row .price-block { display: grid; justify-items: end; gap: 4px; }
+.mini-spark {
+    margin-top: 6px;
+    width: 120px;
+    height: 28px;
+    border: 1px solid rgba(143, 255, 79, 0.14);
+    border-radius: 6px;
+    background: rgba(7, 12, 18, .66);
+}
 
 .form-grid { display: grid; gap: 10px; }
 label { font-size: 12px; color: var(--muted); display: grid; gap: 6px; }
@@ -402,6 +410,10 @@ select, input {
 .worker-actions .chip {
     font-size: 11px;
     padding: 7px 4px;
+}
+
+.position-row .chip {
+    min-width: 110px;
 }
 
 .pos { color: #7dff85; }

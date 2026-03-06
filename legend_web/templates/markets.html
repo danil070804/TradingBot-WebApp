@@ -9,6 +9,7 @@
             <div>
                 <b>{{ m.symbol }}</b>
                 <small>{{ m.name }}</small>
+                <canvas class="mini-spark" width="120" height="28" data-price="{{ m.price }}" data-change="{{ m.day_change }}"></canvas>
             </div>
             <div class="price-block">
                 <span>{{ m.price }}</span>

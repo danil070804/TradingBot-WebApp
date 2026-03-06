@@ -1,6 +1,13 @@
 const LEGEND_LABELS = window.LEGEND_LABELS || {};
 const L = (key, fallback) => LEGEND_LABELS[key] || fallback;
 
+function reasonLabel(reason) {
+    if (reason === "tp") return L("js_reason_tp", "Take Profit");
+    if (reason === "sl") return L("js_reason_sl", "Stop Loss");
+    if (reason === "manual") return L("js_reason_manual", "Manual close");
+    return L("js_reason_time", "By timer");
+}
+
 function bindDirectionButtons() {
     const buttons = document.querySelectorAll(".dir-btn");
     const hidden = document.getElementById("direction-input");
@@ -66,8 +73,7 @@ function bindTradeForm() {
                 }
                 if (status.status === "closed") {
                     const cls = status.is_win ? "pos" : "neg";
-                    const reasonMap = { tp: "TP", sl: "SL", time: "TIME" };
-                    const reason = reasonMap[status.close_reason] || "TIME";
+                    const reason = reasonLabel(status.close_reason);
                     result.innerHTML =
                         `${L("js_trade_done", "Deal completed")}: <span class="${cls}">${status.profit > 0 ? "+" : ""}${status.profit}</span><br>` +
                         `Reason: ${reason}<br>` +
@@ -364,6 +370,7 @@ function bindUserSocket() {
     const curEl = document.getElementById("live-currency");
     const openEl = document.getElementById("live-open-trades");
     const balanceRaw = document.getElementById("balance-raw");
+    const positionsWrap = document.getElementById("open-positions-list");
 
     const protocol = window.location.protocol === "https:" ? "wss" : "ws";
     const ws = new WebSocket(`${protocol}://${window.location.host}/ws/user`);
@@ -382,6 +389,111 @@ function bindUserSocket() {
         if (curEl) curEl.textContent = data.currency || "USD";
         if (openEl) openEl.textContent = String(data.open_trades || 0);
         if (balanceRaw) balanceRaw.value = Number(data.balance || 0).toFixed(4);
+        if (positionsWrap && Array.isArray(data.open_positions)) {
+            renderOpenPositions(data.open_positions, tgId);
+        }
+    });
+}
+
+function renderOpenPositions(items, tgId) {
+    const wrap = document.getElementById("open-positions-list");
+    if (!wrap) return;
+    if (!items.length) {
+        wrap.innerHTML = `<div class="empty">No open positions.</div>`;
+        return;
+    }
+    wrap.innerHTML = items
+        .map((p) => {
+            const side = p.direction === "up" ? L("trade_long", "LONG") : L("trade_short", "SHORT");
+            return `
+            <div class="row position-row">
+                <div>
+                    <b>${p.asset_name} ${side}</b>
+                    <small>${p.amount} · ${p.remaining}s</small>
+                </div>
+                <button class="chip pos-close-btn" data-trade-id="${p.trade_id}" data-tg-id="${tgId}">
+                    ${L("trade_close_now", "Close Now")}
+                </button>
+            </div>`;
+        })
+        .join("");
+}
+
+function bindOpenPositionsActions() {
+    const wrap = document.getElementById("open-positions-list");
+    if (!wrap) return;
+    wrap.addEventListener("click", async (e) => {
+        const btn = e.target.closest(".pos-close-btn");
+        if (!btn) return;
+        const tradeId = btn.dataset.tradeId;
+        const tgId = Number(btn.dataset.tgId || 0);
+        if (!tradeId || !tgId) return;
+        btn.disabled = true;
+        try {
+            const resp = await fetch("/api/trade/close", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ trade_id: tradeId, tg_id: tgId }),
+            });
+            const data = await resp.json();
+            if (!resp.ok || !data.ok) {
+                alert(data.error || "Failed to close");
+                btn.disabled = false;
+                return;
+            }
+        } catch (_) {
+            alert("Network error");
+            btn.disabled = false;
+        }
+    });
+}
+
+async function refreshOpenPositions() {
+    const wrap = document.getElementById("open-positions-list");
+    const tg = document.querySelector('input[name="tg_id"]');
+    if (!wrap || !tg) return;
+    const tgId = Number(tg.value || 0);
+    if (!tgId) return;
+    try {
+        const resp = await fetch(`/api/trade/open_positions?tg_id=${tgId}`);
+        const data = await resp.json();
+        if (!resp.ok || !data.ok) return;
+        renderOpenPositions(data.items || [], tgId);
+    } catch (_) {
+        // no-op
+    }
+}
+
+function bindMarketMiniCharts() {
+    const canvases = document.querySelectorAll(".mini-spark");
+    if (!canvases.length) return;
+    canvases.forEach((canvas) => {
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        const price = Number(canvas.dataset.price || 1);
+        const change = Number(canvas.dataset.change || 0);
+        const points = [];
+        let p = price * (1 - change / 100);
+        for (let i = 0; i < 24; i += 1) {
+            p += (Math.random() - 0.45) * (Math.abs(change) * 0.015 + price * 0.002);
+            points.push(Math.max(0.0001, p));
+        }
+        const max = Math.max(...points);
+        const min = Math.min(...points);
+        const range = Math.max(0.00001, max - min);
+        const w = canvas.width;
+        const h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = change >= 0 ? "#8fff4f" : "#ff6f6f";
+        ctx.beginPath();
+        points.forEach((v, i) => {
+            const x = (i / (points.length - 1)) * (w - 2) + 1;
+            const y = ((max - v) / range) * (h - 6) + 3;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
     });
 }
 
@@ -494,5 +606,9 @@ bindLangSwitch();
 bindWorkerPanel();
 bindMarketSocket();
 bindUserSocket();
+bindOpenPositionsActions();
+bindMarketMiniCharts();
 refreshTape();
+refreshOpenPositions();
 setInterval(refreshTape, 2200);
+setInterval(refreshOpenPositions, 2200);

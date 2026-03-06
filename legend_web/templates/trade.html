@@ -105,4 +105,10 @@
         <div class="empty">{{ labels.js_loading if labels else "Загрузка..." }}</div>
     </div>
 </section>
+<section class="card">
+    <div class="section-title">{{ labels.trade_open_positions if labels else "Открытые позиции" }}</div>
+    <div class="list" id="open-positions-list">
+        <div class="empty">{{ labels.js_loading if labels else "Загрузка..." }}</div>
+    </div>
+</section>
 {% endblock %}
