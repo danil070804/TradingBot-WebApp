@@ -373,6 +373,7 @@ function bindMarketSocket() {
     const protocol = window.location.protocol === "https:" ? "wss" : "ws";
     const ws = new WebSocket(`${protocol}://${window.location.host}/ws/market`);
     let fallbackTimer = null;
+    let lastCandleUpdateMs = 0;
 
     const subscribe = () => {
         ws.send(JSON.stringify({ type: "subscribe", symbol: pairSelect.value || "BTC" }));
@@ -387,8 +388,12 @@ function bindMarketSocket() {
         bidsWrap.innerHTML = (data.bids || [])
             .map((r) => `<div class="book-row bid"><span>${r.price}</span><em>${r.qty}</em></div>`)
             .join("");
-        pushCandle(state, Number(data.mark), Number(data.ts || Math.floor(Date.now() / 1000)));
-        drawCandles(canvas, state.candles);
+        const nowMs = Date.now();
+        if (nowMs - lastCandleUpdateMs >= 3500) {
+            pushCandle(state, Number(data.mark), Number(data.ts || Math.floor(Date.now() / 1000)));
+            drawCandles(canvas, state.candles);
+            lastCandleUpdateMs = nowMs;
+        }
         pushMiniTapeTick(data.tick);
     };
 

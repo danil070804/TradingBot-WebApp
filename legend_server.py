@@ -50,6 +50,7 @@ polling_lock_conn = None
 market_feed_task: asyncio.Task | None = None
 MARKET_TAPE = deque(maxlen=120)
 ACTIVE_WEB_TRADES: dict[str, dict] = {}
+MARKET_BOOK_STATE: dict[str, dict] = {}
 ASSET_SPECS = {
     "BTC": {"name": "Bitcoin", "start": 64000.0, "vol": 0.004, "qty_min": 0.01, "qty_max": 2.4},
     "ETH": {"name": "Ethereum", "start": 3400.0, "vol": 0.005, "qty_min": 0.03, "qty_max": 12.0},
@@ -600,22 +601,34 @@ def generate_tape_tick() -> dict:
 
 def build_orderbook(symbol: str, levels: int = 10) -> tuple[list[dict], list[dict], float]:
     mark = next_symbol_price(symbol)
+    state = MARKET_BOOK_STATE.get(symbol)
+    if not state or len(state.get("ask_qty", [])) != levels:
+        state = {
+            "ask_qty": [random.uniform(0.2, 8.5 + i * 0.25) for i in range(levels)],
+            "bid_qty": [random.uniform(0.2, 8.5 + i * 0.25) for i in range(levels)],
+        }
+        MARKET_BOOK_STATE[symbol] = state
+
     asks = []
     bids = []
+    step = max(mark * 0.0003, 0.00001)
     for i in range(levels):
-        spread = (i + 1) * max(mark * 0.00035, 0.00001)
-        ask_price = mark + spread + random.uniform(0, spread * 0.35)
-        bid_price = max(0.00001, mark - spread - random.uniform(0, spread * 0.35))
+        spread = (i + 1) * step
+        ask_price = mark + spread
+        bid_price = max(0.00001, mark - spread)
+        # Keep quantities moving slowly to avoid book flashing.
+        state["ask_qty"][i] = max(0.03, state["ask_qty"][i] * (1 + random.uniform(-0.035, 0.035)))
+        state["bid_qty"][i] = max(0.03, state["bid_qty"][i] * (1 + random.uniform(-0.035, 0.035)))
         asks.append(
             {
                 "price": round(ask_price, 2 if ask_price >= 1 else 5),
-                "qty": round(random.uniform(0.03, 7.5 + i * 0.22), 3),
+                "qty": round(state["ask_qty"][i], 3),
             }
         )
         bids.append(
             {
                 "price": round(bid_price, 2 if bid_price >= 1 else 5),
-                "qty": round(random.uniform(0.03, 7.5 + i * 0.22), 3),
+                "qty": round(state["bid_qty"][i], 3),
             }
         )
     return asks, bids, mark
@@ -661,8 +674,12 @@ def build_synthetic_candles(symbol: str, tf_sec: int, limit: int = 80) -> list[d
 
 async def market_feed_loop():
     while True:
-        MARKET_TAPE.appendleft(generate_tape_tick())
-        await asyncio.sleep(1.2)
+        batch = random.choice([1, 1, 2])  # 1-2 trades per cycle
+        for idx in range(batch):
+            MARKET_TAPE.appendleft(generate_tape_tick())
+            if idx < batch - 1:
+                await asyncio.sleep(0.8)
+        await asyncio.sleep(random.choice([10, 15, 20]))
 
 
 @asynccontextmanager
@@ -1410,9 +1427,8 @@ async def api_market_snapshot(symbol: str = "BTC"):
     sym = symbol_from_asset_name(symbol)
     asks, bids, mark = build_orderbook(sym, levels=10)
     spread = max(0.00001, asks[0]["price"] - bids[0]["price"])
-    day_stats = MARKET_DAY_STATS.get(sym, {"high": mark, "low": mark})
-    tick = generate_tape_tick()
-    MARKET_TAPE.appendleft(tick)
+    day_stats = MARKET_DAY_STATS.get(sym, {"open": mark, "high": mark, "low": mark})
+    tick = MARKET_TAPE[0] if MARKET_TAPE else None
     return JSONResponse(
         {
             "ok": True,
@@ -1453,8 +1469,7 @@ async def ws_market(websocket: WebSocket):
                 pass
 
             asks, bids, mark = build_orderbook(symbol, levels=10)
-            tick = generate_tape_tick()
-            MARKET_TAPE.appendleft(tick)
+            tick = MARKET_TAPE[0] if MARKET_TAPE else None
             spread = max(0.00001, asks[0]["price"] - bids[0]["price"])
             day_stats = MARKET_DAY_STATS.get(symbol, {"open": mark, "high": mark, "low": mark})
             await websocket.send_json(
@@ -1471,7 +1486,7 @@ async def ws_market(websocket: WebSocket):
                     "tick": tick,
                 }
             )
-            await asyncio.sleep(1.2)
+            await asyncio.sleep(2.0)
     except WebSocketDisconnect:
         return
 
