@@ -336,6 +336,7 @@ function bindMarketSocket() {
     const pairSelect = document.querySelector('select[name="asset_name"]');
     const chartSymbolSelect = document.getElementById("chart-symbol-select");
     const tvChartEl = document.getElementById("tv-chart");
+    const openChartBtn = document.getElementById("open-chart-btn");
     const canvas = document.getElementById("candle-canvas");
     const tfSelect = document.getElementById("chart-tf");
     if (!asksWrap || !bidsWrap || !markEl || !pairSelect) return;
@@ -345,6 +346,9 @@ function bindMarketSocket() {
         state.tf = Number(tfSelect.value || 60);
     }
     state.lastBar = null;
+    const chartLimit = Number((tvChartEl && tvChartEl.dataset.limit) || 300);
+    let liveLockEnabled = true;
+    let crosshairEnabled = true;
     if (chartSymbolSelect && pairSelect && !chartSymbolSelect.value) {
         chartSymbolSelect.value = pairSelect.value || "";
     }
@@ -361,7 +365,7 @@ function bindMarketSocket() {
     if (hasLW) {
         lwChart = window.LightweightCharts.createChart(tvChartEl, {
             width: tvChartEl.clientWidth || 430,
-            height: 360,
+            height: tvChartEl.clientHeight || 360,
             layout: { background: { color: "#06090d" }, textColor: "#9aa3ad" },
             rightPriceScale: { borderColor: "rgba(255,255,255,0.08)" },
             timeScale: { borderColor: "rgba(255,255,255,0.08)", timeVisible: true, secondsVisible: false },
@@ -369,7 +373,7 @@ function bindMarketSocket() {
                 vertLines: { color: "rgba(255,255,255,0.06)" },
                 horzLines: { color: "rgba(255,255,255,0.06)" },
             },
-            crosshair: { mode: 1 },
+            crosshair: { mode: crosshairEnabled ? 1 : 0 },
         });
         candleSeries = lwChart.addCandlestickSeries({
             upColor: "#00d2c9",
@@ -437,6 +441,7 @@ function bindMarketSocket() {
                 }))
             );
             lwChart.timeScale().fitContent();
+            if (liveLockEnabled) lwChart.timeScale().scrollToRealTime();
             return;
         }
         drawCandles(
@@ -483,6 +488,7 @@ function bindMarketSocket() {
                 value: state.lastBar.volume || 0,
                 color: state.lastBar.close >= state.lastBar.open ? "rgba(0,210,201,0.45)" : "rgba(255,55,95,0.45)",
             });
+            if (liveLockEnabled) lwChart.timeScale().scrollToRealTime();
         } else {
             drawCandles(
                 canvas,
@@ -495,7 +501,7 @@ function bindMarketSocket() {
         const sym = encodeURIComponent(getActiveSymbol());
         const tf = Number(state.tf || 60);
         try {
-            const resp = await fetch(`/api/market/candles?symbol=${sym}&tf=${tf}&limit=80`);
+            const resp = await fetch(`/api/market/candles?symbol=${sym}&tf=${tf}&limit=${chartLimit}`);
             const data = await resp.json();
             if (!resp.ok || !data.ok || !Array.isArray(data.candles)) return;
             setChartData(normalizeCandles(data.candles));
@@ -517,6 +523,60 @@ function bindMarketSocket() {
         tfSelect.addEventListener("change", () => {
             state.tf = Number(tfSelect.value || 60);
             primeCandleHistory();
+        });
+    }
+
+    if (openChartBtn) {
+        const syncOpenHref = () => {
+            const sym = encodeURIComponent(getActiveSymbol());
+            openChartBtn.href = `/trade/chart?symbol=${sym}`;
+        };
+        syncOpenHref();
+        if (chartSymbolSelect) chartSymbolSelect.addEventListener("change", syncOpenHref);
+        if (pairSelect) pairSelect.addEventListener("change", syncOpenHref);
+    }
+
+    const tfButtons = document.querySelectorAll(".chart-tf-btn[data-tf]");
+    if (tfButtons.length && tfSelect) {
+        const setActiveTfBtn = (tfValue) => {
+            tfButtons.forEach((btn) => btn.classList.toggle("active", String(btn.dataset.tf) === String(tfValue)));
+        };
+        setActiveTfBtn(tfSelect.value);
+        tfButtons.forEach((btn) => {
+            btn.addEventListener("click", () => {
+                tfSelect.value = String(btn.dataset.tf || "60");
+                setActiveTfBtn(tfSelect.value);
+                tfSelect.dispatchEvent(new Event("change"));
+            });
+        });
+    }
+
+    const fitBtn = document.getElementById("chart-fit-btn");
+    if (fitBtn && lwChart) {
+        fitBtn.addEventListener("click", () => lwChart.timeScale().fitContent());
+    }
+    const resetBtn = document.getElementById("chart-reset-btn");
+    if (resetBtn) {
+        resetBtn.addEventListener("click", () => {
+            primeCandleHistory();
+        });
+    }
+    const crosshairBtn = document.getElementById("chart-crosshair-btn");
+    if (crosshairBtn && lwChart) {
+        crosshairBtn.classList.toggle("active", crosshairEnabled);
+        crosshairBtn.addEventListener("click", () => {
+            crosshairEnabled = !crosshairEnabled;
+            lwChart.applyOptions({ crosshair: { mode: crosshairEnabled ? 1 : 0 } });
+            crosshairBtn.classList.toggle("active", crosshairEnabled);
+        });
+    }
+    const lockBtn = document.getElementById("chart-lock-btn");
+    if (lockBtn) {
+        lockBtn.classList.toggle("active", liveLockEnabled);
+        lockBtn.addEventListener("click", () => {
+            liveLockEnabled = !liveLockEnabled;
+            lockBtn.classList.toggle("active", liveLockEnabled);
+            if (liveLockEnabled && lwChart) lwChart.timeScale().scrollToRealTime();
         });
     }
 
@@ -604,11 +664,11 @@ function bindMarketSocket() {
     });
 
     pairSelect.addEventListener("change", () => {
-        if (chartSymbolSelect) chartSymbolSelect.value = pairSelect.value;
+        if (chartSymbolSelect && chartSymbolSelect !== pairSelect) chartSymbolSelect.value = pairSelect.value;
         primeCandleHistory();
         if (ws.readyState === WebSocket.OPEN) subscribe();
     });
-    if (chartSymbolSelect) {
+    if (chartSymbolSelect && chartSymbolSelect !== pairSelect) {
         chartSymbolSelect.addEventListener("change", () => {
             if (pairSelect) pairSelect.value = chartSymbolSelect.value;
             primeCandleHistory();

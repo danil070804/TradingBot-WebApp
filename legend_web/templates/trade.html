@@ -29,20 +29,25 @@
 
 <section class="card">
     <div class="chart-top">
-        <div class="section-title">Candle Chart</div>
-        <select id="chart-symbol-select" class="chart-tf">
-            {% for a in assets %}
-            <option value="{{ a.name }}">{{ a.name }}</option>
-            {% endfor %}
-        </select>
-        <select id="chart-tf" class="chart-tf">
-            <option value="60" selected>1m</option>
-            <option value="300">5m</option>
-            <option value="900">15m</option>
-            <option value="3600">1h</option>
-        </select>
+        <div class="chart-top-left">
+            <div class="section-title">Candle Chart</div>
+            <a id="open-chart-btn" class="chip chart-open-btn" href="/trade/chart">Открыть график</a>
+        </div>
+        <div class="chart-top-right">
+            <select id="chart-symbol-select" class="chart-tf">
+                {% for a in assets %}
+                <option value="{{ a.name }}">{{ a.name }}</option>
+                {% endfor %}
+            </select>
+            <select id="chart-tf" class="chart-tf">
+                <option value="60" selected>1m</option>
+                <option value="300">5m</option>
+                <option value="900">15m</option>
+                <option value="3600">1h</option>
+            </select>
+        </div>
     </div>
-    <div id="tv-chart" class="tv-chart"></div>
+    <div id="tv-chart" class="tv-chart tv-chart-preview" data-chart-mode="preview" data-limit="120"></div>
     <canvas id="candle-canvas" width="430" height="180" style="display:none;"></canvas>
 </section>
 

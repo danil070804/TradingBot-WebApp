@@ -22,6 +22,12 @@ from starlette.middleware.sessions import SessionMiddleware
 
 import bot
 import db_compat as db
+from binance_market import (
+    BinanceMarketService,
+    asset_to_binance_ticker,
+    calculate_trade_profit,
+    ticker_to_symbol,
+)
 
 try:
     import asyncpg
@@ -35,6 +41,7 @@ DEFAULT_TG_ID = int(os.getenv("WEBAPP_DEFAULT_TG_ID", "0"))
 ALLOW_DEFAULT_TG_FALLBACK = os.getenv("ALLOW_DEFAULT_TG_FALLBACK", "0") == "1"
 RUN_BOT = os.getenv("RUN_BOT", "1") == "1"
 BOT_MODE = os.getenv("BOT_MODE", "webhook").strip().lower()
+MARKET_DEV_FALLBACK = os.getenv("MARKET_DEV_FALLBACK", "0") == "1"
 POLLING_LOCK_KEY = int(os.getenv("BOT_POLLING_LOCK_KEY", "8598101146"))
 WEBHOOK_PATH = os.getenv("WEBHOOK_PATH", "/telegram/webhook")
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")
@@ -49,6 +56,8 @@ polling_task: asyncio.Task | None = None
 polling_lock_conn = None
 market_feed_task: asyncio.Task | None = None
 market_price_task: asyncio.Task | None = None
+MARKET_SERVICE = BinanceMarketService()
+ASSET_TICKER_MAP: dict[str, str] = {}
 MARKET_TAPE = deque(maxlen=120)
 ACTIVE_WEB_TRADES: dict[str, dict] = {}
 MARKET_BOOK_STATE: dict[str, dict] = {}
@@ -423,6 +432,16 @@ async def fetch_one(query: str, params: tuple = ()):
         return await cur.fetchone()
 
 
+async def refresh_asset_market_map() -> dict[str, str]:
+    rows = await fetch_all("SELECT name FROM ecn_assets ORDER BY id ASC")
+    names = [str(r["name"]) for r in rows if r and r["name"]]
+    mapping = {name: asset_to_binance_ticker(name) for name in names}
+    ASSET_TICKER_MAP.clear()
+    ASSET_TICKER_MAP.update(mapping)
+    await MARKET_SERVICE.configure_assets(names)
+    return mapping
+
+
 async def ensure_webapp_user(user_data: dict):
     tg_id = int(user_data["id"])
     first_name = user_data.get("first_name")
@@ -541,6 +560,41 @@ def symbol_from_asset_name(name: str) -> str:
     return (name[:5] if name else "UNKN").upper()
 
 
+def ticker_from_asset_name(name: str) -> str:
+    if name in ASSET_TICKER_MAP:
+        return ASSET_TICKER_MAP[name]
+    return asset_to_binance_ticker(name)
+
+
+def ticker_from_symbol_input(symbol_or_asset: str) -> str:
+    return MARKET_SERVICE.resolve_ticker(symbol_or_asset)
+
+
+def _format_price(price: float) -> float:
+    return round(float(price), 5 if float(price) < 1 else 2)
+
+
+async def fetch_live_mark_or_none(symbol_or_asset: str) -> float | None:
+    ticker = ticker_from_symbol_input(symbol_or_asset)
+    quote = MARKET_SERVICE.get_quote(ticker)
+    if quote and float(quote.get("mark") or 0) > 0:
+        return float(quote["mark"])
+    await MARKET_SERVICE.ensure_depth(ticker, levels=10, max_age=0)
+    quote = MARKET_SERVICE.get_quote(ticker)
+    if quote and float(quote.get("mark") or 0) > 0:
+        return float(quote["mark"])
+    if MARKET_DEV_FALLBACK:
+        legacy_symbol = symbol_from_asset_name(symbol_or_asset)
+        return float(next_symbol_price(legacy_symbol))
+    return None
+
+
+def current_tape_items(limit: int = 25) -> list[dict]:
+    if MARKET_SERVICE.tape:
+        return list(MARKET_SERVICE.tape)[:limit]
+    return list(MARKET_TAPE)[:limit]
+
+
 def next_symbol_price(symbol: str, ts: int | None = None) -> float:
     spec = ASSET_SPECS.get(symbol)
     if not spec:
@@ -580,21 +634,30 @@ def next_symbol_price(symbol: str, ts: int | None = None) -> float:
     return updated
 
 
-def generate_market_rows(assets) -> list[dict]:
+async def generate_market_rows(assets) -> list[dict]:
     rows = []
     for asset in assets:
-        symbol = symbol_from_asset_name(asset["name"])
-        price = next_symbol_price(symbol)
-        stats = MARKET_DAY_STATS.get(symbol) or {"open": price}
-        day_open = float(stats.get("open", price) or price)
-        day_change = round(((price - day_open) / day_open) * 100, 2) if day_open else 0.0
+        ticker = ticker_from_asset_name(asset["name"])
+        quote = MARKET_SERVICE.get_quote(ticker) or {}
+        if not quote:
+            await MARKET_SERVICE.ensure_depth(ticker, levels=10, max_age=0.0)
+            quote = MARKET_SERVICE.get_quote(ticker) or {}
+        price = float(quote.get("mark") or 0)
+        day_change = float(quote.get("day_change") or 0.0)
+        if price <= 0 and MARKET_DEV_FALLBACK:
+            legacy_symbol = symbol_from_asset_name(asset["name"])
+            price = next_symbol_price(legacy_symbol)
+            stats = MARKET_DAY_STATS.get(legacy_symbol) or {"open": price}
+            day_open = float(stats.get("open", price) or price)
+            day_change = round(((price - day_open) / day_open) * 100, 2) if day_open else 0.0
+        symbol = ticker_to_symbol(ticker)
         rows.append(
             {
                 "id": asset["id"],
                 "name": asset["name"],
                 "symbol": symbol,
-                "price": round(price, 2 if price >= 1 else 5),
-                "day_change": day_change,
+                "price": _format_price(price),
+                "day_change": round(day_change, 2),
             }
         )
     return rows
@@ -744,13 +807,16 @@ async def market_price_loop():
 async def lifespan(app: FastAPI):
     global polling_task, market_feed_task, market_price_task
     await bot.init_db()
-    for symbol in ASSET_SPECS.keys():
-        seed_symbol_history(symbol)
-    if not MARKET_TAPE:
-        for _ in range(30):
-            MARKET_TAPE.appendleft(generate_tape_tick())
-    market_feed_task = asyncio.create_task(market_feed_loop())
-    market_price_task = asyncio.create_task(market_price_loop())
+    await refresh_asset_market_map()
+    await MARKET_SERVICE.start()
+    if MARKET_DEV_FALLBACK:
+        for symbol in ASSET_SPECS.keys():
+            seed_symbol_history(symbol)
+        if not MARKET_TAPE:
+            for _ in range(30):
+                MARKET_TAPE.appendleft(generate_tape_tick())
+        market_feed_task = asyncio.create_task(market_feed_loop())
+        market_price_task = asyncio.create_task(market_price_loop())
     if RUN_BOT:
         me = await bot.bot.get_me()
         bot.BOT_USERNAME = me.username
@@ -783,10 +849,13 @@ async def lifespan(app: FastAPI):
         market_feed_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await market_feed_task
+        market_feed_task = None
     if market_price_task:
         market_price_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await market_price_task
+        market_price_task = None
+    await MARKET_SERVICE.stop()
     await release_polling_lock()
     await bot.bot.session.close()
 
@@ -845,7 +914,7 @@ async def home(request: Request):
     )
     stats = await bot.get_user_deal_stats(tg_id) if tg_id else {"wins": 0, "losses": 0, "total": 0, "total_profit": 0.0}
     assets = await fetch_all("SELECT id, name FROM ecn_assets ORDER BY id ASC")
-    markets = generate_market_rows(assets)
+    markets = await generate_market_rows(assets)
     return templates.TemplateResponse(
         "home.html",
         {
@@ -859,7 +928,7 @@ async def home(request: Request):
             "stats": stats,
             "markets": markets[:10],
             "deals": deals,
-            "tape": list(MARKET_TAPE)[:20],
+            "tape": current_tape_items(20),
         },
     )
 
@@ -871,14 +940,14 @@ async def markets(request: Request):
     assets = await fetch_all("SELECT id, name FROM ecn_assets ORDER BY id ASC")
     return templates.TemplateResponse(
         "markets.html",
-        {"request": request, "page": "markets", "title": "Legend Trading", "markets": generate_market_rows(assets), "lang": lang, "labels": labels},
+        {"request": request, "page": "markets", "title": "Legend Trading", "markets": await generate_market_rows(assets), "lang": lang, "labels": labels},
     )
 
 
 @app.get("/api/markets/live", response_class=JSONResponse)
 async def api_markets_live():
     assets = await fetch_all("SELECT id, name FROM ecn_assets ORDER BY id ASC LIMIT 200")
-    rows = generate_market_rows(assets)
+    rows = await generate_market_rows(assets)
     return JSONResponse({"ok": True, "items": rows})
 
 
@@ -886,7 +955,8 @@ async def api_markets_live():
 async def trade(request: Request):
     tg_id = await get_current_user_id(request)
     lang, labels = await get_request_lang_labels(request, tg_id)
-    assets = await fetch_all("SELECT id, name FROM ecn_assets ORDER BY id ASC")
+    raw_assets = await fetch_all("SELECT id, name FROM ecn_assets ORDER BY id ASC")
+    assets = [{"id": a["id"], "name": a["name"], "ticker": ticker_from_asset_name(a["name"])} for a in raw_assets]
     user = await fetch_one("SELECT balance, currency FROM users WHERE tg_id = ?", (tg_id,))
     return templates.TemplateResponse(
         "trade.html",
@@ -897,6 +967,30 @@ async def trade(request: Request):
             "tg_id": tg_id,
             "assets": assets,
             "user": user,
+            "lang": lang,
+            "labels": labels,
+        },
+    )
+
+
+@app.get("/trade/chart", response_class=HTMLResponse)
+async def trade_chart(request: Request):
+    tg_id = await get_current_user_id(request)
+    lang, labels = await get_request_lang_labels(request, tg_id)
+    raw_assets = await fetch_all("SELECT id, name FROM ecn_assets ORDER BY id ASC")
+    assets = [{"id": a["id"], "name": a["name"], "ticker": ticker_from_asset_name(a["name"])} for a in raw_assets]
+    selected = (request.query_params.get("symbol") or "").strip()
+    if not selected and assets:
+        selected = assets[0]["name"]
+    return templates.TemplateResponse(
+        "trade_chart.html",
+        {
+            "request": request,
+            "page": "trade",
+            "title": "Legend Trading Chart",
+            "tg_id": tg_id,
+            "assets": assets,
+            "selected_symbol": selected,
             "lang": lang,
             "labels": labels,
         },
@@ -949,7 +1043,7 @@ async def deals(request: Request):
     )
     return templates.TemplateResponse(
         "deals.html",
-        {"request": request, "page": "deals", "title": "Legend Trading", "deals": rows, "tg_id": tg_id, "lang": lang, "labels": labels, "tape": list(MARKET_TAPE)[:25]},
+        {"request": request, "page": "deals", "title": "Legend Trading", "deals": rows, "tg_id": tg_id, "lang": lang, "labels": labels, "tape": current_tape_items(25)},
     )
 
 
@@ -1198,6 +1292,7 @@ async def admin_add_asset(payload: AdminAssetPayload, request: Request):
     if len(name) < 2:
         return JSONResponse({"ok": False, "error": "Asset name too short"}, status_code=400)
     await bot.add_ecn_asset(name)
+    await refresh_asset_market_map()
     return JSONResponse({"ok": True, "name": name})
 
 
@@ -1246,10 +1341,13 @@ async def api_trade_open(
     if amount > balance:
         return JSONResponse({"ok": False, "error": "Недостаточно средств"}, status_code=400)
 
+    start_mark = await fetch_live_mark_or_none(asset_name)
+    if start_mark is None or start_mark <= 0:
+        return JSONResponse({"ok": False, "error": "Рынок временно недоступен"}, status_code=503)
+
     await bot.change_balance(tg_id, -amount)
-    symbol = symbol_from_asset_name(asset_name)
-    open_mark = next_symbol_price(symbol)
-    start_price = round(open_mark, 2 if open_mark >= 1 else 5)
+    ticker = ticker_from_asset_name(asset_name)
+    start_price = _format_price(start_mark)
     tp_percent = max(0.0, float(payload.tp_percent or 0.0))
     sl_percent = max(0.0, float(payload.sl_percent or 0.0))
     tp_price = None
@@ -1271,6 +1369,7 @@ async def api_trade_open(
         "status": "open",
         "tg_id": tg_id,
         "asset_name": asset_name,
+        "ticker": ticker,
         "direction": direction,
         "amount": amount,
         "seconds": int(seconds),
@@ -1484,25 +1583,38 @@ async def api_overview():
 
 @app.get("/api/market/tape", response_class=JSONResponse)
 async def api_market_tape():
-    return JSONResponse({"ok": True, "items": list(MARKET_TAPE)[:25]})
+    return JSONResponse({"ok": True, "items": current_tape_items(25)})
 
 
 @app.get("/api/market/snapshot", response_class=JSONResponse)
 async def api_market_snapshot(symbol: str = "BTC"):
-    sym = symbol_from_asset_name(symbol)
-    asks, bids, mark = build_orderbook(sym, levels=10)
-    spread = max(0.00001, asks[0]["price"] - bids[0]["price"])
-    day_stats = MARKET_DAY_STATS.get(sym, {"open": mark, "high": mark, "low": mark})
-    tick = MARKET_TAPE[0] if MARKET_TAPE else None
+    ticker = ticker_from_symbol_input(symbol)
+    await MARKET_SERVICE.ensure_depth(ticker, levels=10, max_age=2.0)
+    quote = MARKET_SERVICE.get_quote(ticker) or {}
+    asks, bids = MARKET_SERVICE.get_depth(ticker, levels=10)
+    mark = float(quote.get("mark") or 0)
+    spread = float(quote.get("spread") or 0)
+    day_high = float(quote.get("high") or mark)
+    day_low = float(quote.get("low") or mark)
+    if mark <= 0 and MARKET_DEV_FALLBACK:
+        legacy_symbol = symbol_from_asset_name(symbol)
+        asks, bids, legacy_mark = build_orderbook(legacy_symbol, levels=10)
+        spread = max(0.00001, asks[0]["price"] - bids[0]["price"])
+        day_stats = MARKET_DAY_STATS.get(legacy_symbol, {"open": legacy_mark, "high": legacy_mark, "low": legacy_mark})
+        mark = legacy_mark
+        day_high = float(day_stats["high"])
+        day_low = float(day_stats["low"])
+    tape_head = current_tape_items(1)
+    tick = tape_head[0] if tape_head else None
     return JSONResponse(
         {
             "ok": True,
-            "symbol": sym,
+            "symbol": ticker_to_symbol(ticker),
             "ts": int(time.time()),
-            "mark": round(mark, 2 if mark >= 1 else 5),
-            "spread": round(spread, 5 if mark < 1 else 2),
-            "high": round(day_stats["high"], 2 if day_stats["high"] >= 1 else 5),
-            "low": round(day_stats["low"], 2 if day_stats["low"] >= 1 else 5),
+            "mark": _format_price(mark),
+            "spread": round(float(spread), 5 if mark < 1 else 2),
+            "high": _format_price(day_high),
+            "low": _format_price(day_low),
             "asks": asks,
             "bids": bids,
             "tick": tick,
@@ -1511,16 +1623,20 @@ async def api_market_snapshot(symbol: str = "BTC"):
 
 
 @app.get("/api/market/candles", response_class=JSONResponse)
-async def api_market_candles(symbol: str = "BTC", tf: int = 30, limit: int = 80):
-    sym = symbol_from_asset_name(symbol)
-    candles = build_candles_from_history(sym, tf_sec=tf, limit=limit)
-    return JSONResponse({"ok": True, "symbol": sym, "tf": int(tf), "candles": candles})
+async def api_market_candles(symbol: str = "BTC", tf: int = 60, limit: int = 300):
+    ticker = ticker_from_symbol_input(symbol)
+    await MARKET_SERVICE.ensure_candles(ticker, tf_sec=tf, limit=limit)
+    candles = MARKET_SERVICE.get_candles(ticker, tf_sec=tf, limit=limit)
+    if not candles and MARKET_DEV_FALLBACK:
+        sym = symbol_from_asset_name(symbol)
+        candles = build_candles_from_history(sym, tf_sec=tf, limit=limit)
+    return JSONResponse({"ok": True, "symbol": ticker, "tf": int(tf), "candles": candles})
 
 
 @app.websocket("/ws/market")
 async def ws_market(websocket: WebSocket):
     await websocket.accept()
-    symbol = "BTC"
+    symbol = "BTCUSDT"
     try:
         while True:
             try:
@@ -1529,29 +1645,42 @@ async def ws_market(websocket: WebSocket):
                 if isinstance(payload, dict) and payload.get("type") == "subscribe":
                     incoming = str(payload.get("symbol") or "").strip()
                     if incoming:
-                        symbol = symbol_from_asset_name(incoming)
+                        symbol = ticker_from_symbol_input(incoming)
             except asyncio.TimeoutError:
                 pass
 
-            asks, bids, mark = build_orderbook(symbol, levels=10)
-            tick = MARKET_TAPE[0] if MARKET_TAPE else None
-            spread = max(0.00001, asks[0]["price"] - bids[0]["price"])
-            day_stats = MARKET_DAY_STATS.get(symbol, {"open": mark, "high": mark, "low": mark})
+            await MARKET_SERVICE.ensure_depth(symbol, levels=10, max_age=2.5)
+            quote = MARKET_SERVICE.get_quote(symbol) or {}
+            asks, bids = MARKET_SERVICE.get_depth(symbol, levels=10)
+            mark = float(quote.get("mark") or 0)
+            spread = float(quote.get("spread") or 0)
+            day_high = float(quote.get("high") or mark)
+            day_low = float(quote.get("low") or mark)
+            if mark <= 0 and MARKET_DEV_FALLBACK:
+                legacy_symbol = symbol_from_asset_name(symbol)
+                asks, bids, legacy_mark = build_orderbook(legacy_symbol, levels=10)
+                spread = max(0.00001, asks[0]["price"] - bids[0]["price"])
+                day_stats = MARKET_DAY_STATS.get(legacy_symbol, {"open": legacy_mark, "high": legacy_mark, "low": legacy_mark})
+                mark = legacy_mark
+                day_high = float(day_stats["high"])
+                day_low = float(day_stats["low"])
+            tape_head = current_tape_items(1)
+            tick = tape_head[0] if tape_head else None
             await websocket.send_json(
                 {
                     "type": "market",
-                    "symbol": symbol,
+                    "symbol": ticker_to_symbol(symbol),
                     "ts": int(time.time()),
-                    "mark": round(mark, 2 if mark >= 1 else 5),
-                    "spread": round(spread, 5 if mark < 1 else 2),
-                    "high": round(day_stats["high"], 2 if day_stats["high"] >= 1 else 5),
-                    "low": round(day_stats["low"], 2 if day_stats["low"] >= 1 else 5),
+                    "mark": _format_price(mark),
+                    "spread": round(float(spread), 5 if mark < 1 else 2),
+                    "high": _format_price(day_high),
+                    "low": _format_price(day_low),
                     "asks": asks,
                     "bids": bids,
                     "tick": tick,
                 }
             )
-            await asyncio.sleep(2.2)
+            await asyncio.sleep(1.0)
     except WebSocketDisconnect:
         return
 
@@ -1569,8 +1698,13 @@ async def settle_web_trade(trade_id: str) -> dict | None:
     start_price = trade["start_price"]
     asset_name = trade["asset_name"]
     seconds = trade["seconds"]
-    symbol = symbol_from_asset_name(asset_name)
-    live_mark = next_symbol_price(symbol)
+    ticker = trade.get("ticker") or ticker_from_asset_name(asset_name)
+    live_mark = await fetch_live_mark_or_none(ticker)
+    if live_mark is None or live_mark <= 0:
+        if MARKET_DEV_FALLBACK:
+            live_mark = next_symbol_price(symbol_from_asset_name(asset_name))
+        else:
+            live_mark = start_price
 
     now_ts = time.time()
 
@@ -1585,8 +1719,6 @@ async def settle_web_trade(trade_id: str) -> dict | None:
     if now_ts < float(trade.get("close_ts", now_ts)):
         return trade
 
-    raw_move = (live_mark - start_price) / max(start_price, 0.00001)
-    change_percent = abs(raw_move) * 100.0
     if trade.get("close_reason") == "tp":
         end_price = float(trade["tp_price"])
     elif trade.get("close_reason") == "sl":
@@ -1594,17 +1726,18 @@ async def settle_web_trade(trade_id: str) -> dict | None:
     else:
         end_price = float(live_mark)
 
-    move = (end_price - start_price) / max(start_price, 0.00001)
-    signed_move = move if direction == "up" else -move
-    gross_profit = amount * signed_move * max(1, leverage)
-    max_profit = amount * 1.2
-    max_loss = amount
-    profit = max(-max_loss, min(max_profit, gross_profit))
+    profit = calculate_trade_profit(
+        amount=float(amount),
+        leverage=int(leverage),
+        direction=direction,
+        start_price=float(start_price),
+        end_price=float(end_price),
+    )
     is_win = profit > 0
     credit = max(0.0, amount + profit)
     if credit > 0:
         await bot.change_balance(tg_id, credit)
-    change_percent = abs(move) * 100.0
+    change_percent = abs((end_price - start_price) / max(start_price, 0.00001)) * 100.0
 
     await bot.save_deal(
         user_tg_id=tg_id,
