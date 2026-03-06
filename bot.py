@@ -1745,7 +1745,7 @@ async def on_pay_crypto(callback: CallbackQuery, state: FSMContext):
     text = (
         f"💎 {tr(lang, 'Способ оплаты', 'Payment method', 'Спосіб оплати')}: <b>Crypto bot</b>\n\n"
         f"{tr(lang, 'Сумма к оплате', 'Amount to pay', 'Сума до оплати')}: <b>{amount:.2f} {currency}</b>.\n\n"
-        f"{tr(lang, 'Перейдите по ссылке для оплаты, затем нажмите «✅Проверить оплату».', 'Open payment link, then tap \"✅Check payment\".', 'Перейдіть за посиланням для оплати, потім натисніть \"✅Перевірити оплату\".')}"
+        f"{tr(lang, 'Перейдите по ссылке для оплаты, затем нажмите «✅Проверить оплату».', 'Open payment link, then tap ✅Check payment.', 'Перейдіть за посиланням для оплати, потім натисніть ✅Перевірити оплату.')}"
     )
     await callback.message.answer(text, reply_markup=crypto_payment_keyboard())
     await callback.answer()

@@ -59,8 +59,10 @@ market_price_task: asyncio.Task | None = None
 MARKET_SERVICE = BinanceMarketService()
 ASSET_TICKER_MAP: dict[str, str] = {}
 MARKET_TAPE = deque(maxlen=120)
+MARKET_TAPE_NEXT_TS = 0.0
 ACTIVE_WEB_TRADES: dict[str, dict] = {}
 MARKET_BOOK_STATE: dict[str, dict] = {}
+MARKET_HISTORY_MAXLEN = 12000
 ASSET_SPECS = {
     "BTC": {"name": "Bitcoin", "start": 64000.0, "vol": 0.004, "qty_min": 0.01, "qty_max": 2.4},
     "ETH": {"name": "Ethereum", "start": 3400.0, "vol": 0.005, "qty_min": 0.03, "qty_max": 12.0},
@@ -80,7 +82,7 @@ MARKET_PRICE_STATE = {k: v["start"] for k, v in ASSET_SPECS.items()}
 MARKET_DAY_STATS = {k: {"open": v["start"], "high": v["start"], "low": v["start"]} for k, v in ASSET_SPECS.items()}
 MARKET_MOMENTUM_STATE = {k: 0.0 for k in ASSET_SPECS.keys()}
 MARKET_REGIME_STATE = {k: {"drift": 0.0, "until": 0} for k in ASSET_SPECS.keys()}
-MARKET_PRICE_HISTORY = {k: deque(maxlen=6000) for k in ASSET_SPECS.keys()}
+MARKET_PRICE_HISTORY = {k: deque(maxlen=MARKET_HISTORY_MAXLEN) for k in ASSET_SPECS.keys()}
 
 WEB_I18N = {
     "ru": {
@@ -598,6 +600,35 @@ async def fetch_live_mark_or_none(symbol_or_asset: str) -> float | None:
 def current_tape_items(limit: int = 25) -> list[dict]:
     if MARKET_SERVICE.tape:
         return list(MARKET_SERVICE.tape)[:limit]
+    if MARKET_SERVICE.quote_cache:
+        out = []
+        now_ts = int(time.time())
+        for ticker, quote in list(MARKET_SERVICE.quote_cache.items())[:limit]:
+            mark = float(quote.get("mark") or 0.0)
+            if mark <= 0:
+                continue
+            spread = float(quote.get("spread") or 0.0)
+            out.append(
+                {
+                    "symbol": ticker_to_symbol(ticker),
+                    "price": _format_price(mark),
+                    "qty": round(max(0.001, spread * 10.0), 4),
+                    "side": "buy" if float(quote.get("day_change") or 0.0) >= 0 else "sell",
+                    "ts": now_ts,
+                }
+            )
+        if out:
+            return out[:limit]
+    global MARKET_TAPE_NEXT_TS
+    if not MARKET_TAPE:
+        for _ in range(max(8, min(20, limit))):
+            MARKET_TAPE.appendleft(generate_tape_tick())
+        MARKET_TAPE_NEXT_TS = time.time() + random.choice([10, 15, 20])
+    elif time.time() >= MARKET_TAPE_NEXT_TS:
+        batch = 1 if random.random() < 0.72 else 2
+        for _ in range(batch):
+            MARKET_TAPE.appendleft(generate_tape_tick())
+        MARKET_TAPE_NEXT_TS = time.time() + random.choice([10, 15, 20])
     return list(MARKET_TAPE)[:limit]
 
 
@@ -632,7 +663,7 @@ def next_symbol_price(symbol: str, ts: int | None = None) -> float:
     stats = MARKET_DAY_STATS.setdefault(symbol, {"open": updated, "high": updated, "low": updated})
     stats["high"] = max(stats["high"], updated)
     stats["low"] = min(stats["low"], updated)
-    hist = MARKET_PRICE_HISTORY.setdefault(symbol, deque(maxlen=6000))
+    hist = MARKET_PRICE_HISTORY.setdefault(symbol, deque(maxlen=MARKET_HISTORY_MAXLEN))
     if hist and hist[-1]["t"] == tick_ts:
         hist[-1]["p"] = updated
     elif not hist or tick_ts > hist[-1]["t"]:
@@ -680,6 +711,7 @@ def generate_tape_tick() -> dict:
         "price": round(price, 2 if price >= 1 else 5),
         "qty": qty,
         "side": side,
+        "ts": int(time.time()),
     }
 
 
@@ -718,13 +750,17 @@ def build_orderbook(symbol: str, levels: int = 10) -> tuple[list[dict], list[dic
     return asks, bids, mark
 
 
-def seed_symbol_history(symbol: str, points: int = 5800, step_sec: int = 5):
+def seed_symbol_history(symbol: str, points: int = 5800, step_sec: int = 5, force: bool = False):
     spec = ASSET_SPECS.get(symbol, {"start": MARKET_PRICE_STATE.get(symbol, 100.0), "vol": 0.006})
-    start = float(spec["start"])
+    start = float(MARKET_PRICE_STATE.get(symbol, spec["start"]))
     vol = float(spec.get("vol", 0.006))
-    hist = MARKET_PRICE_HISTORY.setdefault(symbol, deque(maxlen=6000))
-    if hist:
+    hist = MARKET_PRICE_HISTORY.setdefault(symbol, deque(maxlen=MARKET_HISTORY_MAXLEN))
+    if hist and not force:
         return
+    if force:
+        hist.clear()
+    points = max(300, min(MARKET_HISTORY_MAXLEN, int(points)))
+    step_sec = max(2, int(step_sec))
     now = int(time.time())
     ts = now - points * step_sec
     price = start
@@ -746,19 +782,17 @@ def seed_symbol_history(symbol: str, points: int = 5800, step_sec: int = 5):
 
 def build_candles_from_history(symbol: str, tf_sec: int, limit: int = 80) -> list[dict]:
     tf = max(5, int(tf_sec))
-    n = max(20, min(240, int(limit)))
+    n = max(20, min(300, int(limit)))
     history = MARKET_PRICE_HISTORY.get(symbol)
-    if not history:
-        seed_symbol_history(symbol)
+    required_span = tf * (n + 6)
+    min_points = max(1200, min(MARKET_HISTORY_MAXLEN, (required_span // 5) + 240))
+    if not history or len(history) < min_points:
+        seed_symbol_history(symbol, points=min_points, step_sec=5, force=True)
         history = MARKET_PRICE_HISTORY.get(symbol)
     if not history:
         return []
 
-    now = int(time.time())
-    lookback_from = now - tf * (n + 6)
-    recent = [p for p in history if int(p["t"]) >= lookback_from]
-    if len(recent) < 10:
-        recent = list(history)
+    recent = list(history)
 
     buckets: dict[int, dict] = {}
     for item in recent:
@@ -777,6 +811,23 @@ def build_candles_from_history(symbol: str, tf_sec: int, limit: int = 80) -> lis
     ordered = [buckets[k] for k in sorted(buckets.keys())]
     if not ordered:
         return []
+
+    if len(ordered) < n:
+        missing = n - len(ordered)
+        spec = ASSET_SPECS.get(symbol, {"vol": 0.006})
+        vol = max(0.001, float(spec.get("vol", 0.006)))
+        first = ordered[0]
+        price = float(first["o"])
+        prefix = []
+        for idx in range(missing, 0, -1):
+            ts = int(first["t"]) - tf * idx
+            close = max(0.00001, price * (1 + random.uniform(-vol * 1.6, vol * 1.6)))
+            high = max(price, close) * (1 + abs(random.uniform(0.0, vol * 0.9)))
+            low = max(0.00001, min(price, close) * (1 - abs(random.uniform(0.0, vol * 0.9))))
+            prefix.append({"t": ts, "o": price, "h": high, "l": low, "c": close, "v": abs(close - price) * 900.0})
+            price = close
+        ordered = prefix + ordered
+
     out = ordered[-n:]
     return [
         {
@@ -1633,9 +1684,11 @@ async def api_market_candles(symbol: str = "BTC", tf: int = 60, limit: int = 300
     ticker = ticker_from_symbol_input(symbol)
     await MARKET_SERVICE.ensure_candles(ticker, tf_sec=tf, limit=limit)
     candles = MARKET_SERVICE.get_candles(ticker, tf_sec=tf, limit=limit)
-    if not candles:
+    if not candles or len(candles) < max(20, min(int(limit), 300) // 3):
         sym = legacy_symbol_from_symbol_or_ticker(symbol)
-        candles = build_candles_from_history(sym, tf_sec=tf, limit=limit)
+        fallback = build_candles_from_history(sym, tf_sec=tf, limit=limit)
+        if fallback:
+            candles = fallback
     return JSONResponse({"ok": True, "symbol": ticker, "tf": int(tf), "candles": candles})
 
 

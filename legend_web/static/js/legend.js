@@ -337,6 +337,10 @@ function bindMarketSocket() {
     const chartSymbolSelect = document.getElementById("chart-symbol-select");
     const tvChartEl = document.getElementById("tv-chart");
     const openChartBtn = document.getElementById("open-chart-btn");
+    const liveDot = document.getElementById("market-live-dot");
+    const liveText = document.getElementById("market-live-text");
+    const flowText = document.getElementById("market-flow");
+    const participantsText = document.getElementById("market-participants");
     const canvas = document.getElementById("candle-canvas");
     const tfSelect = document.getElementById("chart-tf");
     if (!asksWrap || !bidsWrap || !markEl || !pairSelect) return;
@@ -347,6 +351,7 @@ function bindMarketSocket() {
     }
     state.lastBar = null;
     const chartLimit = Number((tvChartEl && tvChartEl.dataset.limit) || 300);
+    const maxBars = Math.max(120, chartLimit || 120);
     let liveLockEnabled = true;
     let crosshairEnabled = true;
     if (chartSymbolSelect && pairSelect && !chartSymbolSelect.value) {
@@ -466,7 +471,7 @@ function bindMarketSocket() {
                 volume: Math.max(1, Math.abs(mark - prev.close) * 1000),
             };
             state.candles.push(state.lastBar);
-            if (state.candles.length > 120) state.candles.shift();
+            if (state.candles.length > maxBars) state.candles.shift();
         } else {
             prev.high = Math.max(prev.high, mark);
             prev.low = Math.min(prev.low, mark);
@@ -586,6 +591,22 @@ function bindMarketSocket() {
     let lastCandleUpdateMs = 0;
     let lastBookUpdateMs = 0;
     let lastHistorySyncMs = 0;
+    let lastMarketMessageMs = 0;
+
+    const setFeedState = (live) => {
+        if (liveDot) liveDot.classList.toggle("live", !!live);
+        if (liveText) liveText.textContent = live ? "Market Feed: live" : "Market Feed: reconnecting";
+    };
+
+    const updateActivityFromTape = (items) => {
+        if (!Array.isArray(items) || !items.length) return;
+        const nowSec = Math.floor(Date.now() / 1000);
+        const inMin = items.filter((x) => Math.abs(nowSec - Number(x.ts || nowSec)) <= 60);
+        const tpm = inMin.length || Math.min(20, items.length);
+        const symbols = new Set(items.map((x) => String(x.symbol || "").toUpperCase()).filter(Boolean)).size;
+        if (flowText) flowText.textContent = `${tpm} trades/min`;
+        if (participantsText) participantsText.textContent = `${symbols} symbols active`;
+    };
 
     const ensureBookRows = (wrap, type, count) => {
         while (wrap.children.length < count) {
@@ -620,6 +641,8 @@ function bindMarketSocket() {
     };
 
     const applyMarketData = (data) => {
+        lastMarketMessageMs = Date.now();
+        setFeedState(true);
         markEl.textContent = data.mark;
         updateMarketStats(data);
         const nowMs = Date.now();
@@ -654,9 +677,24 @@ function bindMarketSocket() {
         }, 4200);
     };
 
+    const bootstrapSnapshot = async () => {
+        try {
+            const sym = encodeURIComponent(getActiveSymbol());
+            const resp = await fetch(`/api/market/snapshot?symbol=${sym}`);
+            if (!resp.ok) return;
+            const data = await resp.json();
+            if (data.ok) applyMarketData(data);
+        } catch (_) {
+            // no-op
+        }
+    };
+
     ws.addEventListener("open", () => {
         subscribe();
+        setFeedState(true);
+        lastMarketMessageMs = Date.now();
         primeCandleHistory();
+        bootstrapSnapshot();
         if (fallbackTimer) {
             clearInterval(fallbackTimer);
             fallbackTimer = null;
@@ -688,13 +726,28 @@ function bindMarketSocket() {
     });
 
     ws.addEventListener("close", () => {
+        setFeedState(false);
         startFallback();
         setTimeout(bindMarketSocket, 1200);
     });
 
     ws.addEventListener("error", () => {
+        setFeedState(false);
         startFallback();
     });
+
+    // If WS is open but silent for too long, automatically rely on snapshot polling.
+    setInterval(() => {
+        if (!lastMarketMessageMs) return;
+        if (Date.now() - lastMarketMessageMs > 9000) {
+            setFeedState(false);
+            startFallback();
+        }
+    }, 2500);
+
+    // Always seed first values quickly.
+    bootstrapSnapshot();
+    setFeedState(false);
 }
 
 function bindUserSocket() {
@@ -944,6 +997,16 @@ function renderTape(items) {
     });
     if (pulse) {
         pulse.innerHTML = pulseItems.concat(pulseItems).join("");
+    }
+    const flowText = document.getElementById("market-flow");
+    const participantsText = document.getElementById("market-participants");
+    if (Array.isArray(items) && items.length) {
+        const nowSec = Math.floor(Date.now() / 1000);
+        const inMin = items.filter((x) => Math.abs(nowSec - Number(x.ts || nowSec)) <= 60);
+        const tpm = inMin.length || Math.min(20, items.length);
+        const symbols = new Set(items.map((x) => String(x.symbol || "").toUpperCase()).filter(Boolean)).size;
+        if (flowText) flowText.textContent = `${tpm} trades/min`;
+        if (participantsText) participantsText.textContent = `${symbols} symbols active`;
     }
 }
 

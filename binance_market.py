@@ -245,6 +245,7 @@ class BinanceMarketService:
             "price": round(price, 5 if price < 1 else 2),
             "qty": round(qty, 4),
             "side": side,
+            "ts": int(payload.get("T") or time.time() * 1000) // 1000,
         }
         self.tape.appendleft(trade)
         quote = self.quote_cache.get(ticker, {})

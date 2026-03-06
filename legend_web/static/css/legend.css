@@ -175,6 +175,33 @@ body {
 .balance { margin-top: 4px; font-size: 34px; font-weight: 800; color: var(--green); }
 .hint { margin-top: 8px; color: var(--muted); font-size: 12px; }
 
+.activity-strip {
+    margin-top: 8px;
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border-radius: 9px;
+    border: 1px solid rgba(143, 255, 79, 0.18);
+    background: linear-gradient(90deg, rgba(8, 14, 20, 0.9), rgba(7, 18, 14, 0.9));
+    font-size: 11px;
+    color: #c8d5e4;
+}
+
+.activity-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #ff6f6f;
+    box-shadow: 0 0 10px rgba(255, 111, 111, 0.65);
+}
+
+.activity-dot.live {
+    background: #7dff85;
+    box-shadow: 0 0 10px rgba(125, 255, 133, 0.72);
+}
+
 .hero {
     position: relative;
     overflow: hidden;
