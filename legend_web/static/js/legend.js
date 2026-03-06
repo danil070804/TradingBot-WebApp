@@ -73,6 +73,58 @@ function bindExchangeForm() {
     });
 }
 
+async function initTelegramAuth() {
+    if (!window.Telegram || !window.Telegram.WebApp) return;
+    const wa = window.Telegram.WebApp;
+    wa.ready();
+    wa.expand();
+    if (!wa.initData) return;
+    try {
+        const resp = await fetch("/api/auth/telegram", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ init_data: wa.initData }),
+        });
+        const data = await resp.json();
+        if (resp.ok && data.ok && !sessionStorage.getItem("tg_auth_done")) {
+            sessionStorage.setItem("tg_auth_done", "1");
+            location.reload();
+        }
+    } catch (_) {
+        // no-op
+    }
+}
+
+function bindDepositForm() {
+    const form = document.getElementById("deposit-form");
+    const result = document.getElementById("deposit-result");
+    if (!form || !result) return;
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        result.textContent = "Отправляем заявку...";
+        const body = Object.fromEntries(new FormData(form).entries());
+        body.tg_id = Number(body.tg_id);
+        body.amount = Number(body.amount);
+        try {
+            const resp = await fetch("/api/deposit/request", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+            });
+            const data = await resp.json();
+            if (!resp.ok || !data.ok) {
+                result.innerHTML = `<span class="neg">Ошибка: ${data.error || "не удалось отправить"}</span>`;
+                return;
+            }
+            result.innerHTML = `<span class="pos">Заявка #${data.deposit_id} отправлена админу</span>`;
+        } catch (_) {
+            result.innerHTML = `<span class="neg">Сетевая ошибка</span>`;
+        }
+    });
+}
+
+initTelegramAuth();
 bindDirectionButtons();
 bindTradeForm();
 bindExchangeForm();
+bindDepositForm();

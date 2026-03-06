@@ -2,6 +2,10 @@ import asyncio
 import os
 import random
 import contextlib
+import json
+import hmac
+import hashlib
+from urllib.parse import parse_qsl
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -33,6 +37,7 @@ WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")
 SESSION_SECRET = os.getenv("SESSION_SECRET", WEBHOOK_SECRET or "legend_trading_session_secret")
 ADMIN_WEB_USERNAME = os.getenv("ADMIN_WEB_USERNAME", "admin")
 ADMIN_WEB_PASSWORD = os.getenv("ADMIN_WEB_PASSWORD", "")
+USER_SESSION_KEY = "tg_user_id"
 
 
 polling_task: asyncio.Task | None = None
@@ -117,6 +122,31 @@ async def get_or_pick_user_id() -> int:
     return int(row["tg_id"]) if row else 0
 
 
+async def get_current_user_id(request: Request) -> int:
+    from_session = request.session.get(USER_SESSION_KEY)
+    if from_session:
+        return int(from_session)
+    return await get_or_pick_user_id()
+
+
+def validate_telegram_init_data(init_data: str, bot_token: str) -> dict | None:
+    if not init_data or not bot_token:
+        return None
+    pairs = dict(parse_qsl(init_data, strict_parsing=True))
+    incoming_hash = pairs.pop("hash", None)
+    if not incoming_hash:
+        return None
+    data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(pairs.items()))
+    secret_key = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
+    calculated = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+    if calculated != incoming_hash:
+        return None
+    user_raw = pairs.get("user")
+    if not user_raw:
+        return None
+    return json.loads(user_raw)
+
+
 def generate_market_rows(assets) -> list[dict]:
     rows = []
     for asset in assets:
@@ -188,9 +218,22 @@ async def telegram_webhook(request: Request):
     return JSONResponse({"ok": True})
 
 
+class TelegramAuthPayload(BaseModel):
+    init_data: str
+
+
+@app.post("/api/auth/telegram", response_class=JSONResponse)
+async def telegram_auth(payload: TelegramAuthPayload, request: Request):
+    user = validate_telegram_init_data(payload.init_data, bot.config.bot_token)
+    if not user:
+        return JSONResponse({"ok": False, "error": "Invalid initData"}, status_code=401)
+    request.session[USER_SESSION_KEY] = int(user["id"])
+    return JSONResponse({"ok": True, "tg_id": int(user["id"])})
+
+
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    tg_id = await get_or_pick_user_id()
+    tg_id = await get_current_user_id(request)
     user = await fetch_one("SELECT * FROM users WHERE tg_id = ?", (tg_id,))
     deals = await fetch_all(
         "SELECT id, asset_name, direction, amount, currency, is_win, profit, created_at FROM deals WHERE user_tg_id = ? ORDER BY id DESC LIMIT 5",
@@ -225,7 +268,7 @@ async def markets(request: Request):
 
 @app.get("/trade", response_class=HTMLResponse)
 async def trade(request: Request):
-    tg_id = await get_or_pick_user_id()
+    tg_id = await get_current_user_id(request)
     assets = await fetch_all("SELECT id, name FROM ecn_assets ORDER BY id ASC")
     user = await fetch_one("SELECT balance, currency FROM users WHERE tg_id = ?", (tg_id,))
     return templates.TemplateResponse(
@@ -243,7 +286,7 @@ async def trade(request: Request):
 
 @app.get("/exchange", response_class=HTMLResponse)
 async def exchange(request: Request):
-    tg_id = await get_or_pick_user_id()
+    tg_id = await get_current_user_id(request)
     user = await fetch_one("SELECT balance, currency FROM users WHERE tg_id = ?", (tg_id,))
     return templates.TemplateResponse(
         "exchange.html",
@@ -251,9 +294,29 @@ async def exchange(request: Request):
     )
 
 
+@app.get("/deposit", response_class=HTMLResponse)
+async def deposit_page(request: Request):
+    tg_id = await get_current_user_id(request)
+    user = await fetch_one("SELECT balance, currency FROM users WHERE tg_id = ?", (tg_id,))
+    return templates.TemplateResponse(
+        "deposit.html",
+        {
+            "request": request,
+            "page": "deposit",
+            "title": "Legend Trading",
+            "tg_id": tg_id,
+            "user": user,
+            "crypto_url": bot.config.crypto_bot_url,
+            "trc20_address": bot.config.trc20_address,
+            "card_pay_url": bot.config.card_pay_url,
+            "card_requisites": bot.config.card_requisites,
+        },
+    )
+
+
 @app.get("/deals", response_class=HTMLResponse)
 async def deals(request: Request):
-    tg_id = await get_or_pick_user_id()
+    tg_id = await get_current_user_id(request)
     rows = await fetch_all(
         "SELECT id, asset_name, direction, amount, currency, is_win, profit, created_at FROM deals WHERE user_tg_id = ? ORDER BY id DESC LIMIT 200",
         (tg_id,),
@@ -266,7 +329,7 @@ async def deals(request: Request):
 
 @app.get("/profile", response_class=HTMLResponse)
 async def profile_page(request: Request):
-    tg_id = await get_or_pick_user_id()
+    tg_id = await get_current_user_id(request)
     user = await fetch_one(
         "SELECT tg_id, first_name, username, language, currency, balance, created_at FROM users WHERE tg_id = ?",
         (tg_id,),
@@ -472,6 +535,51 @@ async def api_exchange(
     rate = random.uniform(0.8, 1.2)
     received = round(amount * rate, 4)
     return JSONResponse({"ok": True, "rate": round(rate, 4), "received": received, "tg_id": tg_id, "from": from_currency, "to": to_currency})
+
+
+class DepositRequestPayload(BaseModel):
+    tg_id: int
+    amount: float
+    method: str  # crypto | trc20 | card
+
+
+@app.post("/api/deposit/request", response_class=JSONResponse)
+async def api_deposit_request(payload: DepositRequestPayload):
+    user = await fetch_one("SELECT currency, first_name, username FROM users WHERE tg_id = ?", (payload.tg_id,))
+    if not user:
+        return JSONResponse({"ok": False, "error": "Пользователь не найден"}, status_code=404)
+    if payload.amount <= 0:
+        return JSONResponse({"ok": False, "error": "Сумма должна быть больше 0"}, status_code=400)
+
+    currency = user["currency"] or "USD"
+    method = payload.method.strip().lower()
+    if method not in {"crypto", "trc20", "card"}:
+        return JSONResponse({"ok": False, "error": "Неподдерживаемый метод"}, status_code=400)
+
+    dep_id = await bot.create_deposit_request(payload.tg_id, payload.amount, currency, method)
+    worker_id = await bot.get_worker_for_client(payload.tg_id)
+    worker_info_line = f"Реферал воркера: <code>{worker_id}</code>\n" if worker_id else "Реферал воркера: нет данных\n"
+    method_label = {"crypto": "Crypto bot", "trc20": "TRC20 USDT", "card": "Банковская карта"}[method]
+    text_admin = (
+        "🔔 <b>Заявка на проверку оплаты (WebApp)</b>\n\n"
+        f"ID заявки: <b>{dep_id}</b>\n"
+        f"Пользователь ID: <code>{payload.tg_id}</code>\n"
+        f"Сумма: {payload.amount:.2f} {currency}\n"
+        f"Метод: {method_label}\n"
+        f"{worker_info_line}"
+    )
+
+    for admin_id in bot.config.admin_ids:
+        try:
+            await bot.bot.send_message(
+                admin_id,
+                text_admin,
+                reply_markup=bot.admin_deposit_check_keyboard(dep_id),
+            )
+        except Exception:
+            pass
+
+    return JSONResponse({"ok": True, "deposit_id": dep_id})
 
 
 @app.get("/api/overview", response_class=JSONResponse)

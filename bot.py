@@ -262,6 +262,28 @@ async def init_db():
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP
             )"""
     )
+    deposit_requests_ddl = (
+        """CREATE TABLE IF NOT EXISTS deposit_requests(
+                id BIGSERIAL PRIMARY KEY,
+                user_tg_id BIGINT,
+                amount DOUBLE PRECISION,
+                currency TEXT,
+                method TEXT,
+                status TEXT DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )"""
+        if is_pg
+        else
+        """CREATE TABLE IF NOT EXISTS deposit_requests(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_tg_id INTEGER,
+                amount REAL,
+                currency TEXT,
+                method TEXT,
+                status TEXT DEFAULT 'pending',
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )"""
+    )
     worker_clients_ddl = (
         """CREATE TABLE IF NOT EXISTS worker_clients(
                 id BIGSERIAL PRIMARY KEY,
@@ -368,6 +390,7 @@ async def init_db():
         await db.execute(referrals_ddl)
 
         await db.execute(withdrawals_ddl)
+        await db.execute(deposit_requests_ddl)
 
         await db.execute(
             """CREATE TABLE IF NOT EXISTS settings(
@@ -601,6 +624,29 @@ async def create_withdrawal(user_tg_id: int, amount: float, currency: str, metho
         )
         await db.commit()
         return cur.lastrowid
+
+
+async def create_deposit_request(user_tg_id: int, amount: float, currency: str, method: str) -> int:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "INSERT INTO deposit_requests(user_tg_id, amount, currency, method, status) VALUES (?, ?, ?, ?, 'pending')",
+            (user_tg_id, amount, currency, method),
+        )
+        await db.commit()
+        return cur.lastrowid
+
+
+async def get_deposit_request(dep_id: int) -> Optional[aiosqlite.Row]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute("SELECT * FROM deposit_requests WHERE id = ?", (dep_id,))
+        return await cur.fetchone()
+
+
+async def set_deposit_request_status(dep_id: int, status: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("UPDATE deposit_requests SET status = ? WHERE id = ?", (status, dep_id))
+        await db.commit()
 
 
 async def get_user_pending_withdraw_sum(user_tg_id: int) -> float:
@@ -945,15 +991,15 @@ def card_payment_keyboard():
     return kb.as_markup()
 
 
-def admin_deposit_check_keyboard(user_id: int, amount: float, currency: str):
+def admin_deposit_check_keyboard(dep_id: int):
     kb = InlineKeyboardBuilder()
     kb.button(
         text="✅ Подтвердить оплату",
-        callback_data=f"admin_dep_confirm:{user_id}:{amount}:{currency}",
+        callback_data=f"admin_dep_confirm:{dep_id}",
     )
     kb.button(
         text="❌ Отклонить оплату",
-        callback_data=f"admin_dep_reject:{user_id}:{amount}:{currency}",
+        callback_data=f"admin_dep_reject:{dep_id}",
     )
     kb.adjust(2)
     return kb.as_markup()
@@ -1644,8 +1690,10 @@ async def on_check_payment(callback: CallbackQuery, state: FSMContext):
     else:
         worker_info_line = "Реферал воркера: нет данных\n"
 
+    dep_id = await create_deposit_request(callback.from_user.id, amount, currency, "crypto")
     text_admin = (
         "🔔 <b>Заявка на проверку оплаты</b>\n\n"
+        f"ID заявки: <b>{dep_id}</b>\n"
         f"Пользователь: <a href='tg://user?id={callback.from_user.id}'>{callback.from_user.full_name}</a>\n"
         f"ID: <code>{callback.from_user.id}</code>\n"
         f"Сумма: {amount:.2f} {currency}\n"
@@ -1657,7 +1705,7 @@ async def on_check_payment(callback: CallbackQuery, state: FSMContext):
             await bot.send_message(
                 admin_id,
                 text_admin,
-                reply_markup=admin_deposit_check_keyboard(callback.from_user.id, amount, currency),
+                reply_markup=admin_deposit_check_keyboard(dep_id),
             )
         except Exception:
             pass
@@ -1688,8 +1736,10 @@ async def on_check_payment_card(callback: CallbackQuery, state: FSMContext):
 
     worker_id = await get_worker_for_client(callback.from_user.id)
     worker_info_line = f"Реферал воркера: <code>{worker_id}</code>\n" if worker_id else "Реферал воркера: нет данных\n"
+    dep_id = await create_deposit_request(callback.from_user.id, amount, currency, "card")
     text_admin = (
         "🔔 <b>Заявка на проверку оплаты</b>\n\n"
+        f"ID заявки: <b>{dep_id}</b>\n"
         f"Пользователь: <a href='tg://user?id={callback.from_user.id}'>{callback.from_user.full_name}</a>\n"
         f"ID: <code>{callback.from_user.id}</code>\n"
         f"Сумма: {amount:.2f} {currency}\n"
@@ -1701,7 +1751,7 @@ async def on_check_payment_card(callback: CallbackQuery, state: FSMContext):
             await bot.send_message(
                 admin_id,
                 text_admin,
-                reply_markup=admin_deposit_check_keyboard(callback.from_user.id, amount, currency),
+                reply_markup=admin_deposit_check_keyboard(dep_id),
             )
         except Exception:
             pass
@@ -1900,6 +1950,48 @@ async def reject_withdrawal(callback: CallbackQuery):
     except Exception:
         pass
     await callback.message.answer(f"❌ Заявка #{w_id} отклонена.")
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("admin_dep_confirm:"))
+async def approve_deposit(callback: CallbackQuery):
+    if not is_admin_id(callback.from_user.id):
+        await callback.answer("⛔ Нет доступа.")
+        return
+    dep_id = int(callback.data.split(":", 1)[1])
+    dep = await get_deposit_request(dep_id)
+    if not dep or dep["status"] != "pending":
+        await callback.answer("Заявка не найдена или уже обработана.")
+        return
+    user_id = int(dep["user_tg_id"])
+    amount = float(dep["amount"])
+    currency = dep["currency"]
+    await change_balance(user_id, amount)
+    await set_deposit_request_status(dep_id, "approved")
+    try:
+        await bot.send_message(user_id, f"✅ Пополнение подтверждено: +{amount:.2f} {currency}")
+    except Exception:
+        pass
+    await callback.message.answer(f"✅ Пополнение #{dep_id} подтверждено.")
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("admin_dep_reject:"))
+async def reject_deposit(callback: CallbackQuery):
+    if not is_admin_id(callback.from_user.id):
+        await callback.answer("⛔ Нет доступа.")
+        return
+    dep_id = int(callback.data.split(":", 1)[1])
+    dep = await get_deposit_request(dep_id)
+    if not dep or dep["status"] != "pending":
+        await callback.answer("Заявка не найдена или уже обработана.")
+        return
+    await set_deposit_request_status(dep_id, "rejected")
+    try:
+        await bot.send_message(int(dep["user_tg_id"]), "❌ Пополнение отклонено администратором.")
+    except Exception:
+        pass
+    await callback.message.answer(f"❌ Пополнение #{dep_id} отклонено.")
     await callback.answer()
 
 # ---------- VERIFICATION & SETTINGS ----------
