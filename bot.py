@@ -225,6 +225,17 @@ def t(lang: str | None, key: str, **kwargs) -> str:
     return text.format(**kwargs) if kwargs else text
 
 
+def support_contact_text() -> str:
+    raw = (config.support_url or "").strip()
+    if not raw:
+        return "не задано админом"
+    if raw.startswith("https://t.me/"):
+        nick = raw.rsplit("/", 1)[-1].strip()
+        if nick:
+            return f"@{nick} ({raw})"
+    return raw
+
+
 class WithdrawStates(StatesGroup):
     waiting_amount = State()
     waiting_card = State()
@@ -1067,7 +1078,8 @@ def card_payment_keyboard():
     kb = InlineKeyboardBuilder()
     if config.card_pay_url:
         kb.button(text="💳 Перейти к оплате картой", url=config.card_pay_url)
-    kb.button(text="🛟 Связаться с поддержкой", url=config.support_url)
+    if config.support_url:
+        kb.button(text="🛟 Связаться с поддержкой", url=config.support_url)
     kb.adjust(1)
     return kb.as_markup()
 
@@ -1107,7 +1119,8 @@ def withdrawal_admin_keyboard(withdrawal_id: int):
 
 def verification_keyboard():
     kb = InlineKeyboardBuilder()
-    kb.button(text="📩Поддержка", url=config.support_url)
+    if config.support_url:
+        kb.button(text="📩Поддержка", url=config.support_url)
     kb.button(text="⬅️В профиль", callback_data="open_profile")
     kb.adjust(1)
     return kb.as_markup()
@@ -1733,12 +1746,13 @@ async def on_pay_card(callback: CallbackQuery, state: FSMContext):
         await callback.answer()
         return
     requisites = config.card_requisites or "Реквизиты пока не заданы админом."
+    support = support_contact_text()
     text = (
         "💳 Способ оплаты: <b>Банковская карта</b>\n\n"
         f"Сумма к оплате: <b>{amount:.2f} {currency}</b>\n\n"
         "Для оплаты картой и подтверждения платежа свяжитесь с поддержкой.\n"
         f"Реквизиты: <code>{requisites}</code>\n\n"
-        f"Поддержка: {config.support_url}"
+        f"Поддержка: {support}"
     )
     await callback.message.answer(text, reply_markup=card_payment_keyboard())
     await state.clear()

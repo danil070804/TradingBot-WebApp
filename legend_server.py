@@ -1087,12 +1087,14 @@ async def api_deposit_request(payload: DepositRequestPayload):
         return JSONResponse({"ok": False, "error": "Неподдерживаемый метод"}, status_code=400)
 
     if method == "card":
+        support_contact = bot.support_contact_text()
         return JSONResponse(
             {
                 "ok": True,
                 "requires_support": True,
                 "support_url": bot.config.support_url,
-                "message": "Для оплаты картой свяжитесь с поддержкой.",
+                "support_contact": support_contact,
+                "message": f"Для оплаты картой свяжитесь с поддержкой: {support_contact}",
             }
         )
 
