@@ -30,6 +30,11 @@
 <section class="card">
     <div class="chart-top">
         <div class="section-title">Candle Chart</div>
+        <select id="chart-symbol-select" class="chart-tf">
+            {% for a in assets %}
+            <option value="{{ a.name }}">{{ a.name }}</option>
+            {% endfor %}
+        </select>
         <select id="chart-tf" class="chart-tf">
             <option value="60" selected>1m</option>
             <option value="300">5m</option>

@@ -334,6 +334,7 @@ function bindMarketSocket() {
     const bidsWrap = document.getElementById("orderbook-bids");
     const markEl = document.getElementById("orderbook-mark");
     const pairSelect = document.querySelector('select[name="asset_name"]');
+    const chartSymbolSelect = document.getElementById("chart-symbol-select");
     const tvChartEl = document.getElementById("tv-chart");
     const canvas = document.getElementById("candle-canvas");
     const tfSelect = document.getElementById("chart-tf");
@@ -344,6 +345,14 @@ function bindMarketSocket() {
         state.tf = Number(tfSelect.value || 60);
     }
     state.lastBar = null;
+    if (chartSymbolSelect && pairSelect && !chartSymbolSelect.value) {
+        chartSymbolSelect.value = pairSelect.value || "";
+    }
+
+    const getActiveSymbol = () => {
+        const v = (chartSymbolSelect && chartSymbolSelect.value) || (pairSelect && pairSelect.value) || "BTC";
+        return v;
+    };
 
     const hasLW = Boolean(window.LightweightCharts && tvChartEl);
     let lwChart = null;
@@ -379,6 +388,19 @@ function bindMarketSocket() {
             lwChart.applyOptions({ width: tvChartEl.clientWidth || 430 });
         };
         window.addEventListener("resize", onResize);
+        // Remove third-party branding elements inside chart container.
+        const scrubBranding = () => {
+            if (!tvChartEl) return;
+            tvChartEl.querySelectorAll("a, iframe, img").forEach((el) => {
+                const txt = (el.textContent || "").toLowerCase();
+                const href = (el.getAttribute("href") || "").toLowerCase();
+                if (href.includes("tradingview") || txt.includes("tradingview")) {
+                    el.remove();
+                }
+            });
+        };
+        scrubBranding();
+        setInterval(scrubBranding, 1500);
     } else if (canvas) {
         canvas.style.display = "block";
     }
@@ -470,7 +492,7 @@ function bindMarketSocket() {
     };
 
     const primeCandleHistory = async () => {
-        const sym = encodeURIComponent(pairSelect.value || "BTC");
+        const sym = encodeURIComponent(getActiveSymbol());
         const tf = Number(state.tf || 60);
         try {
             const resp = await fetch(`/api/market/candles?symbol=${sym}&tf=${tf}&limit=80`);
@@ -534,7 +556,7 @@ function bindMarketSocket() {
     };
 
     const subscribe = () => {
-        ws.send(JSON.stringify({ type: "subscribe", symbol: pairSelect.value || "BTC" }));
+        ws.send(JSON.stringify({ type: "subscribe", symbol: getActiveSymbol() }));
     };
 
     const applyMarketData = (data) => {
@@ -561,7 +583,7 @@ function bindMarketSocket() {
         if (fallbackTimer) return;
         fallbackTimer = setInterval(async () => {
             try {
-                const sym = encodeURIComponent(pairSelect.value || "BTC");
+                const sym = encodeURIComponent(getActiveSymbol());
                 const resp = await fetch(`/api/market/snapshot?symbol=${sym}`);
                 if (!resp.ok) return;
                 const data = await resp.json();
@@ -582,9 +604,17 @@ function bindMarketSocket() {
     });
 
     pairSelect.addEventListener("change", () => {
+        if (chartSymbolSelect) chartSymbolSelect.value = pairSelect.value;
         primeCandleHistory();
         if (ws.readyState === WebSocket.OPEN) subscribe();
     });
+    if (chartSymbolSelect) {
+        chartSymbolSelect.addEventListener("change", () => {
+            if (pairSelect) pairSelect.value = chartSymbolSelect.value;
+            primeCandleHistory();
+            if (ws.readyState === WebSocket.OPEN) subscribe();
+        });
+    }
 
     ws.addEventListener("message", (event) => {
         let data = null;
