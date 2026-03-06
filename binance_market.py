@@ -73,7 +73,8 @@ def asset_to_binance_ticker(asset_name: str) -> str:
         return f"{compact}USDT"
     if compact in ASSET_ALIAS_TO_TICKER:
         return ASSET_ALIAS_TO_TICKER[compact]
-    return f"{compact[:5] or 'BTC'}USDT"
+    # Keep deterministic fallback ticker for unknown assets so app remains operational.
+    return "BTCUSDT"
 
 
 def tf_to_interval(tf_sec: int) -> str:
@@ -127,7 +128,8 @@ class BinanceMarketService:
         for name in assets:
             ticker = asset_to_binance_ticker(name)
             mapping[name] = ticker
-            symbols.add(ticker)
+            if ticker_to_symbol(ticker) in SUPPORTED_BASES:
+                symbols.add(ticker)
         if not symbols:
             symbols = {"BTCUSDT"}
         self.asset_to_ticker = mapping
@@ -187,13 +189,10 @@ class BinanceMarketService:
     async def _refresh_24h_stats(self):
         if not self.tickers:
             return
-        payload = await self._fetch_json("/api/v3/ticker/24hr", {"symbols": json.dumps(sorted(self.tickers))})
-        if not isinstance(payload, list):
-            return
         now = int(time.time())
-        for row in payload:
-            ticker = str(row.get("symbol") or "").upper()
-            if not ticker:
+        for ticker in sorted(self.tickers):
+            row = await self._fetch_json("/api/v3/ticker/24hr", {"symbol": ticker})
+            if not isinstance(row, dict):
                 continue
             bid = float(row.get("bidPrice") or 0)
             ask = float(row.get("askPrice") or 0)

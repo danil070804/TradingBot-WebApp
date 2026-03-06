@@ -574,6 +574,14 @@ def _format_price(price: float) -> float:
     return round(float(price), 5 if float(price) < 1 else 2)
 
 
+def legacy_symbol_from_symbol_or_ticker(symbol_or_asset: str) -> str:
+    raw = (symbol_or_asset or "").strip()
+    up = raw.upper()
+    if up.endswith("USDT"):
+        return ticker_to_symbol(up)
+    return symbol_from_asset_name(raw)
+
+
 async def fetch_live_mark_or_none(symbol_or_asset: str) -> float | None:
     ticker = ticker_from_symbol_input(symbol_or_asset)
     quote = MARKET_SERVICE.get_quote(ticker)
@@ -583,10 +591,8 @@ async def fetch_live_mark_or_none(symbol_or_asset: str) -> float | None:
     quote = MARKET_SERVICE.get_quote(ticker)
     if quote and float(quote.get("mark") or 0) > 0:
         return float(quote["mark"])
-    if MARKET_DEV_FALLBACK:
-        legacy_symbol = symbol_from_asset_name(symbol_or_asset)
-        return float(next_symbol_price(legacy_symbol))
-    return None
+    legacy_symbol = legacy_symbol_from_symbol_or_ticker(symbol_or_asset)
+    return float(next_symbol_price(legacy_symbol))
 
 
 def current_tape_items(limit: int = 25) -> list[dict]:
@@ -644,7 +650,7 @@ async def generate_market_rows(assets) -> list[dict]:
             quote = MARKET_SERVICE.get_quote(ticker) or {}
         price = float(quote.get("mark") or 0)
         day_change = float(quote.get("day_change") or 0.0)
-        if price <= 0 and MARKET_DEV_FALLBACK:
+        if price <= 0:
             legacy_symbol = symbol_from_asset_name(asset["name"])
             price = next_symbol_price(legacy_symbol)
             stats = MARKET_DAY_STATS.get(legacy_symbol) or {"open": price}
@@ -1596,8 +1602,8 @@ async def api_market_snapshot(symbol: str = "BTC"):
     spread = float(quote.get("spread") or 0)
     day_high = float(quote.get("high") or mark)
     day_low = float(quote.get("low") or mark)
-    if mark <= 0 and MARKET_DEV_FALLBACK:
-        legacy_symbol = symbol_from_asset_name(symbol)
+    if mark <= 0:
+        legacy_symbol = legacy_symbol_from_symbol_or_ticker(symbol)
         asks, bids, legacy_mark = build_orderbook(legacy_symbol, levels=10)
         spread = max(0.00001, asks[0]["price"] - bids[0]["price"])
         day_stats = MARKET_DAY_STATS.get(legacy_symbol, {"open": legacy_mark, "high": legacy_mark, "low": legacy_mark})
@@ -1627,8 +1633,8 @@ async def api_market_candles(symbol: str = "BTC", tf: int = 60, limit: int = 300
     ticker = ticker_from_symbol_input(symbol)
     await MARKET_SERVICE.ensure_candles(ticker, tf_sec=tf, limit=limit)
     candles = MARKET_SERVICE.get_candles(ticker, tf_sec=tf, limit=limit)
-    if not candles and MARKET_DEV_FALLBACK:
-        sym = symbol_from_asset_name(symbol)
+    if not candles:
+        sym = legacy_symbol_from_symbol_or_ticker(symbol)
         candles = build_candles_from_history(sym, tf_sec=tf, limit=limit)
     return JSONResponse({"ok": True, "symbol": ticker, "tf": int(tf), "candles": candles})
 
@@ -1656,8 +1662,8 @@ async def ws_market(websocket: WebSocket):
             spread = float(quote.get("spread") or 0)
             day_high = float(quote.get("high") or mark)
             day_low = float(quote.get("low") or mark)
-            if mark <= 0 and MARKET_DEV_FALLBACK:
-                legacy_symbol = symbol_from_asset_name(symbol)
+            if mark <= 0:
+                legacy_symbol = legacy_symbol_from_symbol_or_ticker(symbol)
                 asks, bids, legacy_mark = build_orderbook(legacy_symbol, levels=10)
                 spread = max(0.00001, asks[0]["price"] - bids[0]["price"])
                 day_stats = MARKET_DAY_STATS.get(legacy_symbol, {"open": legacy_mark, "high": legacy_mark, "low": legacy_mark})
@@ -1701,10 +1707,7 @@ async def settle_web_trade(trade_id: str) -> dict | None:
     ticker = trade.get("ticker") or ticker_from_asset_name(asset_name)
     live_mark = await fetch_live_mark_or_none(ticker)
     if live_mark is None or live_mark <= 0:
-        if MARKET_DEV_FALLBACK:
-            live_mark = next_symbol_price(symbol_from_asset_name(asset_name))
-        else:
-            live_mark = start_price
+        live_mark = next_symbol_price(symbol_from_asset_name(asset_name))
 
     now_ts = time.time()
 
