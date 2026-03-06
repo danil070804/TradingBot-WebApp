@@ -5,6 +5,7 @@
 - Единый сервер (`legend_server.py`) для WebApp + запуска бота
 - WebApp в стиле `Legend Trading` (`legend_web/`)
 - Совместимость БД: `SQLite` и `PostgreSQL` через `DATABASE_URL` (`db_compat.py`)
+- Автодеплой для Railway через `railway.toml`
 
 ## Запуск локально
 
@@ -26,9 +27,15 @@ uvicorn legend_server:app --reload --port 8080
 - `DATABASE_URL` (PostgreSQL)
 - `RUN_BOT=1`
 - `WEBAPP_DEFAULT_TG_ID=<ваш tg_id>`
+- опционально: `LOG_CHAT_ID`, `CRYPTO_BOT_URL`, `TRC20_ADDRESS`, `SUPPORT_URL`
 
-Start command:
+### Быстрый деплой (без ручной настройки команды запуска)
 
-```bash
-uvicorn legend_server:app --host 0.0.0.0 --port $PORT
-```
+1. `New Project` -> `Deploy from GitHub repo`.
+2. Выберите этот репозиторий.
+3. Railway подхватит `railway.toml` и сам возьмет `startCommand`.
+4. Добавьте переменные окружения из `.env.example`.
+5. Нажмите `Deploy`.
+
+Проверка после деплоя:
+- `https://<ваш-домен>/api/overview` должен отдавать JSON.
