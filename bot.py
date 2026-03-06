@@ -32,6 +32,8 @@ class Config:
     trc20_address: str
     support_url: str
     webapp_url: str
+    card_pay_url: str
+    card_requisites: str
 
 
 config = Config(
@@ -42,6 +44,8 @@ config = Config(
     trc20_address=os.getenv("TRC20_ADDRESS", ""),
     support_url=os.getenv("SUPPORT_URL", "https://t.me/your_support_chat"),
     webapp_url=(os.getenv("WEBAPP_URL") or os.getenv("WEBHOOK_BASE_URL") or "").rstrip("/"),
+    card_pay_url=os.getenv("CARD_PAY_URL", ""),
+    card_requisites=os.getenv("CARD_REQUISITES", ""),
 )
 
 bot = Bot(token=config.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
@@ -56,6 +60,88 @@ ACTIVE_DIALOGS_WORKER: dict[int, int] = {}
 class DepositStates(StatesGroup):
     waiting_amount = State()
     waiting_method = State()
+
+
+I18N = {
+    "ru": {
+        "open_app": "🚀 Открыть приложение",
+        "portfolio": "📁 Портфель",
+        "open_ecn": "📈 Открыть ECN",
+        "info": "ℹ️ Инфо",
+        "support": "🌐 Тех. Поддержка",
+        "deposit": "📥Пополнить",
+        "withdraw": "📤Вывести",
+        "verify": "✅Верификация",
+        "my_deals": "📑Мои сделки",
+        "settings": "⚙️Настройки",
+        "worker_panel": "⚒Панель воркера",
+        "admin_panel": "🛠Админ-панель",
+        "pay_card": "💳Банковской картой",
+        "deposit_cancel": "❌Отмена",
+        "deposit_enter_amount": "📥 На сколько вы хотите пополнить баланс? Введите сумму в {currency}.",
+        "deposit_invalid_amount": "❗ Введите корректную положительную сумму.",
+        "deposit_choose_method": "Вы хотите пополнить баланс на <b>{amount:.2f} {currency}</b>.\n\nВыберите удобный способ оплаты:",
+        "deposit_cancelled": "❌ Пополнение отменено.",
+        "profile_title": "🧾 <b>Профиль</b>",
+    },
+    "en": {
+        "open_app": "🚀 Open App",
+        "portfolio": "📁 Portfolio",
+        "open_ecn": "📈 Open ECN",
+        "info": "ℹ️ Info",
+        "support": "🌐 Support",
+        "deposit": "📥Deposit",
+        "withdraw": "📤Withdraw",
+        "verify": "✅Verification",
+        "my_deals": "📑My Deals",
+        "settings": "⚙️Settings",
+        "worker_panel": "⚒Worker Panel",
+        "admin_panel": "🛠Admin Panel",
+        "pay_card": "💳By Bank Card",
+        "deposit_cancel": "❌Cancel",
+        "deposit_enter_amount": "📥 How much do you want to deposit? Enter amount in {currency}.",
+        "deposit_invalid_amount": "❗ Enter a valid positive amount.",
+        "deposit_choose_method": "You want to top up <b>{amount:.2f} {currency}</b>.\n\nChoose payment method:",
+        "deposit_cancelled": "❌ Deposit canceled.",
+        "profile_title": "🧾 <b>Profile</b>",
+    },
+    "uk": {
+        "open_app": "🚀 Відкрити застосунок",
+        "portfolio": "📁 Портфель",
+        "open_ecn": "📈 Відкрити ECN",
+        "info": "ℹ️ Інфо",
+        "support": "🌐 Тех. Підтримка",
+        "deposit": "📥Поповнити",
+        "withdraw": "📤Вивести",
+        "verify": "✅Верифікація",
+        "my_deals": "📑Мої угоди",
+        "settings": "⚙️Налаштування",
+        "worker_panel": "⚒Панель воркера",
+        "admin_panel": "🛠Адмін-панель",
+        "pay_card": "💳Банківською карткою",
+        "deposit_cancel": "❌Скасувати",
+        "deposit_enter_amount": "📥 На яку суму ви хочете поповнити баланс? Вкажіть суму в {currency}.",
+        "deposit_invalid_amount": "❗ Введіть коректну додатну суму.",
+        "deposit_choose_method": "Ви хочете поповнити баланс на <b>{amount:.2f} {currency}</b>.\n\nОберіть спосіб оплати:",
+        "deposit_cancelled": "❌ Поповнення скасовано.",
+        "profile_title": "🧾 <b>Профіль</b>",
+    },
+}
+
+
+def normalize_lang(lang: str | None) -> str:
+    code = (lang or "ru").strip().lower()
+    if code.startswith("uk"):
+        return "uk"
+    if code.startswith("en"):
+        return "en"
+    return "ru"
+
+
+def t(lang: str | None, key: str, **kwargs) -> str:
+    lang_code = normalize_lang(lang)
+    text = I18N.get(lang_code, I18N["ru"]).get(key, I18N["ru"].get(key, key))
+    return text.format(**kwargs) if kwargs else text
 
 
 class WithdrawStates(StatesGroup):
@@ -301,26 +387,17 @@ async def init_db():
 
         await db.execute(deals_ddl)
 
-        # заполняем список активов ECN по умолчанию, если пусто
-        cur = await db.execute("SELECT COUNT(*) FROM ecn_assets")
-        cnt_row = await cur.fetchone()
-        if cnt_row and cnt_row[0] == 0:
-            default_assets = [
-                "Bitcoin",
-                "Ethereum",
-                "Solana",
-                "Dogecoin",
-                "Litecoin",
-                "XRP",
-                "Cardano",
-                "Avalanche",
-                "Polkadot",
-                "Chainlink",
-            ]
-            await db.executemany(
-                "INSERT INTO ecn_assets(name) VALUES (?)",
-                [(name,) for name in default_assets],
-            )
+        # Расширяем список активов ECN (insert-ignore для уже существующих)
+        default_assets = [
+            "Bitcoin", "Ethereum", "Solana", "Dogecoin", "Litecoin", "XRP", "Cardano", "Avalanche",
+            "Polkadot", "Chainlink", "Toncoin", "TRON", "Stellar", "Monero", "Bitcoin Cash",
+            "Shiba Inu", "Pepe", "Arbitrum", "Optimism", "Near Protocol", "Uniswap", "Aptos",
+            "Sui", "Kaspa", "Fantom", "Algorand", "Injective", "Render", "Filecoin", "Hedera",
+        ]
+        await db.executemany(
+            "INSERT OR IGNORE INTO ecn_assets(name) VALUES (?)",
+            [(name,) for name in default_assets],
+        )
 
         await db.commit()
 
@@ -332,6 +409,10 @@ async def init_db():
                 config.crypto_bot_url = row["value"]
             elif row["key"] == "trc20_address":
                 config.trc20_address = row["value"]
+            elif row["key"] == "card_pay_url":
+                config.card_pay_url = row["value"]
+            elif row["key"] == "card_requisites":
+                config.card_requisites = row["value"]
 
 async def get_user_row(tg_user) -> aiosqlite.Row:
     async with aiosqlite.connect(DB_PATH) as db:
@@ -639,6 +720,10 @@ async def set_setting(key: str, value: str):
         config.crypto_bot_url = value
     elif key == "trc20_address":
         config.trc20_address = value
+    elif key == "card_pay_url":
+        config.card_pay_url = value
+    elif key == "card_requisites":
+        config.card_requisites = value
 
 async def get_worker_clients_list(worker_tg_id: int, favorites_only: bool = False):
     async with aiosqlite.connect(DB_PATH) as db:
@@ -780,45 +865,51 @@ def currency_keyboard():
     kb.adjust(4)
     return kb.as_markup()
 
-def main_menu_keyboard():
+def main_menu_keyboard(lang: str = "ru"):
     keyboard_rows = []
     if config.webapp_url:
         keyboard_rows.append(
-            [KeyboardButton(text="🚀 Открыть приложение", web_app=WebAppInfo(url=config.webapp_url))]
+            [KeyboardButton(text=t(lang, "open_app"), web_app=WebAppInfo(url=config.webapp_url))]
         )
     return ReplyKeyboardMarkup(
         keyboard=keyboard_rows + [
-            [KeyboardButton(text="📁 Портфель")],
-            [KeyboardButton(text="📈 Открыть ECN")],
+            [KeyboardButton(text=t(lang, "portfolio"))],
+            [KeyboardButton(text=t(lang, "open_ecn"))],
             [
-                KeyboardButton(text="ℹ️ Инфо"),
-                KeyboardButton(text="🌐 Тех. Поддержка"),
+                KeyboardButton(text=t(lang, "info")),
+                KeyboardButton(text=t(lang, "support")),
             ],
         ],
         resize_keyboard=True,
     )
 
 
-def profile_keyboard(is_admin: bool, is_worker: bool):
+def profile_keyboard(is_admin: bool, is_worker: bool, lang: str = "ru"):
     kb = InlineKeyboardBuilder()
-    kb.button(text="📥Пополнить", callback_data="deposit")
-    kb.button(text="📤Вывести", callback_data="withdraw")
-    kb.button(text="✅Верификация", callback_data="verify")
-    kb.button(text="📑Мои сделки", callback_data="my_deals")
-    kb.button(text="⚙️Настройки", callback_data="settings")
+    if config.webapp_url:
+        kb.button(text=t(lang, "open_app"), web_app=WebAppInfo(url=config.webapp_url))
+    kb.button(text=t(lang, "deposit"), callback_data="deposit")
+    kb.button(text=t(lang, "withdraw"), callback_data="withdraw")
+    kb.button(text=t(lang, "verify"), callback_data="verify")
+    kb.button(text=t(lang, "my_deals"), callback_data="my_deals")
+    kb.button(text=t(lang, "settings"), callback_data="settings")
     if is_worker:
-        kb.button(text="⚒Панель воркера", callback_data="open_worker_panel")
+        kb.button(text=t(lang, "worker_panel"), callback_data="open_worker_panel")
     if is_admin:
-        kb.button(text="🛠Админ-панель", callback_data="open_admin_panel")
-    kb.adjust(2, 2, 1, 1, 1)
+        kb.button(text=t(lang, "admin_panel"), callback_data="open_admin_panel")
+    if config.webapp_url:
+        kb.adjust(1, 2, 2, 1, 1, 1)
+    else:
+        kb.adjust(2, 2, 1, 1, 1)
     return kb.as_markup()
 
 
-def deposit_method_keyboard():
+def deposit_method_keyboard(lang: str = "ru"):
     kb = InlineKeyboardBuilder()
     kb.button(text="💎Crypto bot", callback_data="pay_crypto")
     kb.button(text="👛По адресу TRC20 USDT", callback_data="pay_trc20")
-    kb.button(text="❌Отмена", callback_data="cancel_deposit")
+    kb.button(text=t(lang, "pay_card"), callback_data="pay_card")
+    kb.button(text=t(lang, "deposit_cancel"), callback_data="cancel_deposit")
     kb.adjust(1)
     return kb.as_markup()
 
@@ -830,6 +921,17 @@ def crypto_payment_keyboard():
     kb.button(text="✅Проверить оплату", callback_data="check_payment")
     kb.adjust(1)
     return kb.as_markup()
+
+
+def card_payment_keyboard():
+    kb = InlineKeyboardBuilder()
+    if config.card_pay_url:
+        kb.button(text="💳 Перейти к оплате картой", url=config.card_pay_url)
+    kb.button(text="✅ Я оплатил картой", callback_data="check_payment_card")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
 def admin_deposit_check_keyboard(user_id: int, amount: float, currency: str):
     kb = InlineKeyboardBuilder()
     kb.button(
@@ -1023,6 +1125,7 @@ async def on_currency_selected(callback: CallbackQuery):
 
 async def send_main_menu(message: Message):
     user_row = await get_user_row(message.from_user)
+    lang = normalize_lang(user_row["language"])
     first_name = message.from_user.first_name
     text = (
         f"👋 Приветствую, <b>{first_name}</b>!\n\n"
@@ -1030,7 +1133,7 @@ async def send_main_menu(message: Message):
         "Через него вы сможете управлять своим аккаунтом, балансом и сделками.\n\n"
         "👇 Выберите раздел:"
     )
-    await message.answer(text, reply_markup=main_menu_keyboard())
+    await message.answer(text, reply_markup=main_menu_keyboard(lang))
 
 
 # ---------- MAIN MENU BUTTONS & ECN DEMO ----------
@@ -1065,31 +1168,35 @@ def ecn_time_keyboard():
     return kb.as_markup()
 
 
-@dp.message(F.text == "📁 Портфель")
+@dp.message(F.text.in_({"📁 Портфель", "📁 Portfolio", "📁 Портфель"}))
 async def menu_portfolio(message: Message):
     await send_profile(message)
 
 
-@dp.message(F.text == "ℹ️ Инфо")
+@dp.message(F.text.in_({"ℹ️ Инфо", "ℹ️ Info", "ℹ️ Інфо"}))
 async def menu_info(message: Message):
+    user_row = await get_user_row(message.from_user)
+    lang = normalize_lang(user_row["language"])
     text = (
         "ℹ️ Информация\n\n"
         "📣 Новости: https://www.youtube.com/channel/UCVj_rwnR1p-7Da15L8MwRNQ\n"
         "📄 Пользовательское соглашение: https://telegra.ph/Polzovatelskoe-soglashenie-03-27-13"
     )
-    await message.answer(text, reply_markup=main_menu_keyboard())
+    await message.answer(text, reply_markup=main_menu_keyboard(lang))
 
 
-@dp.message(F.text == "🌐 Тех. Поддержка")
+@dp.message(F.text.in_({"🌐 Тех. Поддержка", "🌐 Support", "🌐 Тех. Підтримка"}))
 async def menu_support(message: Message):
+    user_row = await get_user_row(message.from_user)
+    lang = normalize_lang(user_row["language"])
     await message.answer(
         "📩 Связаться с технической поддержкой можно здесь:\n"
         f"{config.support_url}",
-        reply_markup=main_menu_keyboard(),
+        reply_markup=main_menu_keyboard(lang),
     )
 
 
-@dp.message(F.text == "📈 Открыть ECN")
+@dp.message(F.text.in_({"📈 Открыть ECN", "📈 Open ECN", "📈 Відкрити ECN"}))
 async def menu_open_ecn(message: Message, state: FSMContext):
     await start_ecn_flow(message, state)
 
@@ -1373,17 +1480,23 @@ async def send_profile(callback_or_msg):
         msg = callback_or_msg
 
     user_row = await get_user_row(tg_user)
+    lang = normalize_lang(user_row["language"])
     currency = user_row["currency"] or "USD"
     balance = user_row["balance"] or 0.0
     is_admin = bool(user_row["is_admin"]) or is_admin_id(tg_user.id)
     is_worker = bool(user_row["is_worker"])
     deal_stats = await get_user_deal_stats(tg_user.id)
     pending_withdraw = await get_user_pending_withdraw_sum(tg_user.id)
+    worker_id = await get_worker_for_client(tg_user.id)
 
     text_lines = [
-        "🧾 <b>Профиль</b>",
+        t(lang, "profile_title"),
         f"└ Идентификатор: <code>{tg_user.id}</code>",
+        f"└ Username: @{tg_user.username}" if tg_user.username else "└ Username: —",
+        f"└ Язык: {lang.upper()}",
+        f"└ Валюта: {currency}",
         "└ Верификация: Нет",
+        f"└ Воркер: <code>{worker_id}</code>" if worker_id else "└ Воркер: —",
         "",
         "📊 <b>Информация о сделках</b>",
         f"└ Всего сделок: {deal_stats['total']} шт.",
@@ -1396,17 +1509,16 @@ async def send_profile(callback_or_msg):
         f"└ На выводе: {pending_withdraw:.2f} {currency}",
     ]
     text = "\n".join(text_lines)
-    await msg.answer(text, reply_markup=profile_keyboard(is_admin, is_worker))
+    await msg.answer(text, reply_markup=profile_keyboard(is_admin, is_worker, lang))
 
 # ---------- DEPOSIT ----------
 
 @dp.callback_query(F.data == "deposit")
 async def on_deposit(callback: CallbackQuery, state: FSMContext):
     user_row = await get_user_row(callback.from_user)
+    lang = normalize_lang(user_row["language"])
     currency = user_row["currency"] or "USD"
-    await callback.message.answer(
-        f"📥 На сколько вы хотите пополнить баланс? Введите сумму в {currency}."
-    )
+    await callback.message.answer(t(lang, "deposit_enter_amount", currency=currency))
     await state.set_state(DepositStates.waiting_amount)
     await callback.answer()
 
@@ -1414,27 +1526,29 @@ async def on_deposit(callback: CallbackQuery, state: FSMContext):
 @dp.message(DepositStates.waiting_amount)
 async def deposit_amount_entered(message: Message, state: FSMContext):
     user_row = await get_user_row(message.from_user)
+    lang = normalize_lang(user_row["language"])
     currency = user_row["currency"] or "USD"
     try:
         amount = float(message.text.replace(",", "."))
         if amount <= 0:
             raise ValueError
     except ValueError:
-        await message.answer("❗ Введите корректную положительную сумму.")
+        await message.answer(t(lang, "deposit_invalid_amount"))
         return
     await state.update_data(deposit_amount=amount)
     await state.set_state(DepositStates.waiting_method)
     await message.answer(
-        f"Вы хотите пополнить баланс на <b>{amount:.2f} {currency}</b>.\n\n"
-        "Выберите удобный способ оплаты:",
-        reply_markup=deposit_method_keyboard(),
+        t(lang, "deposit_choose_method", amount=amount, currency=currency),
+        reply_markup=deposit_method_keyboard(lang),
     )
 
 
 @dp.callback_query(DepositStates.waiting_method, F.data == "cancel_deposit")
 async def on_cancel_deposit(callback: CallbackQuery, state: FSMContext):
+    user_row = await get_user_row(callback.from_user)
+    lang = normalize_lang(user_row["language"])
     await state.clear()
-    await callback.message.answer("❌ Пополнение отменено.")
+    await callback.message.answer(t(lang, "deposit_cancelled"))
     await callback.answer()
 
 
@@ -1475,6 +1589,27 @@ async def on_pay_trc20(callback: CallbackQuery, state: FSMContext):
     )
     await callback.message.answer(text)
     await state.clear()
+    await callback.answer()
+
+
+@dp.callback_query(DepositStates.waiting_method, F.data == "pay_card")
+async def on_pay_card(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    amount = data.get("deposit_amount")
+    user_row = await get_user_row(callback.from_user)
+    currency = user_row["currency"] or "USD"
+    if amount is None:
+        await callback.message.answer("Сумма пополнения не найдена. Начните заново.")
+        await callback.answer()
+        return
+    requisites = config.card_requisites or "Реквизиты пока не заданы админом."
+    text = (
+        "💳 Способ оплаты: <b>Банковская карта</b>\n\n"
+        f"Сумма к оплате: <b>{amount:.2f} {currency}</b>\n\n"
+        "Оплатите по реквизитам и нажмите подтверждение:\n"
+        f"<code>{requisites}</code>"
+    )
+    await callback.message.answer(text, reply_markup=card_payment_keyboard())
     await callback.answer()
 
 @dp.callback_query(F.data == "check_payment")
@@ -1521,6 +1656,45 @@ async def on_check_payment(callback: CallbackQuery, state: FSMContext):
     await callback.message.answer(
         "✅ Запрос на проверку оплаты отправлен администратору. После подтверждения "
         "админ начислит средства на баланс."
+    )
+    await state.clear()
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "check_payment_card")
+async def on_check_payment_card(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    amount = data.get("deposit_amount")
+    user_row = await get_user_row(callback.from_user)
+    currency = user_row["currency"] or "USD"
+    if amount is None:
+        await callback.message.answer("Сумма не найдена. Начните пополнение заново.")
+        await callback.answer()
+        return
+
+    worker_id = await get_worker_for_client(callback.from_user.id)
+    worker_info_line = f"Реферал воркера: <code>{worker_id}</code>\n" if worker_id else "Реферал воркера: нет данных\n"
+    text_admin = (
+        "🔔 <b>Заявка на проверку оплаты</b>\n\n"
+        f"Пользователь: <a href='tg://user?id={callback.from_user.id}'>{callback.from_user.full_name}</a>\n"
+        f"ID: <code>{callback.from_user.id}</code>\n"
+        f"Сумма: {amount:.2f} {currency}\n"
+        "Метод: Банковская карта\n"
+        f"{worker_info_line}"
+    )
+    for admin_id in config.admin_ids:
+        try:
+            await bot.send_message(
+                admin_id,
+                text_admin,
+                reply_markup=admin_deposit_check_keyboard(callback.from_user.id, amount, currency),
+            )
+        except Exception:
+            pass
+
+    await callback.message.answer(
+        "✅ Заявка на проверку оплаты картой отправлена администратору. "
+        "После проверки средства зачислятся на баланс."
     )
     await state.clear()
     await callback.answer()

@@ -187,7 +187,7 @@ async def home(request: Request):
             "tg_id": tg_id,
             "user": user,
             "stats": stats,
-            "markets": markets[:6],
+            "markets": markets[:10],
             "deals": deals,
         },
     )
@@ -240,6 +240,29 @@ async def deals(request: Request):
     return templates.TemplateResponse(
         "deals.html",
         {"request": request, "page": "deals", "title": "Legend Trading", "deals": rows, "tg_id": tg_id},
+    )
+
+
+@app.get("/profile", response_class=HTMLResponse)
+async def profile_page(request: Request):
+    tg_id = await get_or_pick_user_id()
+    user = await fetch_one(
+        "SELECT tg_id, first_name, username, language, currency, balance, created_at FROM users WHERE tg_id = ?",
+        (tg_id,),
+    )
+    stats = await bot.get_user_deal_stats(tg_id) if tg_id else {"wins": 0, "losses": 0, "total": 0, "total_profit": 0.0}
+    pending = await bot.get_user_pending_withdraw_sum(tg_id) if tg_id else 0.0
+    return templates.TemplateResponse(
+        "profile.html",
+        {
+            "request": request,
+            "page": "profile",
+            "title": "Legend Trading",
+            "user": user,
+            "stats": stats,
+            "pending": pending,
+            "tg_id": tg_id,
+        },
     )
 
 

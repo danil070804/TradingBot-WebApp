@@ -30,6 +30,9 @@ uvicorn legend_server:app --reload --port 8080
 - `WEBAPP_DEFAULT_TG_ID=<ваш tg_id>`
 - `WEBHOOK_BASE_URL=https://<ваш-railway-домен>`
 - `WEBHOOK_SECRET=<случайная_строка>`
+- `WEBAPP_URL=https://<ваш-railway-домен>`
+- `CARD_PAY_URL=<ссылка_на_оплату_картой>` (опционально)
+- `CARD_REQUISITES=<реквизиты_карты>` (опционально)
 - опционально: `LOG_CHAT_ID`, `CRYPTO_BOT_URL`, `TRC20_ADDRESS`, `SUPPORT_URL`
 
 ### Быстрый деплой (без ручной настройки команды запуска)

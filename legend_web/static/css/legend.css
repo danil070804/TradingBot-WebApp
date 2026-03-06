@@ -58,11 +58,30 @@ body {
     font-weight: 700;
     color: #08110b;
     background: linear-gradient(140deg, #c3ff7a, #84d336);
+    box-shadow: 0 0 24px rgba(143, 255, 79, 0.45);
 }
 .brand-title { font-family: "Oxanium", sans-serif; font-size: 22px; font-weight: 700; }
 .brand-sub { font-size: 12px; color: var(--muted); margin-top: -2px; }
 
 .content { padding: 14px; display: grid; gap: 12px; }
+
+.quick-actions {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: 1fr 1fr;
+}
+
+.qa-btn {
+    text-decoration: none;
+    border: 1px solid rgba(143, 255, 79, 0.2);
+    background: linear-gradient(180deg, rgba(24, 38, 23, 0.9), rgba(12, 20, 12, 0.95));
+    color: #dfffd1;
+    border-radius: 10px;
+    padding: 10px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 700;
+}
 
 .card {
     border: 1px solid var(--line);
@@ -157,7 +176,7 @@ select, input {
     width: 100%;
     max-width: 480px;
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(6, 1fr);
     gap: 2px;
     padding: 8px;
     border-top: 1px solid var(--line);
