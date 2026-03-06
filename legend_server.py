@@ -48,6 +48,7 @@ LANG_SESSION_KEY = "web_lang"
 polling_task: asyncio.Task | None = None
 polling_lock_conn = None
 market_feed_task: asyncio.Task | None = None
+market_price_task: asyncio.Task | None = None
 MARKET_TAPE = deque(maxlen=120)
 ACTIVE_WEB_TRADES: dict[str, dict] = {}
 MARKET_BOOK_STATE: dict[str, dict] = {}
@@ -69,6 +70,7 @@ ASSET_SPECS = {
 MARKET_PRICE_STATE = {k: v["start"] for k, v in ASSET_SPECS.items()}
 MARKET_DAY_STATS = {k: {"open": v["start"], "high": v["start"], "low": v["start"]} for k, v in ASSET_SPECS.items()}
 MARKET_MOMENTUM_STATE = {k: 0.0 for k in ASSET_SPECS.keys()}
+MARKET_PRICE_HISTORY = {k: deque(maxlen=6000) for k in ASSET_SPECS.keys()}
 
 WEB_I18N = {
     "ru": {
@@ -538,7 +540,7 @@ def symbol_from_asset_name(name: str) -> str:
     return (name[:5] if name else "UNKN").upper()
 
 
-def next_symbol_price(symbol: str) -> float:
+def next_symbol_price(symbol: str, ts: int | None = None) -> float:
     spec = ASSET_SPECS.get(symbol)
     if not spec:
         base = MARKET_PRICE_STATE.get(symbol, random.uniform(0.3, 800.0))
@@ -562,6 +564,12 @@ def next_symbol_price(symbol: str) -> float:
     stats = MARKET_DAY_STATS.setdefault(symbol, {"open": updated, "high": updated, "low": updated})
     stats["high"] = max(stats["high"], updated)
     stats["low"] = min(stats["low"], updated)
+    tick_ts = int(ts or time.time())
+    hist = MARKET_PRICE_HISTORY.setdefault(symbol, deque(maxlen=6000))
+    if hist and hist[-1]["t"] == tick_ts:
+        hist[-1]["p"] = updated
+    elif not hist or tick_ts > hist[-1]["t"]:
+        hist.append({"t": tick_ts, "p": updated})
     return updated
 
 
@@ -634,42 +642,66 @@ def build_orderbook(symbol: str, levels: int = 10) -> tuple[list[dict], list[dic
     return asks, bids, mark
 
 
-def build_synthetic_candles(symbol: str, tf_sec: int, limit: int = 80) -> list[dict]:
+def seed_symbol_history(symbol: str, points: int = 5800, step_sec: int = 5):
     spec = ASSET_SPECS.get(symbol, {"start": MARKET_PRICE_STATE.get(symbol, 100.0), "vol": 0.006})
+    start = float(spec["start"])
+    vol = float(spec.get("vol", 0.006))
+    hist = MARKET_PRICE_HISTORY.setdefault(symbol, deque(maxlen=6000))
+    if hist:
+        return
+    now = int(time.time())
+    ts = now - points * step_sec
+    price = start
+    trend = random.uniform(-vol * 0.04, vol * 0.04)
+    momentum = 0.0
+    for _ in range(points):
+        ts += step_sec
+        trend = max(-vol * 0.08, min(vol * 0.08, trend + random.uniform(-vol * 0.01, vol * 0.01)))
+        noise = random.uniform(-vol * 0.06, vol * 0.06)
+        momentum = momentum * 0.92 + trend + noise
+        step = max(-vol * 0.16, min(vol * 0.16, momentum))
+        price = max(0.00001, price * (1 + step))
+        hist.append({"t": ts, "p": price})
+    MARKET_PRICE_STATE[symbol] = price
+    stats = MARKET_DAY_STATS.setdefault(symbol, {"open": start, "high": price, "low": price})
+    stats["high"] = max(stats["high"], max(p["p"] for p in hist))
+    stats["low"] = min(stats["low"], min(p["p"] for p in hist))
+
+
+def build_candles_from_history(symbol: str, tf_sec: int, limit: int = 80) -> list[dict]:
     tf = max(5, int(tf_sec))
     n = max(20, min(240, int(limit)))
-    vol = float(spec.get("vol", 0.006))
-    current = float(MARKET_PRICE_STATE.get(symbol, spec.get("start", 100.0)))
+    history = MARKET_PRICE_HISTORY.get(symbol)
+    if not history:
+        seed_symbol_history(symbol)
+        history = MARKET_PRICE_HISTORY.get(symbol)
+    if not history:
+        return []
+
     now = int(time.time())
+    lookback_from = now - tf * (n + 6)
+    recent = [p for p in history if int(p["t"]) >= lookback_from]
+    if len(recent) < 10:
+        recent = list(history)
 
-    seed = current * (1 + random.uniform(-vol * 9.0, vol * 9.0))
-    price = max(0.00001, seed)
-    candles: list[dict] = []
+    buckets: dict[int, dict] = {}
+    for item in recent:
+        t = int(item["t"])
+        p = float(item["p"])
+        b = (t // tf) * tf
+        c = buckets.get(b)
+        if c is None:
+            buckets[b] = {"t": b, "o": p, "h": p, "l": p, "c": p}
+        else:
+            c["h"] = max(c["h"], p)
+            c["l"] = min(c["l"], p)
+            c["c"] = p
 
-    for i in range(n, 0, -1):
-        t = now - i * tf
-        pull = ((current - price) / max(current, 0.00001)) * 0.08
-        drift = random.uniform(-vol * 0.24, vol * 0.24) + pull
-        o = price
-        c = max(0.00001, o * (1 + drift))
-        h = max(o, c) * (1 + random.uniform(0.00005, vol * 0.08))
-        l = min(o, c) * (1 - random.uniform(0.00005, vol * 0.08))
-        candles.append(
-            {
-                "t": t,
-                "o": round(o, 6),
-                "h": round(h, 6),
-                "l": round(l, 6),
-                "c": round(c, 6),
-            }
-        )
-        price = c
-
-    if candles:
-        candles[-1]["c"] = round(current, 6)
-        candles[-1]["h"] = round(max(candles[-1]["h"], current), 6)
-        candles[-1]["l"] = round(min(candles[-1]["l"], current), 6)
-    return candles
+    ordered = [buckets[k] for k in sorted(buckets.keys())]
+    if not ordered:
+        return []
+    out = ordered[-n:]
+    return [{"t": c["t"], "o": round(c["o"], 6), "h": round(c["h"], 6), "l": round(c["l"], 6), "c": round(c["c"], 6)} for c in out]
 
 
 async def market_feed_loop():
@@ -682,14 +714,25 @@ async def market_feed_loop():
         await asyncio.sleep(random.choice([10, 15, 20]))
 
 
+async def market_price_loop():
+    while True:
+        ts = int(time.time())
+        for symbol in ASSET_SPECS.keys():
+            next_symbol_price(symbol, ts=ts)
+        await asyncio.sleep(2.0)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global polling_task, market_feed_task
+    global polling_task, market_feed_task, market_price_task
     await bot.init_db()
+    for symbol in ASSET_SPECS.keys():
+        seed_symbol_history(symbol)
     if not MARKET_TAPE:
         for _ in range(30):
             MARKET_TAPE.appendleft(generate_tape_tick())
     market_feed_task = asyncio.create_task(market_feed_loop())
+    market_price_task = asyncio.create_task(market_price_loop())
     if RUN_BOT:
         me = await bot.bot.get_me()
         bot.BOT_USERNAME = me.username
@@ -722,6 +765,10 @@ async def lifespan(app: FastAPI):
         market_feed_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await market_feed_task
+    if market_price_task:
+        market_price_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await market_price_task
     await release_polling_lock()
     await bot.bot.session.close()
 
@@ -1448,7 +1495,7 @@ async def api_market_snapshot(symbol: str = "BTC"):
 @app.get("/api/market/candles", response_class=JSONResponse)
 async def api_market_candles(symbol: str = "BTC", tf: int = 30, limit: int = 80):
     sym = symbol_from_asset_name(symbol)
-    candles = build_synthetic_candles(sym, tf_sec=tf, limit=limit)
+    candles = build_candles_from_history(sym, tf_sec=tf, limit=limit)
     return JSONResponse({"ok": True, "symbol": sym, "tf": int(tf), "candles": candles})
 
 
