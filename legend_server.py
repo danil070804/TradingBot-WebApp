@@ -14,14 +14,44 @@ from pydantic import BaseModel
 import bot
 import db_compat as db
 
+try:
+    import asyncpg
+except Exception:
+    asyncpg = None
+
 
 BASE_DIR = Path(__file__).resolve().parent
 WEB_DIR = BASE_DIR / "legend_web"
 DEFAULT_TG_ID = int(os.getenv("WEBAPP_DEFAULT_TG_ID", "0"))
 RUN_BOT = os.getenv("RUN_BOT", "1") == "1"
+POLLING_LOCK_KEY = int(os.getenv("BOT_POLLING_LOCK_KEY", "8598101146"))
 
 
 polling_task: asyncio.Task | None = None
+polling_lock_conn = None
+
+
+async def acquire_polling_lock() -> bool:
+    database_url = os.getenv("DATABASE_URL", "").strip()
+    if not database_url.startswith(("postgres://", "postgresql://")) or asyncpg is None:
+        return True
+
+    global polling_lock_conn
+    polling_lock_conn = await asyncpg.connect(database_url)
+    locked = await polling_lock_conn.fetchval("SELECT pg_try_advisory_lock($1)", POLLING_LOCK_KEY)
+    return bool(locked)
+
+
+async def release_polling_lock():
+    global polling_lock_conn
+    if polling_lock_conn is None:
+        return
+    try:
+        await polling_lock_conn.execute("SELECT pg_advisory_unlock($1)", POLLING_LOCK_KEY)
+    except Exception:
+        pass
+    await polling_lock_conn.close()
+    polling_lock_conn = None
 
 
 async def fetch_all(query: str, params: tuple = ()):
@@ -67,14 +97,21 @@ async def lifespan(app: FastAPI):
     global polling_task
     await bot.init_db()
     if RUN_BOT:
-        me = await bot.bot.get_me()
-        bot.BOT_USERNAME = me.username
-        polling_task = asyncio.create_task(bot.dp.start_polling(bot.bot))
+        can_start_polling = await acquire_polling_lock()
+        if can_start_polling:
+            await bot.bot.delete_webhook(drop_pending_updates=True)
+            me = await bot.bot.get_me()
+            bot.BOT_USERNAME = me.username
+            print(f"Bot polling started as @{bot.BOT_USERNAME}")
+            polling_task = asyncio.create_task(bot.dp.start_polling(bot.bot))
+        else:
+            print("Polling lock is busy: another instance already runs bot polling. Starting web only.")
     yield
     if polling_task:
         polling_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await polling_task
+    await release_polling_lock()
     await bot.bot.session.close()
 
 
