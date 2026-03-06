@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Legend Trading Admin Login</title>
+    <link rel="stylesheet" href="/static/css/legend.css">
+</head>
+<body>
+<div class="page-bg"></div>
+<div class="app-shell">
+    <main class="content">
+        <section class="card hero">
+            <h1>Admin Login</h1>
+            <div class="hint">Доступ только для администратора</div>
+        </section>
+        <section class="card">
+            <form id="admin-login-form" class="form-grid">
+                <label>Логин
+                    <input name="username" required>
+                </label>
+                <label>Пароль
+                    <input type="password" name="password" required>
+                </label>
+                <button class="submit" type="submit">Войти</button>
+            </form>
+            <div id="admin-login-result" class="result-box"></div>
+        </section>
+    </main>
+</div>
+<script>
+document.getElementById("admin-login-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const result = document.getElementById("admin-login-result");
+    const body = Object.fromEntries(new FormData(e.target).entries());
+    const resp = await fetch("/admin/login", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(body)
+    });
+    const data = await resp.json();
+    if (resp.ok && data.ok) {
+        window.location.href = "/admin";
+        return;
+    }
+    result.innerHTML = `<span class="neg">Ошибка входа</span>`;
+});
+</script>
+</body>
+</html>

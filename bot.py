@@ -157,6 +157,11 @@ class AdminStates(StatesGroup):
 class AdminPaymentStates(StatesGroup):
     waiting_crypto_url = State()
     waiting_trc20 = State()
+    waiting_card_url = State()
+    waiting_card_requisites = State()
+    waiting_support_url = State()
+    waiting_webapp_url = State()
+    waiting_asset_name = State()
 
 
 class WorkerServiceStates(StatesGroup):
@@ -413,6 +418,10 @@ async def init_db():
                 config.card_pay_url = row["value"]
             elif row["key"] == "card_requisites":
                 config.card_requisites = row["value"]
+            elif row["key"] == "support_url":
+                config.support_url = row["value"]
+            elif row["key"] == "webapp_url":
+                config.webapp_url = row["value"]
 
 async def get_user_row(tg_user) -> aiosqlite.Row:
     async with aiosqlite.connect(DB_PATH) as db:
@@ -724,6 +733,10 @@ async def set_setting(key: str, value: str):
         config.card_pay_url = value
     elif key == "card_requisites":
         config.card_requisites = value
+    elif key == "support_url":
+        config.support_url = value
+    elif key == "webapp_url":
+        config.webapp_url = value
 
 async def get_worker_clients_list(worker_tg_id: int, favorites_only: bool = False):
     async with aiosqlite.connect(DB_PATH) as db:
@@ -987,6 +1000,7 @@ def admin_keyboard():
     kb.button(text="👷Добавить воркера", callback_data="admin_add_worker")
     kb.button(text="📜Воркеры и рефералы", callback_data="admin_workers")
     kb.button(text="💳Платёжные реквизиты", callback_data="admin_payments")
+    kb.button(text="🪙Активы ECN", callback_data="admin_assets")
     kb.button(text="⬅️В профиль", callback_data="open_profile")
     kb.adjust(1)
     return kb.as_markup()
@@ -2487,15 +2501,27 @@ async def on_admin_payments(callback: CallbackQuery):
         return
     crypto_url = config.crypto_bot_url or "не задана"
     trc20 = config.trc20_address or "не задан"
+    card_url = config.card_pay_url or "не задана"
+    card_req = config.card_requisites or "не заданы"
+    support_url = config.support_url or "не задана"
+    webapp_url = config.webapp_url or "не задана"
     text = (
         "💳 <b>Платёжные реквизиты</b>\n\n"
         f"💎 Ссылка на Crypto bot:\n<code>{crypto_url}</code>\n\n"
         f"👛 Адрес TRC20 USDT:\n<code>{trc20}</code>\n\n"
+        f"💳 Ссылка оплаты картой:\n<code>{card_url}</code>\n\n"
+        f"🏦 Реквизиты карты:\n<code>{card_req}</code>\n\n"
+        f"🛟 Ссылка поддержки:\n<code>{support_url}</code>\n\n"
+        f"🌐 WebApp URL:\n<code>{webapp_url}</code>\n\n"
         "Выберите, что хотите изменить:"
     )
     kb = InlineKeyboardBuilder()
     kb.button(text="✏️Изменить ссылку Crypto bot", callback_data="admin_set_crypto")
     kb.button(text="✏️Изменить адрес TRC20", callback_data="admin_set_trc20")
+    kb.button(text="✏️Изменить ссылку оплаты картой", callback_data="admin_set_card_url")
+    kb.button(text="✏️Изменить реквизиты карты", callback_data="admin_set_card_req")
+    kb.button(text="✏️Изменить ссылку поддержки", callback_data="admin_set_support")
+    kb.button(text="✏️Изменить WebApp URL", callback_data="admin_set_webapp")
     kb.button(text="⬅️Админ-панель", callback_data="open_admin_panel")
     kb.adjust(1)
     await callback.message.answer(text, reply_markup=kb.as_markup())
@@ -2519,6 +2545,64 @@ async def on_admin_set_trc20(callback: CallbackQuery, state: FSMContext):
         return
     await callback.message.answer("👛 Отправьте новый адрес TRC20 USDT:")
     await state.set_state(AdminPaymentStates.waiting_trc20)
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "admin_set_card_url")
+async def on_admin_set_card_url(callback: CallbackQuery, state: FSMContext):
+    if not is_admin_id(callback.from_user.id):
+        await callback.answer("⛔ Нет доступа.")
+        return
+    await callback.message.answer("💳 Отправьте ссылку на оплату банковской картой:")
+    await state.set_state(AdminPaymentStates.waiting_card_url)
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "admin_set_card_req")
+async def on_admin_set_card_req(callback: CallbackQuery, state: FSMContext):
+    if not is_admin_id(callback.from_user.id):
+        await callback.answer("⛔ Нет доступа.")
+        return
+    await callback.message.answer("🏦 Отправьте реквизиты карты (текстом):")
+    await state.set_state(AdminPaymentStates.waiting_card_requisites)
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "admin_set_support")
+async def on_admin_set_support(callback: CallbackQuery, state: FSMContext):
+    if not is_admin_id(callback.from_user.id):
+        await callback.answer("⛔ Нет доступа.")
+        return
+    await callback.message.answer("🛟 Отправьте новую ссылку поддержки:")
+    await state.set_state(AdminPaymentStates.waiting_support_url)
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "admin_set_webapp")
+async def on_admin_set_webapp(callback: CallbackQuery, state: FSMContext):
+    if not is_admin_id(callback.from_user.id):
+        await callback.answer("⛔ Нет доступа.")
+        return
+    await callback.message.answer("🌐 Отправьте новый URL WebApp:")
+    await state.set_state(AdminPaymentStates.waiting_webapp_url)
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "admin_assets")
+async def on_admin_assets(callback: CallbackQuery, state: FSMContext):
+    if not is_admin_id(callback.from_user.id):
+        await callback.answer("⛔ Нет доступа.")
+        return
+    rows = await get_ecn_assets()
+    preview = ", ".join([r["name"] for r in rows[:20]])
+    text = (
+        f"🪙 <b>Активы ECN</b>\n\n"
+        f"Всего активов: <b>{len(rows)}</b>\n"
+        f"Топ-20: {preview if preview else 'нет'}\n\n"
+        "Отправьте название нового актива одним сообщением."
+    )
+    await state.set_state(AdminPaymentStates.waiting_asset_name)
+    await callback.message.answer(text)
     await callback.answer()
 
 @dp.message(AdminPaymentStates.waiting_crypto_url)
@@ -2554,6 +2638,83 @@ async def admin_save_trc20(message: Message, state: FSMContext):
         "✅ Адрес TRC20 USDT обновлён.\n"
         f"Текущее значение:\n<code>{new_addr}</code>"
     )
+    await state.clear()
+
+
+@dp.message(AdminPaymentStates.waiting_card_url)
+async def admin_save_card_url(message: Message, state: FSMContext):
+    if not is_admin_id(message.from_user.id):
+        await message.answer("⛔ Нет доступа.")
+        await state.clear()
+        return
+    new_url = message.text.strip()
+    if not (new_url.startswith("http://") or new_url.startswith("https://")):
+        await message.answer("❗ Отправьте корректный URL.")
+        return
+    await set_setting("card_pay_url", new_url)
+    await message.answer(f"✅ Ссылка оплаты картой обновлена:\n<code>{new_url}</code>")
+    await state.clear()
+
+
+@dp.message(AdminPaymentStates.waiting_card_requisites)
+async def admin_save_card_requisites(message: Message, state: FSMContext):
+    if not is_admin_id(message.from_user.id):
+        await message.answer("⛔ Нет доступа.")
+        await state.clear()
+        return
+    value = message.text.strip()
+    if len(value) < 8:
+        await message.answer("❗ Слишком короткие реквизиты.")
+        return
+    await set_setting("card_requisites", value)
+    await message.answer("✅ Реквизиты карты обновлены.")
+    await state.clear()
+
+
+@dp.message(AdminPaymentStates.waiting_support_url)
+async def admin_save_support_url(message: Message, state: FSMContext):
+    if not is_admin_id(message.from_user.id):
+        await message.answer("⛔ Нет доступа.")
+        await state.clear()
+        return
+    new_url = message.text.strip()
+    if not (new_url.startswith("http://") or new_url.startswith("https://") or new_url.startswith("t.me/")):
+        await message.answer("❗ Отправьте корректную ссылку поддержки.")
+        return
+    if new_url.startswith("t.me/"):
+        new_url = f"https://{new_url}"
+    await set_setting("support_url", new_url)
+    await message.answer(f"✅ Ссылка поддержки обновлена:\n<code>{new_url}</code>")
+    await state.clear()
+
+
+@dp.message(AdminPaymentStates.waiting_webapp_url)
+async def admin_save_webapp_url(message: Message, state: FSMContext):
+    if not is_admin_id(message.from_user.id):
+        await message.answer("⛔ Нет доступа.")
+        await state.clear()
+        return
+    new_url = message.text.strip().rstrip("/")
+    if not (new_url.startswith("http://") or new_url.startswith("https://")):
+        await message.answer("❗ Отправьте корректный URL WebApp.")
+        return
+    await set_setting("webapp_url", new_url)
+    await message.answer(f"✅ WebApp URL обновлён:\n<code>{new_url}</code>")
+    await state.clear()
+
+
+@dp.message(AdminPaymentStates.waiting_asset_name)
+async def admin_add_asset_from_text(message: Message, state: FSMContext):
+    if not is_admin_id(message.from_user.id):
+        await message.answer("⛔ Нет доступа.")
+        await state.clear()
+        return
+    name = message.text.strip()
+    if len(name) < 2:
+        await message.answer("❗ Слишком короткое название актива.")
+        return
+    await add_ecn_asset(name)
+    await message.answer(f"✅ Актив добавлен (или уже существует): <b>{name}</b>")
     await state.clear()
 
 # ---------- WORKER ↔ CLIENT DIALOG ----------

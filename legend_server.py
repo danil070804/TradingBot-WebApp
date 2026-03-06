@@ -6,11 +6,12 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from aiogram.types import Update
+from starlette.middleware.sessions import SessionMiddleware
 
 import bot
 import db_compat as db
@@ -29,6 +30,9 @@ BOT_MODE = os.getenv("BOT_MODE", "webhook").strip().lower()
 POLLING_LOCK_KEY = int(os.getenv("BOT_POLLING_LOCK_KEY", "8598101146"))
 WEBHOOK_PATH = os.getenv("WEBHOOK_PATH", "/telegram/webhook")
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")
+SESSION_SECRET = os.getenv("SESSION_SECRET", WEBHOOK_SECRET or "legend_trading_session_secret")
+ADMIN_WEB_USERNAME = os.getenv("ADMIN_WEB_USERNAME", "admin")
+ADMIN_WEB_PASSWORD = os.getenv("ADMIN_WEB_PASSWORD", "")
 
 
 polling_task: asyncio.Task | None = None
@@ -88,6 +92,22 @@ async def fetch_one(query: str, params: tuple = ()):
         conn.row_factory = db.Row
         cur = await conn.execute(query, params)
         return await cur.fetchone()
+
+
+async def get_settings_map() -> dict:
+    rows = await fetch_all("SELECT key, value FROM settings")
+    data = {row["key"]: row["value"] for row in rows}
+    data.setdefault("crypto_bot_url", bot.config.crypto_bot_url or "")
+    data.setdefault("trc20_address", bot.config.trc20_address or "")
+    data.setdefault("card_pay_url", bot.config.card_pay_url or "")
+    data.setdefault("card_requisites", bot.config.card_requisites or "")
+    data.setdefault("support_url", bot.config.support_url or "")
+    data.setdefault("webapp_url", bot.config.webapp_url or "")
+    return data
+
+
+def is_admin_session(request: Request) -> bool:
+    return bool(request.session.get("is_admin"))
 
 
 async def get_or_pick_user_id() -> int:
@@ -151,6 +171,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Legend Trading", lifespan=lifespan)
+app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET, same_site="lax", https_only=True)
 templates = Jinja2Templates(directory=str(WEB_DIR / "templates"))
 app.mount("/static", StaticFiles(directory=str(WEB_DIR / "static")), name="static")
 
@@ -264,6 +285,96 @@ async def profile_page(request: Request):
             "tg_id": tg_id,
         },
     )
+
+
+@app.get("/admin/login", response_class=HTMLResponse)
+async def admin_login_page(request: Request):
+    if is_admin_session(request):
+        return RedirectResponse(url="/admin", status_code=302)
+    return templates.TemplateResponse("admin_login.html", {"request": request, "title": "Legend Trading Admin"})
+
+
+class AdminLoginPayload(BaseModel):
+    username: str
+    password: str
+
+
+@app.post("/admin/login", response_class=JSONResponse)
+async def admin_login(payload: AdminLoginPayload, request: Request):
+    if payload.username == ADMIN_WEB_USERNAME and payload.password == ADMIN_WEB_PASSWORD and ADMIN_WEB_PASSWORD:
+        request.session["is_admin"] = True
+        return JSONResponse({"ok": True})
+    return JSONResponse({"ok": False, "error": "Invalid credentials"}, status_code=401)
+
+
+@app.post("/admin/logout", response_class=JSONResponse)
+async def admin_logout(request: Request):
+    request.session.clear()
+    return JSONResponse({"ok": True})
+
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_dashboard(request: Request):
+    if not is_admin_session(request):
+        return RedirectResponse(url="/admin/login", status_code=302)
+    users = await fetch_one("SELECT COUNT(*) AS c FROM users")
+    workers = await fetch_one("SELECT COUNT(*) AS c FROM users WHERE is_worker = 1")
+    deals = await fetch_one("SELECT COUNT(*) AS c FROM deals")
+    withdrawals_pending = await fetch_one("SELECT COUNT(*) AS c FROM withdrawals WHERE status = 'pending'")
+    settings_map = await get_settings_map()
+    assets = await fetch_all("SELECT id, name FROM ecn_assets ORDER BY id ASC LIMIT 200")
+    return templates.TemplateResponse(
+        "admin_dashboard.html",
+        {
+            "request": request,
+            "title": "Legend Trading Admin",
+            "users_count": int(users["c"] if users else 0),
+            "workers_count": int(workers["c"] if workers else 0),
+            "deals_count": int(deals["c"] if deals else 0),
+            "pending_withdrawals": int(withdrawals_pending["c"] if withdrawals_pending else 0),
+            "settings_map": settings_map,
+            "assets": assets,
+        },
+    )
+
+
+class AdminSettingPayload(BaseModel):
+    key: str
+    value: str
+
+
+@app.post("/admin/api/settings", response_class=JSONResponse)
+async def admin_update_setting(payload: AdminSettingPayload, request: Request):
+    if not is_admin_session(request):
+        return JSONResponse({"ok": False, "error": "Unauthorized"}, status_code=401)
+    allowed_keys = {
+        "crypto_bot_url",
+        "trc20_address",
+        "card_pay_url",
+        "card_requisites",
+        "support_url",
+        "webapp_url",
+    }
+    key = payload.key.strip()
+    if key not in allowed_keys:
+        return JSONResponse({"ok": False, "error": "Unsupported key"}, status_code=400)
+    await bot.set_setting(key, payload.value.strip())
+    return JSONResponse({"ok": True})
+
+
+class AdminAssetPayload(BaseModel):
+    name: str
+
+
+@app.post("/admin/api/assets", response_class=JSONResponse)
+async def admin_add_asset(payload: AdminAssetPayload, request: Request):
+    if not is_admin_session(request):
+        return JSONResponse({"ok": False, "error": "Unauthorized"}, status_code=401)
+    name = payload.name.strip()
+    if len(name) < 2:
+        return JSONResponse({"ok": False, "error": "Asset name too short"}, status_code=400)
+    await bot.add_ecn_asset(name)
+    return JSONResponse({"ok": True, "name": name})
 
 
 class TradeOpenPayload(BaseModel):

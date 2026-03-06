@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Legend Trading Admin</title>
+    <link rel="stylesheet" href="/static/css/legend.css">
+</head>
+<body>
+<div class="page-bg"></div>
+<div class="app-shell" style="max-width: 1100px;">
+    <main class="content">
+        <section class="card hero">
+            <h1>Админ-панель</h1>
+            <div class="hint">Управление реквизитами, монетами и параметрами платформы</div>
+        </section>
+
+        <section class="metrics">
+            <article class="card metric"><h3>Users</h3><p>{{ users_count }}</p></article>
+            <article class="card metric"><h3>Workers</h3><p>{{ workers_count }}</p></article>
+            <article class="card metric"><h3>Deals</h3><p>{{ deals_count }}</p></article>
+            <article class="card metric"><h3>Pending WD</h3><p>{{ pending_withdrawals }}</p></article>
+        </section>
+
+        <section class="card">
+            <div class="section-title">Системные реквизиты</div>
+            <div class="form-grid">
+                <label>Crypto Bot URL<input id="s-crypto_bot_url" value="{{ settings_map.crypto_bot_url }}"></label>
+                <label>TRC20 Address<input id="s-trc20_address" value="{{ settings_map.trc20_address }}"></label>
+                <label>Card Pay URL<input id="s-card_pay_url" value="{{ settings_map.card_pay_url }}"></label>
+                <label>Card Requisites<input id="s-card_requisites" value="{{ settings_map.card_requisites }}"></label>
+                <label>Support URL<input id="s-support_url" value="{{ settings_map.support_url }}"></label>
+                <label>WebApp URL<input id="s-webapp_url" value="{{ settings_map.webapp_url }}"></label>
+                <button class="submit" type="button" onclick="saveSettings()">Сохранить настройки</button>
+            </div>
+            <div id="settings-result" class="result-box"></div>
+        </section>
+
+        <section class="card">
+            <div class="section-title">Активы ECN</div>
+            <div class="form-grid">
+                <label>Добавить актив<input id="new-asset-name" placeholder="Например, BNB"></label>
+                <button class="submit alt" type="button" onclick="addAsset()">Добавить</button>
+            </div>
+            <div id="asset-result" class="result-box"></div>
+            <div class="list">
+                {% for a in assets %}
+                <div class="row"><div><b>{{ a.id }}</b> {{ a.name }}</div></div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="card">
+            <button class="submit alt" type="button" onclick="logout()">Выйти из админки</button>
+        </section>
+    </main>
+</div>
+<script>
+async function saveKey(key, value) {
+    const r = await fetch("/admin/api/settings", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({key, value})
+    });
+    return r.ok;
+}
+
+async function saveSettings() {
+    const keys = [
+        "crypto_bot_url", "trc20_address", "card_pay_url",
+        "card_requisites", "support_url", "webapp_url"
+    ];
+    let ok = true;
+    for (const key of keys) {
+        const value = document.getElementById(`s-${key}`).value;
+        const res = await saveKey(key, value);
+        if (!res) ok = false;
+    }
+    document.getElementById("settings-result").innerHTML = ok
+        ? '<span class="pos">Настройки сохранены</span>'
+        : '<span class="neg">Ошибка сохранения</span>';
+}
+
+async function addAsset() {
+    const name = document.getElementById("new-asset-name").value.trim();
+    const r = await fetch("/admin/api/assets", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({name})
+    });
+    if (r.ok) {
+        document.getElementById("asset-result").innerHTML = '<span class="pos">Актив добавлен</span>';
+        setTimeout(() => location.reload(), 450);
+        return;
+    }
+    document.getElementById("asset-result").innerHTML = '<span class="neg">Не удалось добавить актив</span>';
+}
+
+async function logout() {
+    await fetch("/admin/logout", {method: "POST"});
+    location.href = "/admin/login";
+}
+</script>
+</body>
+</html>
