@@ -66,6 +66,7 @@ ASSET_SPECS = {
     "LTC": {"name": "Litecoin", "start": 86.0, "vol": 0.008, "qty_min": 0.2, "qty_max": 240.0},
 }
 MARKET_PRICE_STATE = {k: v["start"] for k, v in ASSET_SPECS.items()}
+MARKET_DAY_STATS = {k: {"high": v["start"], "low": v["start"]} for k, v in ASSET_SPECS.items()}
 
 WEB_I18N = {
     "ru": {
@@ -546,6 +547,9 @@ def next_symbol_price(symbol: str) -> float:
     drift = (random.random() - 0.5) * 2 * vol
     updated = max(0.00001, base * (1 + drift))
     MARKET_PRICE_STATE[symbol] = updated
+    stats = MARKET_DAY_STATS.setdefault(symbol, {"high": updated, "low": updated})
+    stats["high"] = max(stats["high"], updated)
+    stats["low"] = min(stats["low"], updated)
     return updated
 
 
@@ -1333,6 +1337,30 @@ async def api_market_tape():
     return JSONResponse({"ok": True, "items": list(MARKET_TAPE)[:25]})
 
 
+@app.get("/api/market/snapshot", response_class=JSONResponse)
+async def api_market_snapshot(symbol: str = "BTC"):
+    sym = symbol_from_asset_name(symbol)
+    asks, bids, mark = build_orderbook(sym, levels=10)
+    spread = max(0.00001, asks[0]["price"] - bids[0]["price"])
+    day_stats = MARKET_DAY_STATS.get(sym, {"high": mark, "low": mark})
+    tick = generate_tape_tick()
+    MARKET_TAPE.appendleft(tick)
+    return JSONResponse(
+        {
+            "ok": True,
+            "symbol": sym,
+            "ts": int(time.time()),
+            "mark": round(mark, 2 if mark >= 1 else 5),
+            "spread": round(spread, 5 if mark < 1 else 2),
+            "high": round(day_stats["high"], 2 if day_stats["high"] >= 1 else 5),
+            "low": round(day_stats["low"], 2 if day_stats["low"] >= 1 else 5),
+            "asks": asks,
+            "bids": bids,
+            "tick": tick,
+        }
+    )
+
+
 @app.websocket("/ws/market")
 async def ws_market(websocket: WebSocket):
     await websocket.accept()
@@ -1352,12 +1380,17 @@ async def ws_market(websocket: WebSocket):
             asks, bids, mark = build_orderbook(symbol, levels=10)
             tick = generate_tape_tick()
             MARKET_TAPE.appendleft(tick)
+            spread = max(0.00001, asks[0]["price"] - bids[0]["price"])
+            day_stats = MARKET_DAY_STATS.get(symbol, {"high": mark, "low": mark})
             await websocket.send_json(
                 {
                     "type": "market",
                     "symbol": symbol,
                     "ts": int(time.time()),
                     "mark": round(mark, 2 if mark >= 1 else 5),
+                    "spread": round(spread, 5 if mark < 1 else 2),
+                    "high": round(day_stats["high"], 2 if day_stats["high"] >= 1 else 5),
+                    "low": round(day_stats["low"], 2 if day_stats["low"] >= 1 else 5),
                     "asks": asks,
                     "bids": bids,
                     "tick": tick,

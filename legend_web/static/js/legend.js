@@ -287,6 +287,29 @@ function drawCandles(canvas, candles) {
     }
 }
 
+function updateMarketStats(data) {
+    const m = document.getElementById("stat-mark");
+    const s = document.getElementById("stat-spread");
+    const h = document.getElementById("stat-high");
+    const l = document.getElementById("stat-low");
+    if (m) m.textContent = `${data.mark ?? "--"}`;
+    if (s) s.textContent = `${data.spread ?? "--"}`;
+    if (h) h.textContent = `${data.high ?? "--"}`;
+    if (l) l.textContent = `${data.low ?? "--"}`;
+}
+
+function pushMiniTapeTick(tick) {
+    const mini = document.getElementById("mini-tape");
+    if (!mini || !tick) return;
+    const sideClass = tick.side === "buy" ? "pos" : "neg";
+    const sideText = tick.side === "buy" ? L("js_side_buy", "BUY") : L("js_side_sell", "SELL");
+    const node = document.createElement("div");
+    node.className = "row mono";
+    node.innerHTML = `<div><b>${tick.symbol}</b><small class="${sideClass}">${sideText}</small></div><div>${tick.price} • ${tick.qty}</div>`;
+    mini.prepend(node);
+    while (mini.children.length > 8) mini.lastElementChild.remove();
+}
+
 function bindMarketSocket() {
     const asksWrap = document.getElementById("orderbook-asks");
     const bidsWrap = document.getElementById("orderbook-bids");
@@ -307,13 +330,47 @@ function bindMarketSocket() {
 
     const protocol = window.location.protocol === "https:" ? "wss" : "ws";
     const ws = new WebSocket(`${protocol}://${window.location.host}/ws/market`);
+    let fallbackTimer = null;
 
     const subscribe = () => {
         ws.send(JSON.stringify({ type: "subscribe", symbol: pairSelect.value || "BTC" }));
     };
 
+    const applyMarketData = (data) => {
+        markEl.textContent = data.mark;
+        updateMarketStats(data);
+        asksWrap.innerHTML = (data.asks || [])
+            .map((r) => `<div class="book-row ask"><span>${r.price}</span><em>${r.qty}</em></div>`)
+            .join("");
+        bidsWrap.innerHTML = (data.bids || [])
+            .map((r) => `<div class="book-row bid"><span>${r.price}</span><em>${r.qty}</em></div>`)
+            .join("");
+        pushCandle(state, Number(data.mark), Number(data.ts || Math.floor(Date.now() / 1000)));
+        drawCandles(canvas, state.candles);
+        pushMiniTapeTick(data.tick);
+    };
+
+    const startFallback = () => {
+        if (fallbackTimer) return;
+        fallbackTimer = setInterval(async () => {
+            try {
+                const sym = encodeURIComponent(pairSelect.value || "BTC");
+                const resp = await fetch(`/api/market/snapshot?symbol=${sym}`);
+                if (!resp.ok) return;
+                const data = await resp.json();
+                if (data.ok) applyMarketData(data);
+            } catch (_) {
+                // no-op
+            }
+        }, 1100);
+    };
+
     ws.addEventListener("open", () => {
         subscribe();
+        if (fallbackTimer) {
+            clearInterval(fallbackTimer);
+            fallbackTimer = null;
+        }
     });
 
     pairSelect.addEventListener("change", () => {
@@ -329,35 +386,16 @@ function bindMarketSocket() {
             return;
         }
         if (!data || data.type !== "market") return;
-
-        markEl.textContent = data.mark;
-        asksWrap.innerHTML = (data.asks || [])
-            .map((r) => `<div class="book-row ask"><span>${r.price}</span><em>${r.qty}</em></div>`)
-            .join("");
-        bidsWrap.innerHTML = (data.bids || [])
-            .map((r) => `<div class="book-row bid"><span>${r.price}</span><em>${r.qty}</em></div>`)
-            .join("");
-
-        pushCandle(state, Number(data.mark), Number(data.ts || Math.floor(Date.now() / 1000)));
-        drawCandles(canvas, state.candles);
-
-        if (data.tick) {
-            const current = document.querySelectorAll("#market-tape-list .row");
-            const wrap = document.getElementById("market-tape-list");
-            if (wrap) {
-                const row = document.createElement("div");
-                row.className = "row mono";
-                const sideClass = data.tick.side === "buy" ? "pos" : "neg";
-                const sideText = data.tick.side === "buy" ? L("js_side_buy", "BUY") : L("js_side_sell", "SELL");
-                row.innerHTML = `<div><b>${data.tick.symbol}</b><small class="${sideClass}">${sideText}</small></div><div>${data.tick.price} • ${data.tick.qty}</div>`;
-                wrap.prepend(row);
-                if (current.length > 22) current[current.length - 1].remove();
-            }
-        }
+        applyMarketData(data);
     });
 
     ws.addEventListener("close", () => {
+        startFallback();
         setTimeout(bindMarketSocket, 1200);
+    });
+
+    ws.addEventListener("error", () => {
+        startFallback();
     });
 }
 

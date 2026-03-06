@@ -8,6 +8,25 @@
     <div class="pulse-wrap"><div id="market-pulse" class="pulse-track"></div></div>
 </section>
 
+<section class="stats-grid">
+    <article class="card stat-card">
+        <small>MARK</small>
+        <b id="stat-mark">--</b>
+    </article>
+    <article class="card stat-card">
+        <small>SPREAD</small>
+        <b id="stat-spread">--</b>
+    </article>
+    <article class="card stat-card">
+        <small>24H HIGH</small>
+        <b id="stat-high">--</b>
+    </article>
+    <article class="card stat-card">
+        <small>24H LOW</small>
+        <b id="stat-low">--</b>
+    </article>
+</section>
+
 <section class="card">
     <div class="chart-top">
         <div class="section-title">Candle Chart</div>
@@ -85,9 +104,19 @@
     <div class="trade-right">
         <div class="section-title">{{ labels.trade_order_book if labels else "Order Book" }}</div>
         <div class="book">
-            <div id="orderbook-asks"></div>
+            <div id="orderbook-asks">
+                <div class="book-row ask"><span>--</span><em>--</em></div>
+                <div class="book-row ask"><span>--</span><em>--</em></div>
+            </div>
             <div class="book-mid">MARK <span id="orderbook-mark">--</span></div>
-            <div id="orderbook-bids"></div>
+            <div id="orderbook-bids">
+                <div class="book-row bid"><span>--</span><em>--</em></div>
+                <div class="book-row bid"><span>--</span><em>--</em></div>
+            </div>
+        </div>
+        <div class="section-title tape-title">{{ labels.live_tape if labels else "Лента рынка (live)" }}</div>
+        <div class="mini-tape" id="mini-tape">
+            <div class="row mono"><div><b>--</b><small>--</small></div><div>--</div></div>
         </div>
     </div>
 </section>
