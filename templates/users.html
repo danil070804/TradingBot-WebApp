@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Пользователи | Trading Bot{% endblock %}
+{% block content %}
+<section class="hero">
+    <h1>Пользователи</h1>
+    <p>Список всех аккаунтов с параметрами и текущим балансом.</p>
+</section>
+<section class="table-card">
+    <table>
+        <thead>
+        <tr>
+            <th>TG ID</th>
+            <th>Имя</th>
+            <th>Username</th>
+            <th>Язык</th>
+            <th>Валюта</th>
+            <th>Баланс</th>
+            <th>Роль</th>
+            <th>Создан</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for u in users %}
+        <tr>
+            <td>{{ u.tg_id }}</td>
+            <td>{{ u.first_name or "-" }}</td>
+            <td>@{{ u.username or "-" }}</td>
+            <td>{{ u.language or "-" }}</td>
+            <td>{{ u.currency or "-" }}</td>
+            <td>{{ "%.2f"|format(u.balance or 0) }}</td>
+            <td>{{ "Worker" if u.is_worker else "Client" }}</td>
+            <td>{{ u.created_at }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

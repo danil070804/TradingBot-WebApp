@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Выводы | Trading Bot{% endblock %}
+{% block content %}
+<section class="hero">
+    <h1>Выводы</h1>
+    <p>Контроль заявок на вывод, методов и статусов.</p>
+</section>
+<section class="table-card">
+    <table>
+        <thead>
+        <tr>
+            <th>ID</th>
+            <th>User</th>
+            <th>Сумма</th>
+            <th>Метод</th>
+            <th>Реквизиты</th>
+            <th>Статус</th>
+            <th>Создано</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for w in withdrawals %}
+        <tr>
+            <td>#{{ w.id }}</td>
+            <td>{{ w.user_tg_id }}</td>
+            <td>{{ "%.2f"|format(w.amount) }} {{ w.currency }}</td>
+            <td>{{ w.method }}</td>
+            <td>{{ w.details }}</td>
+            <td>{{ w.status }}</td>
+            <td>{{ w.created_at }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}
