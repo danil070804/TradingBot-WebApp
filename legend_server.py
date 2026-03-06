@@ -5,6 +5,8 @@ import contextlib
 import json
 import hmac
 import hashlib
+import time
+import secrets
 from collections import deque
 from urllib.parse import parse_qsl
 from contextlib import asynccontextmanager
@@ -47,6 +49,7 @@ polling_task: asyncio.Task | None = None
 polling_lock_conn = None
 market_feed_task: asyncio.Task | None = None
 MARKET_TAPE = deque(maxlen=120)
+ACTIVE_WEB_TRADES: dict[str, dict] = {}
 
 WEB_I18N = {
     "ru": {
@@ -61,6 +64,7 @@ WEB_I18N = {
         "quick_deposit": "Пополнить",
         "quick_history": "История сделок",
         "quick_profile": "Полный профиль",
+        "quick_worker": "Панель воркера",
         "live_tape": "Лента рынка (live)",
         "home_balance": "Общий баланс",
         "home_success": "Успешные",
@@ -79,6 +83,9 @@ WEB_I18N = {
         "trade_short": "ШОРТ",
         "trade_create": "Создать сделку",
         "trade_order_book": "Order Book",
+        "trade_countdown": "До завершения",
+        "trade_status_open": "Сделка открыта",
+        "trade_status_closed": "Сделка закрыта",
         "deals_title": "История сделок",
         "deals_empty": "История пока пустая.",
         "deposit_title": "Пополнение баланса",
@@ -115,6 +122,8 @@ WEB_I18N = {
         "js_trade_opening": "Открываем сделку...",
         "js_trade_error": "не удалось открыть сделку",
         "js_trade_done": "Сделка завершена",
+        "js_trade_started": "Сделка открыта, идет отсчет",
+        "js_trade_waiting": "До завершения",
         "js_trade_balance": "Новый баланс",
         "js_trade_rate": "Курс",
         "js_network_error": "Сетевая ошибка",
@@ -128,6 +137,9 @@ WEB_I18N = {
         "js_loading": "Загрузка...",
         "js_side_buy": "ПОКУПКА",
         "js_side_sell": "ПРОДАЖА",
+        "worker_title": "Панель воркера",
+        "worker_hint": "Управление вашими рефералами в реальном времени",
+        "worker_empty": "У вас пока нет рефералов.",
     },
     "en": {
         "nav_home": "Home",
@@ -141,6 +153,7 @@ WEB_I18N = {
         "quick_deposit": "Deposit",
         "quick_history": "Trade History",
         "quick_profile": "Full Profile",
+        "quick_worker": "Worker Panel",
         "live_tape": "Market Tape (live)",
         "home_balance": "Total Balance",
         "home_success": "Wins",
@@ -159,6 +172,9 @@ WEB_I18N = {
         "trade_short": "SHORT",
         "trade_create": "Create Deal",
         "trade_order_book": "Order Book",
+        "trade_countdown": "Time left",
+        "trade_status_open": "Trade opened",
+        "trade_status_closed": "Trade closed",
         "deals_title": "Deals History",
         "deals_empty": "No history yet.",
         "deposit_title": "Balance Top Up",
@@ -195,6 +211,8 @@ WEB_I18N = {
         "js_trade_opening": "Opening trade...",
         "js_trade_error": "failed to open trade",
         "js_trade_done": "Deal completed",
+        "js_trade_started": "Trade opened, countdown started",
+        "js_trade_waiting": "Time left",
         "js_trade_balance": "New balance",
         "js_trade_rate": "Rate",
         "js_network_error": "Network error",
@@ -208,6 +226,9 @@ WEB_I18N = {
         "js_loading": "Loading...",
         "js_side_buy": "BUY",
         "js_side_sell": "SELL",
+        "worker_title": "Worker Panel",
+        "worker_hint": "Manage your referrals in real time",
+        "worker_empty": "No referrals yet.",
     },
     "uk": {
         "nav_home": "Головна",
@@ -221,6 +242,7 @@ WEB_I18N = {
         "quick_deposit": "Поповнити",
         "quick_history": "Історія угод",
         "quick_profile": "Повний профіль",
+        "quick_worker": "Панель воркера",
         "live_tape": "Стрічка ринку (live)",
         "home_balance": "Загальний баланс",
         "home_success": "Успішні",
@@ -239,6 +261,9 @@ WEB_I18N = {
         "trade_short": "ШОРТ",
         "trade_create": "Створити угоду",
         "trade_order_book": "Order Book",
+        "trade_countdown": "До завершення",
+        "trade_status_open": "Угода відкрита",
+        "trade_status_closed": "Угода закрита",
         "deals_title": "Історія угод",
         "deals_empty": "Історія поки порожня.",
         "deposit_title": "Поповнення балансу",
@@ -275,6 +300,8 @@ WEB_I18N = {
         "js_trade_opening": "Відкриваємо угоду...",
         "js_trade_error": "не вдалося відкрити угоду",
         "js_trade_done": "Угода завершена",
+        "js_trade_started": "Угода відкрита, іде відлік",
+        "js_trade_waiting": "До завершення",
         "js_trade_balance": "Новий баланс",
         "js_trade_rate": "Курс",
         "js_network_error": "Мережева помилка",
@@ -288,6 +315,9 @@ WEB_I18N = {
         "js_loading": "Завантаження...",
         "js_side_buy": "КУПІВЛЯ",
         "js_side_sell": "ПРОДАЖ",
+        "worker_title": "Панель воркера",
+        "worker_hint": "Керуйте вашими рефералами у реальному часі",
+        "worker_empty": "У вас поки немає рефералів.",
     },
 }
 
@@ -682,7 +712,7 @@ async def profile_page(request: Request):
             {"request": request, "page": "profile", "title": "Legend Trading", "user": None, "stats": {"total": 0, "wins": 0, "losses": 0, "total_profit": 0.0}, "pending": 0.0, "tg_id": 0, "withdrawals": [], "deposits": [], "lang": lang, "labels": labels},
         )
     user = await fetch_one(
-        "SELECT tg_id, first_name, username, language, currency, balance, created_at FROM users WHERE tg_id = ?",
+        "SELECT tg_id, first_name, username, language, currency, balance, is_worker, created_at FROM users WHERE tg_id = ?",
         (tg_id,),
     )
     stats = await bot.get_user_deal_stats(tg_id) if tg_id else {"wins": 0, "losses": 0, "total": 0, "total_profit": 0.0}
@@ -711,6 +741,123 @@ async def profile_page(request: Request):
             "labels": labels,
         },
     )
+
+
+@app.get("/worker", response_class=HTMLResponse)
+async def worker_page(request: Request):
+    tg_id = await get_current_user_id(request)
+    if not tg_id:
+        return RedirectResponse(url="/", status_code=302)
+
+    user = await fetch_one("SELECT is_worker FROM users WHERE tg_id = ?", (tg_id,))
+    if not user or not bool(user["is_worker"]):
+        return RedirectResponse(url="/profile", status_code=302)
+
+    lang, labels = await get_request_lang_labels(request, tg_id)
+    rows = await fetch_all(
+        """
+        SELECT wc.id, wc.client_tg_id, wc.min_deposit, wc.min_withdraw, wc.verified, wc.withdraw_enabled,
+               wc.trading_enabled, wc.favorite, wc.blocked, u.first_name, u.username, u.balance, u.currency
+        FROM worker_clients wc
+        LEFT JOIN users u ON u.tg_id = wc.client_tg_id
+        WHERE wc.worker_tg_id = ?
+        ORDER BY wc.id DESC
+        LIMIT 200
+        """,
+        (tg_id,),
+    )
+    return templates.TemplateResponse(
+        "worker.html",
+        {
+            "request": request,
+            "page": "worker",
+            "title": "Legend Trading Worker",
+            "lang": lang,
+            "labels": labels,
+            "worker_id": tg_id,
+            "clients": rows,
+        },
+    )
+
+
+@app.get("/api/worker/clients", response_class=JSONResponse)
+async def api_worker_clients(request: Request):
+    tg_id = await get_current_user_id(request)
+    user = await fetch_one("SELECT is_worker FROM users WHERE tg_id = ?", (tg_id,))
+    if not user or not bool(user["is_worker"]):
+        return JSONResponse({"ok": False, "error": "Forbidden"}, status_code=403)
+    rows = await fetch_all(
+        """
+        SELECT wc.id, wc.client_tg_id, wc.min_deposit, wc.min_withdraw, wc.verified, wc.withdraw_enabled,
+               wc.trading_enabled, wc.favorite, wc.blocked, u.first_name, u.username, u.balance, u.currency
+        FROM worker_clients wc
+        LEFT JOIN users u ON u.tg_id = wc.client_tg_id
+        WHERE wc.worker_tg_id = ?
+        ORDER BY wc.id DESC
+        LIMIT 200
+        """,
+        (tg_id,),
+    )
+    items = [dict(r) for r in rows]
+    return JSONResponse({"ok": True, "items": items})
+
+
+class WorkerClientUpdatePayload(BaseModel):
+    wc_id: int
+    action: str
+    value: float | int | None = None
+
+
+@app.post("/api/worker/client/update", response_class=JSONResponse)
+async def api_worker_client_update(payload: WorkerClientUpdatePayload, request: Request):
+    tg_id = await get_current_user_id(request)
+    user = await fetch_one("SELECT is_worker FROM users WHERE tg_id = ?", (tg_id,))
+    if not user or not bool(user["is_worker"]):
+        return JSONResponse({"ok": False, "error": "Forbidden"}, status_code=403)
+
+    wc = await fetch_one(
+        "SELECT id, client_tg_id, worker_tg_id, verified, withdraw_enabled, trading_enabled, favorite, blocked "
+        "FROM worker_clients WHERE id = ?",
+        (payload.wc_id,),
+    )
+    if not wc or int(wc["worker_tg_id"]) != int(tg_id):
+        return JSONResponse({"ok": False, "error": "Client not found"}, status_code=404)
+
+    action = payload.action.strip().lower()
+    if action == "toggle_verified":
+        await bot.update_worker_client_field(payload.wc_id, "verified", 0 if wc["verified"] else 1)
+    elif action == "toggle_withdraw":
+        await bot.update_worker_client_field(payload.wc_id, "withdraw_enabled", 0 if wc["withdraw_enabled"] else 1)
+    elif action == "toggle_trade":
+        await bot.update_worker_client_field(payload.wc_id, "trading_enabled", 0 if wc["trading_enabled"] else 1)
+    elif action == "toggle_favorite":
+        await bot.update_worker_client_field(payload.wc_id, "favorite", 0 if wc["favorite"] else 1)
+    elif action == "toggle_block":
+        await bot.update_worker_client_field(payload.wc_id, "blocked", 0 if wc["blocked"] else 1)
+    elif action == "set_min_deposit":
+        val = float(payload.value or 0)
+        if val < 0:
+            return JSONResponse({"ok": False, "error": "Value must be >= 0"}, status_code=400)
+        await bot.update_worker_client_field(payload.wc_id, "min_deposit", val)
+    elif action == "set_min_withdraw":
+        val = float(payload.value or 0)
+        if val < 0:
+            return JSONResponse({"ok": False, "error": "Value must be >= 0"}, status_code=400)
+        await bot.update_worker_client_field(payload.wc_id, "min_withdraw", val)
+    elif action == "set_luck":
+        val = float(payload.value or 0)
+        if val < 0 or val > 100:
+            return JSONResponse({"ok": False, "error": "Luck must be in 0..100"}, status_code=400)
+        await bot.set_client_luck(tg_id, int(wc["client_tg_id"]), val)
+    elif action == "add_balance":
+        val = float(payload.value or 0)
+        if val <= 0:
+            return JSONResponse({"ok": False, "error": "Amount must be > 0"}, status_code=400)
+        await bot.change_balance(int(wc["client_tg_id"]), val)
+    else:
+        return JSONResponse({"ok": False, "error": "Unsupported action"}, status_code=400)
+
+    return JSONResponse({"ok": True})
 
 
 @app.get("/admin/login", response_class=HTMLResponse)
@@ -836,45 +983,65 @@ async def api_trade_open(
 
     await bot.change_balance(tg_id, -amount)
     start_price = round(random.uniform(10, 100_000), 2)
-    luck_percent = await bot.get_luck_percent_for_client(tg_id)
-    win_prob = max(0.0, min(1.0, (luck_percent / 100.0) if luck_percent is not None else 0.5))
-    is_win = random.random() < win_prob
-    change_percent = random.uniform(0.1, 1.0) * max(1, leverage / 5)
-    if (direction == "up" and is_win) or (direction == "down" and not is_win):
-        end_price = start_price * (1 + change_percent / 100)
-    else:
-        end_price = start_price * (1 - change_percent / 100)
-
-    payout_rate = 0.6
-    profit = amount * payout_rate if is_win else -amount
-    if is_win:
-        await bot.change_balance(tg_id, amount + (amount * payout_rate))
-
-    await bot.save_deal(
-        user_tg_id=tg_id,
-        asset_name=asset_name,
-        direction=direction,
-        amount=amount,
-        currency=currency,
-        start_price=start_price,
-        end_price=end_price,
-        change_percent=change_percent,
-        is_win=is_win,
-        profit=profit,
-        expires_in_sec=seconds,
-    )
-    new_balance = await bot.get_user_balance(tg_id)
+    now_ts = time.time()
+    trade_id = secrets.token_hex(8)
+    ACTIVE_WEB_TRADES[trade_id] = {
+        "id": trade_id,
+        "status": "open",
+        "tg_id": tg_id,
+        "asset_name": asset_name,
+        "direction": direction,
+        "amount": amount,
+        "seconds": int(seconds),
+        "leverage": int(leverage),
+        "currency": currency,
+        "start_price": start_price,
+        "opened_ts": now_ts,
+        "close_ts": now_ts + seconds,
+    }
     return JSONResponse(
         {
             "ok": True,
-            "is_win": is_win,
-            "profit": round(profit, 2),
-            "balance": round(new_balance, 2),
+            "trade_id": trade_id,
+            "status": "open",
             "start_price": start_price,
-            "end_price": round(end_price, 2),
-            "change_percent": round(change_percent, 3),
+            "close_at": int(now_ts + seconds),
+            "seconds": int(seconds),
         }
     )
+
+
+@app.get("/api/trade/status", response_class=JSONResponse)
+async def api_trade_status(trade_id: str, tg_id: int):
+    trade = ACTIVE_WEB_TRADES.get(trade_id)
+    if not trade:
+        return JSONResponse({"ok": False, "error": "Trade not found"}, status_code=404)
+    if int(trade["tg_id"]) != int(tg_id):
+        return JSONResponse({"ok": False, "error": "Forbidden"}, status_code=403)
+
+    trade = await settle_web_trade(trade_id)
+    if not trade:
+        return JSONResponse({"ok": False, "error": "Trade not found"}, status_code=404)
+
+    remaining = max(0, int(trade["close_ts"] - time.time()))
+    payload = {
+        "ok": True,
+        "trade_id": trade_id,
+        "status": trade["status"],
+        "remaining": remaining,
+        "start_price": trade["start_price"],
+    }
+    if trade["status"] == "closed":
+        payload.update(
+            {
+                "is_win": bool(trade["is_win"]),
+                "profit": float(trade["profit"]),
+                "balance": float(trade["balance"]),
+                "end_price": float(trade["end_price"]),
+                "change_percent": float(trade["change_percent"]),
+            }
+        )
+    return JSONResponse(payload)
 
 
 class ExchangePayload(BaseModel):
@@ -974,3 +1141,62 @@ async def api_overview():
 @app.get("/api/market/tape", response_class=JSONResponse)
 async def api_market_tape():
     return JSONResponse({"ok": True, "items": list(MARKET_TAPE)[:25]})
+
+
+async def settle_web_trade(trade_id: str) -> dict | None:
+    trade = ACTIVE_WEB_TRADES.get(trade_id)
+    if not trade:
+        return None
+    if trade["status"] == "closed":
+        return trade
+    if time.time() < trade["close_ts"]:
+        return trade
+
+    tg_id = trade["tg_id"]
+    direction = trade["direction"]
+    amount = trade["amount"]
+    leverage = trade["leverage"]
+    start_price = trade["start_price"]
+    asset_name = trade["asset_name"]
+    seconds = trade["seconds"]
+
+    luck_percent = await bot.get_luck_percent_for_client(tg_id)
+    win_prob = max(0.0, min(1.0, (luck_percent / 100.0) if luck_percent is not None else 0.5))
+    is_win = random.random() < win_prob
+    change_percent = random.uniform(0.1, 1.0) * max(1, leverage / 5)
+    if (direction == "up" and is_win) or (direction == "down" and not is_win):
+        end_price = start_price * (1 + change_percent / 100)
+    else:
+        end_price = start_price * (1 - change_percent / 100)
+
+    payout_rate = 0.6
+    profit = amount * payout_rate if is_win else -amount
+    if is_win:
+        await bot.change_balance(tg_id, amount + (amount * payout_rate))
+
+    await bot.save_deal(
+        user_tg_id=tg_id,
+        asset_name=asset_name,
+        direction=direction,
+        amount=amount,
+        currency=trade["currency"],
+        start_price=start_price,
+        end_price=end_price,
+        change_percent=change_percent,
+        is_win=is_win,
+        profit=profit,
+        expires_in_sec=seconds,
+    )
+    new_balance = await bot.get_user_balance(tg_id)
+
+    trade.update(
+        {
+            "status": "closed",
+            "is_win": is_win,
+            "profit": round(profit, 2),
+            "balance": round(new_balance, 2),
+            "end_price": round(end_price, 2),
+            "change_percent": round(change_percent, 3),
+        }
+    )
+    return trade

@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Worker | Legend Trading{% endblock %}
+{% block content %}
+<section class="card hero">
+    <h1>{{ labels.worker_title if labels else "Панель воркера" }}</h1>
+    <div class="hint">{{ labels.worker_hint if labels else "Управление вашими рефералами в реальном времени" }}</div>
+    <div class="hint">ID: {{ worker_id }}</div>
+</section>
+
+<section class="card">
+    <div class="section-title">{{ labels.worker_title if labels else "Панель воркера" }}</div>
+    <div id="worker-list" class="list">
+        {% for c in clients %}
+        <div class="row worker-row" data-wc-id="{{ c.id }}">
+            <div>
+                <b>#{{ c.id }} {{ c.first_name if c.first_name else "user" }}</b>
+                <small>ID {{ c.client_tg_id }} · @{{ c.username if c.username else "-" }}</small>
+                <small>Balance: {{ "%.2f"|format((c.balance or 0)) }} {{ c.currency if c.currency else "USD" }}</small>
+            </div>
+            <div class="worker-actions">
+                <button class="chip worker-act" data-action="toggle_trade">Trade {{ "ON" if c.trading_enabled else "OFF" }}</button>
+                <button class="chip worker-act" data-action="toggle_withdraw">WD {{ "ON" if c.withdraw_enabled else "OFF" }}</button>
+                <button class="chip worker-act" data-action="toggle_verified">KYC {{ "ON" if c.verified else "OFF" }}</button>
+                <button class="chip worker-act" data-action="toggle_favorite">Fav {{ "ON" if c.favorite else "OFF" }}</button>
+                <button class="chip worker-act" data-action="toggle_block">{{ "UNBLOCK" if c.blocked else "BLOCK" }}</button>
+                <button class="chip worker-prompt" data-action="set_luck" data-label="Luck 0-100">Luck</button>
+                <button class="chip worker-prompt" data-action="set_min_deposit" data-label="Min deposit">Min dep</button>
+                <button class="chip worker-prompt" data-action="set_min_withdraw" data-label="Min withdraw">Min wd</button>
+                <button class="chip worker-prompt" data-action="add_balance" data-label="Add balance">+Balance</button>
+            </div>
+        </div>
+        {% else %}
+        <div class="empty">{{ labels.worker_empty if labels else "У вас пока нет рефералов." }}</div>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

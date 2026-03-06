@@ -12,6 +12,9 @@
     <a class="qa-btn" href="/deposit">{{ labels.quick_deposit if labels else "Пополнить" }}</a>
     <a class="qa-btn" href="/deals">{{ labels.quick_history if labels else "История сделок" }}</a>
     <a class="qa-btn" href="/profile">{{ labels.quick_profile if labels else "Полный профиль" }}</a>
+    {% if user and user.is_worker %}
+    <a class="qa-btn" href="/worker">{{ labels.quick_worker if labels else "Панель воркера" }}</a>
+    {% endif %}
 </section>
 
 <section class="metrics">

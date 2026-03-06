@@ -62,7 +62,14 @@
         </div>
     </div>
 </section>
-<div id="trade-result" class="result-box"></div>
+<section class="card">
+    <div class="section-title">{{ labels.trade_countdown if labels else "До завершения" }}</div>
+    <div class="timer-wrap">
+        <div id="trade-timer" class="timer-value">--</div>
+        <div class="timer-bar"><span id="trade-progress"></span></div>
+    </div>
+    <div id="trade-result" class="result-box"></div>
+</section>
 <section class="card">
     <div class="section-title">{{ labels.live_tape if labels else "Лента рынка (live)" }}</div>
     <div class="list" id="market-tape-list">

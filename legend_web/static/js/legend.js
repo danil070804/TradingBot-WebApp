@@ -17,6 +17,8 @@ function bindDirectionButtons() {
 function bindTradeForm() {
     const form = document.getElementById("trade-form");
     const result = document.getElementById("trade-result");
+    const timer = document.getElementById("trade-timer");
+    const progress = document.getElementById("trade-progress");
     if (!form || !result) return;
     form.addEventListener("submit", async (e) => {
         e.preventDefault();
@@ -37,11 +39,47 @@ function bindTradeForm() {
                 result.innerHTML = `<span class="neg">Error: ${data.error || L("js_trade_error", "failed to open trade")}</span>`;
                 return;
             }
-            const cls = data.is_win ? "pos" : "neg";
-            result.innerHTML =
-                `${L("js_trade_done", "Deal completed")}: <span class="${cls}">${data.profit > 0 ? "+" : ""}${data.profit}</span><br>` +
-                `${L("js_trade_balance", "New balance")}: ${data.balance}<br>` +
-                `${L("js_trade_rate", "Rate")}: ${data.start_price} -> ${data.end_price}`;
+            result.innerHTML = `<span class="pos">${L("js_trade_started", "Trade opened, countdown started")}</span>`;
+            const started = Math.floor(Date.now() / 1000);
+            const closeAt = Number(data.close_at);
+            const total = Math.max(1, Number(data.seconds || 1));
+            const updateTimerUi = (remaining) => {
+                if (timer) timer.textContent = `${L("js_trade_waiting", "Time left")}: ${remaining}s`;
+                if (progress) {
+                    const done = Math.min(100, Math.max(0, ((total - remaining) / total) * 100));
+                    progress.style.width = `${done}%`;
+                }
+            };
+            updateTimerUi(total);
+
+            const poll = async () => {
+                const now = Math.floor(Date.now() / 1000);
+                updateTimerUi(Math.max(0, closeAt - now));
+                const statusResp = await fetch(`/api/trade/status?trade_id=${encodeURIComponent(data.trade_id)}&tg_id=${body.tg_id}`);
+                const status = await statusResp.json();
+                if (!statusResp.ok || !status.ok) {
+                    result.innerHTML = `<span class="neg">Error: ${status.error || L("js_trade_error", "failed to open trade")}</span>`;
+                    return true;
+                }
+                if (status.status === "closed") {
+                    const cls = status.is_win ? "pos" : "neg";
+                    result.innerHTML =
+                        `${L("js_trade_done", "Deal completed")}: <span class="${cls}">${status.profit > 0 ? "+" : ""}${status.profit}</span><br>` +
+                        `${L("js_trade_balance", "New balance")}: ${status.balance}<br>` +
+                        `${L("js_trade_rate", "Rate")}: ${status.start_price} -> ${status.end_price}`;
+                    updateTimerUi(0);
+                    return true;
+                }
+                return false;
+            };
+
+            let done = false;
+            while (!done) {
+                done = await poll();
+                if (!done) {
+                    await new Promise((resolve) => setTimeout(resolve, 1000));
+                }
+            }
         } catch (_) {
             result.innerHTML = `<span class="neg">${L("js_network_error", "Network error")}</span>`;
         }
@@ -176,6 +214,50 @@ function bindLangSwitch() {
     });
 }
 
+function bindWorkerPanel() {
+    const wrap = document.getElementById("worker-list");
+    if (!wrap) return;
+
+    const doUpdate = async (wcId, action, value = null) => {
+        const resp = await fetch("/api/worker/client/update", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ wc_id: Number(wcId), action, value }),
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.ok) {
+            alert(data.error || "Update failed");
+            return false;
+        }
+        location.reload();
+        return true;
+    };
+
+    wrap.querySelectorAll(".worker-act").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+            const row = btn.closest(".worker-row");
+            if (!row) return;
+            await doUpdate(row.dataset.wcId, btn.dataset.action);
+        });
+    });
+
+    wrap.querySelectorAll(".worker-prompt").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+            const row = btn.closest(".worker-row");
+            if (!row) return;
+            const label = btn.dataset.label || "Value";
+            const valRaw = prompt(`${label}:`);
+            if (valRaw === null) return;
+            const val = Number(valRaw);
+            if (Number.isNaN(val)) {
+                alert("Invalid number");
+                return;
+            }
+            await doUpdate(row.dataset.wcId, btn.dataset.action, val);
+        });
+    });
+}
+
 function renderTape(items) {
     const wrap = document.getElementById("market-tape-list");
     if (!wrap) return;
@@ -212,5 +294,6 @@ bindTradeForm();
 bindExchangeForm();
 bindDepositForm();
 bindLangSwitch();
+bindWorkerPanel();
 refreshTape();
 setInterval(refreshTape, 2200);
