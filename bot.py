@@ -83,6 +83,33 @@ I18N = {
         "deposit_choose_method": "Вы хотите пополнить баланс на <b>{amount:.2f} {currency}</b>.\n\nВыберите удобный способ оплаты:",
         "deposit_cancelled": "❌ Пополнение отменено.",
         "profile_title": "🧾 <b>Профиль</b>",
+        "menu_welcome": "👋 Приветствую, <b>{name}</b>!\n\nЭто телеграм-бот криптоплатформы для торговли фьючерсами.\nЧерез него вы сможете управлять своим аккаунтом, балансом и сделками.\n\n👇 Выберите раздел:",
+        "menu_info_text": "ℹ️ Информация\n\n📣 Новости: https://www.youtube.com/channel/UCVj_rwnR1p-7Da15L8MwRNQ\n📄 Пользовательское соглашение: https://telegra.ph/Polzovatelskoe-soglashenie-03-27-13",
+        "menu_support_text": "📩 Связаться с технической поддержкой можно здесь:\n{url}",
+        "profile_id": "└ Идентификатор: <code>{id}</code>",
+        "profile_username": "└ Username: @{username}",
+        "profile_username_none": "└ Username: —",
+        "profile_language": "└ Язык: {lang}",
+        "profile_currency": "└ Валюта: {currency}",
+        "profile_verification": "└ Верификация: Нет",
+        "profile_worker": "└ Воркер: <code>{worker}</code>",
+        "profile_worker_none": "└ Воркер: —",
+        "profile_deals_title": "📊 <b>Информация о сделках</b>",
+        "profile_deals_total": "└ Всего сделок: {total} шт.",
+        "profile_deals_wins": "└ Успешные сделки: {wins} шт.",
+        "profile_deals_losses": "└ Безуспешные сделки: {losses} шт.",
+        "profile_deals_pnl": "└ PnL: {pnl:.2f} {currency}",
+        "profile_balance_title": "💰 <b>Баланс</b>",
+        "profile_balance_value": "└ Баланс: {balance:.2f} {currency}",
+        "profile_pending_value": "└ На выводе: {pending:.2f} {currency}",
+        "settings_title": "🧩 <b>Настройки</b>\n\n📘 Язык интерфейса: <b>{lang}</b>\n💱 Валюта: <b>{cur}</b>\n\nВыберите, что хотите изменить:",
+        "settings_choose_lang": "🌐 Выберите язык интерфейса:",
+        "settings_choose_currency": "💱 Выберите валюту:",
+        "settings_btn_lang": "🌐Язык интерфейса",
+        "settings_btn_currency": "💱Валюта",
+        "settings_btn_back": "⬅️В профиль",
+        "my_deals_empty": "📑 У вас пока нет завершённых сделок.",
+        "my_deals_title": "📑 <b>Последние сделки</b>",
     },
     "en": {
         "open_app": "🚀 Open App",
@@ -104,6 +131,33 @@ I18N = {
         "deposit_choose_method": "You want to top up <b>{amount:.2f} {currency}</b>.\n\nChoose payment method:",
         "deposit_cancelled": "❌ Deposit canceled.",
         "profile_title": "🧾 <b>Profile</b>",
+        "menu_welcome": "👋 Welcome, <b>{name}</b>!\n\nThis is a Telegram crypto futures trading bot.\nYou can manage your account, balance, and deals here.\n\n👇 Choose a section:",
+        "menu_info_text": "ℹ️ Information\n\n📣 News: https://www.youtube.com/channel/UCVj_rwnR1p-7Da15L8MwRNQ\n📄 User agreement: https://telegra.ph/Polzovatelskoe-soglashenie-03-27-13",
+        "menu_support_text": "📩 Contact technical support here:\n{url}",
+        "profile_id": "└ ID: <code>{id}</code>",
+        "profile_username": "└ Username: @{username}",
+        "profile_username_none": "└ Username: —",
+        "profile_language": "└ Language: {lang}",
+        "profile_currency": "└ Currency: {currency}",
+        "profile_verification": "└ Verification: No",
+        "profile_worker": "└ Worker: <code>{worker}</code>",
+        "profile_worker_none": "└ Worker: —",
+        "profile_deals_title": "📊 <b>Deals stats</b>",
+        "profile_deals_total": "└ Total deals: {total}",
+        "profile_deals_wins": "└ Winning deals: {wins}",
+        "profile_deals_losses": "└ Losing deals: {losses}",
+        "profile_deals_pnl": "└ PnL: {pnl:.2f} {currency}",
+        "profile_balance_title": "💰 <b>Balance</b>",
+        "profile_balance_value": "└ Balance: {balance:.2f} {currency}",
+        "profile_pending_value": "└ Pending withdraw: {pending:.2f} {currency}",
+        "settings_title": "🧩 <b>Settings</b>\n\n📘 Interface language: <b>{lang}</b>\n💱 Currency: <b>{cur}</b>\n\nChoose what to change:",
+        "settings_choose_lang": "🌐 Choose interface language:",
+        "settings_choose_currency": "💱 Choose currency:",
+        "settings_btn_lang": "🌐Language",
+        "settings_btn_currency": "💱Currency",
+        "settings_btn_back": "⬅️Back to profile",
+        "my_deals_empty": "📑 You have no completed deals yet.",
+        "my_deals_title": "📑 <b>Recent deals</b>",
     },
     "uk": {
         "open_app": "🚀 Відкрити застосунок",
@@ -125,6 +179,33 @@ I18N = {
         "deposit_choose_method": "Ви хочете поповнити баланс на <b>{amount:.2f} {currency}</b>.\n\nОберіть спосіб оплати:",
         "deposit_cancelled": "❌ Поповнення скасовано.",
         "profile_title": "🧾 <b>Профіль</b>",
+        "menu_welcome": "👋 Вітаю, <b>{name}</b>!\n\nЦе Telegram-бот криптоплатформи для торгівлі ф'ючерсами.\nТут ви можете керувати акаунтом, балансом і угодами.\n\n👇 Оберіть розділ:",
+        "menu_info_text": "ℹ️ Інформація\n\n📣 Новини: https://www.youtube.com/channel/UCVj_rwnR1p-7Da15L8MwRNQ\n📄 Угода користувача: https://telegra.ph/Polzovatelskoe-soglashenie-03-27-13",
+        "menu_support_text": "📩 Зв'язатися з техпідтримкою можна тут:\n{url}",
+        "profile_id": "└ Ідентифікатор: <code>{id}</code>",
+        "profile_username": "└ Username: @{username}",
+        "profile_username_none": "└ Username: —",
+        "profile_language": "└ Мова: {lang}",
+        "profile_currency": "└ Валюта: {currency}",
+        "profile_verification": "└ Верифікація: Ні",
+        "profile_worker": "└ Воркер: <code>{worker}</code>",
+        "profile_worker_none": "└ Воркер: —",
+        "profile_deals_title": "📊 <b>Інформація про угоди</b>",
+        "profile_deals_total": "└ Всього угод: {total} шт.",
+        "profile_deals_wins": "└ Успішні угоди: {wins} шт.",
+        "profile_deals_losses": "└ Неуспішні угоди: {losses} шт.",
+        "profile_deals_pnl": "└ PnL: {pnl:.2f} {currency}",
+        "profile_balance_title": "💰 <b>Баланс</b>",
+        "profile_balance_value": "└ Баланс: {balance:.2f} {currency}",
+        "profile_pending_value": "└ На виводі: {pending:.2f} {currency}",
+        "settings_title": "🧩 <b>Налаштування</b>\n\n📘 Мова інтерфейсу: <b>{lang}</b>\n💱 Валюта: <b>{cur}</b>\n\nОберіть, що хочете змінити:",
+        "settings_choose_lang": "🌐 Оберіть мову інтерфейсу:",
+        "settings_choose_currency": "💱 Оберіть валюту:",
+        "settings_btn_lang": "🌐Мова інтерфейсу",
+        "settings_btn_currency": "💱Валюта",
+        "settings_btn_back": "⬅️До профілю",
+        "my_deals_empty": "📑 У вас ще немає завершених угод.",
+        "my_deals_title": "📑 <b>Останні угоди</b>",
     },
 }
 
@@ -1032,11 +1113,11 @@ def verification_keyboard():
     return kb.as_markup()
 
 
-def settings_keyboard():
+def settings_keyboard(lang: str = "ru"):
     kb = InlineKeyboardBuilder()
-    kb.button(text="🌐Язык интерфейса", callback_data="settings_lang")
-    kb.button(text="💱Валюта", callback_data="settings_currency")
-    kb.button(text="⬅️В профиль", callback_data="open_profile")
+    kb.button(text=t(lang, "settings_btn_lang"), callback_data="settings_lang")
+    kb.button(text=t(lang, "settings_btn_currency"), callback_data="settings_currency")
+    kb.button(text=t(lang, "settings_btn_back"), callback_data="open_profile")
     kb.adjust(1)
     return kb.as_markup()
 
@@ -1186,13 +1267,7 @@ async def on_currency_selected(callback: CallbackQuery):
 async def send_main_menu(message: Message):
     user_row = await get_user_row(message.from_user)
     lang = normalize_lang(user_row["language"])
-    first_name = message.from_user.first_name
-    text = (
-        f"👋 Приветствую, <b>{first_name}</b>!\n\n"
-        "Это телеграм-бот криптоплатформы для торговли фьючерсами.\n"
-        "Через него вы сможете управлять своим аккаунтом, балансом и сделками.\n\n"
-        "👇 Выберите раздел:"
-    )
+    text = t(lang, "menu_welcome", name=message.from_user.first_name)
     await message.answer(text, reply_markup=main_menu_keyboard(lang))
 
 
@@ -1237,11 +1312,7 @@ async def menu_portfolio(message: Message):
 async def menu_info(message: Message):
     user_row = await get_user_row(message.from_user)
     lang = normalize_lang(user_row["language"])
-    text = (
-        "ℹ️ Информация\n\n"
-        "📣 Новости: https://www.youtube.com/channel/UCVj_rwnR1p-7Da15L8MwRNQ\n"
-        "📄 Пользовательское соглашение: https://telegra.ph/Polzovatelskoe-soglashenie-03-27-13"
-    )
+    text = t(lang, "menu_info_text")
     await message.answer(text, reply_markup=main_menu_keyboard(lang))
 
 
@@ -1250,8 +1321,7 @@ async def menu_support(message: Message):
     user_row = await get_user_row(message.from_user)
     lang = normalize_lang(user_row["language"])
     await message.answer(
-        "📩 Связаться с технической поддержкой можно здесь:\n"
-        f"{config.support_url}",
+        t(lang, "menu_support_text", url=config.support_url),
         reply_markup=main_menu_keyboard(lang),
     )
 
@@ -1551,22 +1621,22 @@ async def send_profile(callback_or_msg):
 
     text_lines = [
         t(lang, "profile_title"),
-        f"└ Идентификатор: <code>{tg_user.id}</code>",
-        f"└ Username: @{tg_user.username}" if tg_user.username else "└ Username: —",
-        f"└ Язык: {lang.upper()}",
-        f"└ Валюта: {currency}",
-        "└ Верификация: Нет",
-        f"└ Воркер: <code>{worker_id}</code>" if worker_id else "└ Воркер: —",
+        t(lang, "profile_id", id=tg_user.id),
+        t(lang, "profile_username", username=tg_user.username) if tg_user.username else t(lang, "profile_username_none"),
+        t(lang, "profile_language", lang=lang.upper()),
+        t(lang, "profile_currency", currency=currency),
+        t(lang, "profile_verification"),
+        t(lang, "profile_worker", worker=worker_id) if worker_id else t(lang, "profile_worker_none"),
         "",
-        "📊 <b>Информация о сделках</b>",
-        f"└ Всего сделок: {deal_stats['total']} шт.",
-        f"└ Успешные сделки: {deal_stats['wins']} шт.",
-        f"└ Безуспешные сделки: {deal_stats['losses']} шт.",
-        f"└ PnL: {deal_stats['total_profit']:.2f} {currency}",
+        t(lang, "profile_deals_title"),
+        t(lang, "profile_deals_total", total=deal_stats["total"]),
+        t(lang, "profile_deals_wins", wins=deal_stats["wins"]),
+        t(lang, "profile_deals_losses", losses=deal_stats["losses"]),
+        t(lang, "profile_deals_pnl", pnl=deal_stats["total_profit"], currency=currency),
         "",
-        "💰 <b>Баланс</b>",
-        f"└ Баланс: {balance:.2f} {currency}",
-        f"└ На выводе: {pending_withdraw:.2f} {currency}",
+        t(lang, "profile_balance_title"),
+        t(lang, "profile_balance_value", balance=balance, currency=currency),
+        t(lang, "profile_pending_value", pending=pending_withdraw, currency=currency),
     ]
     text = "\n".join(text_lines)
     await msg.answer(text, reply_markup=profile_keyboard(is_admin, is_worker, lang))
@@ -1977,39 +2047,40 @@ async def on_verify(callback: CallbackQuery):
 @dp.callback_query(F.data == "settings")
 async def on_settings(callback: CallbackQuery):
     user_row = await get_user_row(callback.from_user)
-    lang = user_row["language"] or "не выбран"
+    lang = normalize_lang(user_row["language"])
     cur = user_row["currency"] or "не выбрана"
-    text = (
-        "🧩 <b>Настройки</b>\n\n"
-        f"📘 Язык интерфейса: <b>{lang.upper()}</b>\n"
-        f"💱 Валюта: <b>{cur}</b>\n\n"
-        "Выберите, что хотите изменить:"
-    )
-    await callback.message.answer(text, reply_markup=settings_keyboard())
+    text = t(lang, "settings_title", lang=lang.upper(), cur=cur)
+    await callback.message.answer(text, reply_markup=settings_keyboard(lang))
     await callback.answer()
 
 
 @dp.callback_query(F.data == "settings_lang")
 async def on_settings_lang(callback: CallbackQuery):
-    await callback.message.answer("🌐 Выберите язык интерфейса:", reply_markup=language_keyboard())
+    user_row = await get_user_row(callback.from_user)
+    lang = normalize_lang(user_row["language"])
+    await callback.message.answer(t(lang, "settings_choose_lang"), reply_markup=language_keyboard())
     await callback.answer()
 
 
 @dp.callback_query(F.data == "settings_currency")
 async def on_settings_currency(callback: CallbackQuery):
-    await callback.message.answer("💱 Выберите валюту:", reply_markup=currency_keyboard())
+    user_row = await get_user_row(callback.from_user)
+    lang = normalize_lang(user_row["language"])
+    await callback.message.answer(t(lang, "settings_choose_currency"), reply_markup=currency_keyboard())
     await callback.answer()
 
 
 @dp.callback_query(F.data == "my_deals")
 async def on_my_deals(callback: CallbackQuery):
+    user_row = await get_user_row(callback.from_user)
+    lang = normalize_lang(user_row["language"])
     rows = await get_user_deals(callback.from_user.id, limit=10)
     if not rows:
-        await callback.message.answer("📑 У вас пока нет завершённых сделок.")
+        await callback.message.answer(t(lang, "my_deals_empty"))
         await callback.answer()
         return
 
-    lines = ["📑 <b>Последние сделки</b>", ""]
+    lines = [t(lang, "my_deals_title"), ""]
     for row in rows:
         side = "UP" if row["direction"] == "up" else "DOWN"
         outcome = "✅" if row["is_win"] else "❌"

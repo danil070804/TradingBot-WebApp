@@ -2,7 +2,7 @@
 {% block title %}Сделки | Legend Trading{% endblock %}
 {% block content %}
 <section class="card">
-    <div class="section-title">История сделок</div>
+    <div class="section-title">{{ labels.deals_title if labels else "История сделок" }}</div>
     <div class="list">
         {% for d in deals %}
         <div class="row">
@@ -13,7 +13,7 @@
             <div class="{{ 'pos' if d.is_win else 'neg' }}">{{ "%+.2f"|format(d.profit) }}</div>
         </div>
         {% else %}
-        <div class="empty">История пока пустая.</div>
+        <div class="empty">{{ labels.deals_empty if labels else "История пока пустая." }}</div>
         {% endfor %}
     </div>
 </section>

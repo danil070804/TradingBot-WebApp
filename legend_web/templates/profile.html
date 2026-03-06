@@ -3,8 +3,8 @@
 {% block content %}
 {% if not user %}
 <section class="card">
-    <div class="section-title">Профиль не инициализирован</div>
-    <div class="empty">Откройте WebApp напрямую из Telegram-кнопки бота, чтобы загрузить ваш профиль.</div>
+    <div class="section-title">{{ labels.profile_not_init_title if labels else "Профиль не инициализирован" }}</div>
+    <div class="empty">{{ labels.profile_not_init_desc if labels else "Откройте WebApp напрямую из Telegram-кнопки бота, чтобы загрузить ваш профиль." }}</div>
 </section>
 {% else %}
 <section class="card hero">
@@ -14,23 +14,23 @@
 </section>
 
 <section class="card">
-    <div class="section-title">Данные пользователя</div>
+    <div class="section-title">{{ labels.profile_user_data if labels else "Данные пользователя" }}</div>
     <div class="list">
-        <div class="row"><div><b>Имя</b></div><div>{{ user.first_name if user else "-" }}</div></div>
-        <div class="row"><div><b>Username</b></div><div>@{{ user.username if user and user.username else "-" }}</div></div>
-        <div class="row"><div><b>Язык</b></div><div>{{ user.language if user and user.language else "ru" }}</div></div>
-        <div class="row"><div><b>Валюта</b></div><div>{{ user.currency if user and user.currency else "USD" }}</div></div>
-        <div class="row"><div><b>На выводе</b></div><div>{{ "%.2f"|format(pending) }}</div></div>
+        <div class="row"><div><b>{{ labels.profile_name if labels else "Имя" }}</b></div><div>{{ user.first_name if user else "-" }}</div></div>
+        <div class="row"><div><b>{{ labels.profile_username if labels else "Username" }}</b></div><div>@{{ user.username if user and user.username else "-" }}</div></div>
+        <div class="row"><div><b>{{ labels.profile_lang if labels else "Язык" }}</b></div><div>{{ user.language if user and user.language else "ru" }}</div></div>
+        <div class="row"><div><b>{{ labels.profile_currency if labels else "Валюта" }}</b></div><div>{{ user.currency if user and user.currency else "USD" }}</div></div>
+        <div class="row"><div><b>{{ labels.profile_pending if labels else "На выводе" }}</b></div><div>{{ "%.2f"|format(pending) }}</div></div>
     </div>
 </section>
 
 <section class="metrics">
     <article class="card metric">
-        <h3>Сделок</h3>
+        <h3>{{ labels.profile_total_deals if labels else "Сделок" }}</h3>
         <p>{{ stats.total }}</p>
     </article>
     <article class="card metric">
-        <h3>Успешные</h3>
+        <h3>{{ labels.profile_wins if labels else "Успешные" }}</h3>
         <p>{{ stats.wins }}</p>
     </article>
     <article class="card metric">
@@ -39,7 +39,7 @@
     </article>
 </section>
 <section class="card">
-    <div class="section-title">Последние пополнения</div>
+    <div class="section-title">{{ labels.profile_recent_deposits if labels else "Последние пополнения" }}</div>
     <div class="list">
         {% for d in deposits %}
         <div class="row">
@@ -47,12 +47,12 @@
             <div>{{ "%.2f"|format(d.amount) }} {{ d.currency }} • {{ d.status }}</div>
         </div>
         {% else %}
-        <div class="empty">Пополнений пока нет.</div>
+        <div class="empty">{{ labels.profile_no_deposits if labels else "Пополнений пока нет." }}</div>
         {% endfor %}
     </div>
 </section>
 <section class="card">
-    <div class="section-title">Последние выводы</div>
+    <div class="section-title">{{ labels.profile_recent_withdraws if labels else "Последние выводы" }}</div>
     <div class="list">
         {% for w in withdrawals %}
         <div class="row">
@@ -60,7 +60,7 @@
             <div>{{ "%.2f"|format(w.amount) }} {{ w.currency }} • {{ w.status }}</div>
         </div>
         {% else %}
-        <div class="empty">Выводов пока нет.</div>
+        <div class="empty">{{ labels.profile_no_withdraws if labels else "Выводов пока нет." }}</div>
         {% endfor %}
     </div>
 </section>

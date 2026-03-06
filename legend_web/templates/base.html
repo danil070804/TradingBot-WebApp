@@ -41,6 +41,9 @@
     </nav>
 </div>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script>
+window.LEGEND_LABELS = {{ labels|tojson if labels else '{}' }};
+</script>
 <script src="/static/js/legend.js"></script>
 </body>
 </html>

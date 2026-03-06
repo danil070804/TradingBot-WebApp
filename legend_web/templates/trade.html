@@ -2,22 +2,22 @@
 {% block title %}Торговля | Legend Trading{% endblock %}
 {% block content %}
 <section class="card hero">
-    <h1>Futures Terminal</h1>
-    <div class="hint">Баланс: {{ "%.2f"|format((user.balance if user else 0) or 0) }} {{ (user.currency if user else "USD") or "USD" }}</div>
+    <h1>{{ labels.trade_title if labels else "Futures Terminal" }}</h1>
+    <div class="hint">{{ labels.trade_balance if labels else "Баланс" }}: {{ "%.2f"|format((user.balance if user else 0) or 0) }} {{ (user.currency if user else "USD") or "USD" }}</div>
 </section>
 
 <section class="card trade-layout">
     <div class="trade-left">
         <form id="trade-form" class="form-grid">
             <input type="hidden" name="tg_id" value="{{ tg_id }}">
-            <label>Пара
+            <label>{{ labels.trade_pair if labels else "Пара" }}
                 <select name="asset_name">
                     {% for a in assets %}
                     <option value="{{ a.name }}">{{ a.name }}</option>
                     {% endfor %}
                 </select>
             </label>
-            <label>Сумма
+            <label>{{ labels.trade_amount if labels else "Сумма" }}
                 <input id="trade-amount-input" type="number" step="0.01" min="100" name="amount" value="100">
             </label>
             <div class="chips">
@@ -27,12 +27,12 @@
                 <button type="button" class="chip" data-amt="5000">5k</button>
             </div>
 
-            <label>Плечо: <span id="lev-val">10x</span>
+            <label>{{ labels.trade_leverage if labels else "Плечо" }}: <span id="lev-val">10x</span>
                 <input id="lev-range" type="range" min="1" max="50" value="10">
                 <input type="hidden" name="leverage" id="lev-hidden" value="10">
             </label>
 
-            <label>Экспирация
+            <label>{{ labels.trade_expiration if labels else "Экспирация" }}
                 <select name="seconds">
                     <option value="10">10с</option>
                     <option value="30" selected>30с</option>
@@ -42,15 +42,15 @@
             </label>
 
             <div class="direction-group">
-                <button type="button" class="dir-btn active" data-dir="up">ЛОНГ</button>
-                <button type="button" class="dir-btn" data-dir="down">ШОРТ</button>
+                <button type="button" class="dir-btn active" data-dir="up">{{ labels.trade_long if labels else "ЛОНГ" }}</button>
+                <button type="button" class="dir-btn" data-dir="down">{{ labels.trade_short if labels else "ШОРТ" }}</button>
             </div>
             <input type="hidden" name="direction" id="direction-input" value="up">
-            <button class="submit" type="submit">Создать сделку</button>
+            <button class="submit" type="submit">{{ labels.trade_create if labels else "Создать сделку" }}</button>
         </form>
     </div>
     <div class="trade-right">
-        <div class="section-title">Order Book</div>
+        <div class="section-title">{{ labels.trade_order_book if labels else "Order Book" }}</div>
         <div class="book">
             {% for i in range(8) %}
             <div class="book-row ask"><span>{{ 55000 + i * 7 }}</span><em>{{ "%.3f"|format(0.3 + i * 0.21) }}</em></div>
@@ -66,7 +66,7 @@
 <section class="card">
     <div class="section-title">{{ labels.live_tape if labels else "Лента рынка (live)" }}</div>
     <div class="list" id="market-tape-list">
-        <div class="empty">Загрузка...</div>
+        <div class="empty">{{ labels.js_loading if labels else "Загрузка..." }}</div>
     </div>
 </section>
 {% endblock %}

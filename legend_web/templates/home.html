@@ -2,7 +2,7 @@
 {% block title %}Главная | Legend Trading{% endblock %}
 {% block content %}
 <section class="card hero">
-    <h1>Общий баланс</h1>
+    <h1>{{ labels.home_balance if labels else "Общий баланс" }}</h1>
     <div class="balance">{{ "%.2f"|format((user.balance if user else 0) or 0) }} {{ (user.currency if user else "USD") or "USD" }}</div>
     <div class="hint">ID: {{ tg_id }}</div>
 </section>
@@ -16,11 +16,11 @@
 
 <section class="metrics">
     <article class="card metric">
-        <h3>Успешные</h3>
+        <h3>{{ labels.home_success if labels else "Успешные" }}</h3>
         <p>{{ stats.wins }}</p>
     </article>
     <article class="card metric">
-        <h3>Неуспешные</h3>
+        <h3>{{ labels.home_fail if labels else "Неуспешные" }}</h3>
         <p>{{ stats.losses }}</p>
     </article>
     <article class="card metric">
@@ -30,7 +30,7 @@
 </section>
 
 <section class="card">
-    <div class="section-title">Популярные пары</div>
+    <div class="section-title">{{ labels.home_pairs if labels else "Популярные пары" }}</div>
     <div class="tickers">
         {% for m in markets %}
         <div class="ticker">
@@ -43,7 +43,7 @@
 </section>
 
 <section class="card">
-    <div class="section-title">Последние сделки</div>
+    <div class="section-title">{{ labels.home_recent if labels else "Последние сделки" }}</div>
     <div class="list">
         {% for d in deals %}
         <div class="row">
@@ -54,7 +54,7 @@
             <div class="{{ 'pos' if d.is_win else 'neg' }}">{{ "%+.2f"|format(d.profit) }}</div>
         </div>
         {% else %}
-        <div class="empty">Сделок пока нет.</div>
+        <div class="empty">{{ labels.home_no_deals if labels else "Сделок пока нет." }}</div>
         {% endfor %}
     </div>
 </section>

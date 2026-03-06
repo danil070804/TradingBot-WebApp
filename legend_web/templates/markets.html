@@ -2,7 +2,7 @@
 {% block title %}Рынки | Legend Trading{% endblock %}
 {% block content %}
 <section class="card">
-    <div class="section-title">Рынки</div>
+    <div class="section-title">{{ labels.markets_title if labels else "Рынки" }}</div>
     <div class="list">
         {% for m in markets %}
         <div class="row markets-row">

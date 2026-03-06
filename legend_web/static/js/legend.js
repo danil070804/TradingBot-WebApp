@@ -1,3 +1,6 @@
+const LEGEND_LABELS = window.LEGEND_LABELS || {};
+const L = (key, fallback) => LEGEND_LABELS[key] || fallback;
+
 function bindDirectionButtons() {
     const buttons = document.querySelectorAll(".dir-btn");
     const hidden = document.getElementById("direction-input");
@@ -17,7 +20,7 @@ function bindTradeForm() {
     if (!form || !result) return;
     form.addEventListener("submit", async (e) => {
         e.preventDefault();
-        result.textContent = "Открываем сделку...";
+        result.textContent = L("js_trade_opening", "Opening trade...");
         const body = Object.fromEntries(new FormData(form).entries());
         body.tg_id = Number(body.tg_id);
         body.amount = Number(body.amount);
@@ -31,16 +34,16 @@ function bindTradeForm() {
             });
             const data = await resp.json();
             if (!resp.ok || !data.ok) {
-                result.innerHTML = `<span class="neg">Ошибка: ${data.error || "не удалось открыть сделку"}</span>`;
+                result.innerHTML = `<span class="neg">Error: ${data.error || L("js_trade_error", "failed to open trade")}</span>`;
                 return;
             }
             const cls = data.is_win ? "pos" : "neg";
             result.innerHTML =
-                `Сделка завершена: <span class="${cls}">${data.profit > 0 ? "+" : ""}${data.profit}</span><br>` +
-                `Новый баланс: ${data.balance}<br>` +
-                `Курс: ${data.start_price} -> ${data.end_price}`;
+                `${L("js_trade_done", "Deal completed")}: <span class="${cls}">${data.profit > 0 ? "+" : ""}${data.profit}</span><br>` +
+                `${L("js_trade_balance", "New balance")}: ${data.balance}<br>` +
+                `${L("js_trade_rate", "Rate")}: ${data.start_price} -> ${data.end_price}`;
         } catch (_) {
-            result.innerHTML = `<span class="neg">Сетевая ошибка</span>`;
+            result.innerHTML = `<span class="neg">${L("js_network_error", "Network error")}</span>`;
         }
     });
 }
@@ -74,7 +77,7 @@ function bindExchangeForm() {
     if (!form || !result) return;
     form.addEventListener("submit", async (e) => {
         e.preventDefault();
-        result.textContent = "Обрабатываем обмен...";
+        result.textContent = L("js_exchange_processing", "Processing exchange...");
         const body = Object.fromEntries(new FormData(form).entries());
         body.tg_id = Number(body.tg_id);
         body.amount = Number(body.amount);
@@ -86,12 +89,12 @@ function bindExchangeForm() {
             });
             const data = await resp.json();
             if (!resp.ok || !data.ok) {
-                result.innerHTML = `<span class="neg">Ошибка: ${data.error || "не удалось обменять"}</span>`;
+                result.innerHTML = `<span class="neg">Error: ${data.error || L("js_exchange_error", "failed to exchange")}</span>`;
                 return;
             }
-            result.innerHTML = `Курс: ${data.rate}<br>Получено: <span class="pos">${data.received} ${data.to}</span>`;
+            result.innerHTML = `${L("js_exchange_rate", "Rate")}: ${data.rate}<br>${L("js_exchange_received", "Received")}: <span class="pos">${data.received} ${data.to}</span>`;
         } catch (_) {
-            result.innerHTML = `<span class="neg">Сетевая ошибка</span>`;
+            result.innerHTML = `<span class="neg">${L("js_network_error", "Network error")}</span>`;
         }
     });
 }
@@ -124,7 +127,7 @@ function bindDepositForm() {
     if (!form || !result) return;
     form.addEventListener("submit", async (e) => {
         e.preventDefault();
-        result.textContent = "Обрабатываем...";
+        result.textContent = L("js_deposit_processing", "Processing...");
         const body = Object.fromEntries(new FormData(form).entries());
         body.tg_id = Number(body.tg_id);
         body.amount = Number(body.amount);
@@ -136,7 +139,7 @@ function bindDepositForm() {
             });
             const data = await resp.json();
             if (!resp.ok || !data.ok) {
-                result.innerHTML = `<span class="neg">Ошибка: ${data.error || "не удалось отправить"}</span>`;
+                result.innerHTML = `<span class="neg">Error: ${data.error || L("js_deposit_error", "failed to send")}</span>`;
                 return;
             }
             if (data.requires_support) {
@@ -146,9 +149,9 @@ function bindDepositForm() {
                 }
                 return;
             }
-            result.innerHTML = `<span class="pos">Заявка #${data.deposit_id} отправлена админу</span>`;
+            result.innerHTML = `<span class="pos">${L("js_deposit_sent", "Request #{id} sent to admin").replace("{id}", data.deposit_id)}</span>`;
         } catch (_) {
-            result.innerHTML = `<span class="neg">Сетевая ошибка</span>`;
+            result.innerHTML = `<span class="neg">${L("js_network_error", "Network error")}</span>`;
         }
     });
 }
@@ -181,7 +184,8 @@ function renderTape(items) {
         const row = document.createElement("div");
         row.className = "row mono";
         const sideClass = item.side === "buy" ? "pos" : "neg";
-        row.innerHTML = `<div><b>${item.symbol}</b><small class="${sideClass}">${item.side.toUpperCase()}</small></div><div>${item.price} • ${item.qty}</div>`;
+        const sideText = item.side === "buy" ? L("js_side_buy", "BUY") : L("js_side_sell", "SELL");
+        row.innerHTML = `<div><b>${item.symbol}</b><small class="${sideClass}">${sideText}</small></div><div>${item.price} • ${item.qty}</div>`;
         wrap.appendChild(row);
     });
 }
