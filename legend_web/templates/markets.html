@@ -12,8 +12,8 @@
                 <canvas class="mini-spark" width="120" height="28" data-price="{{ m.price }}" data-change="{{ m.day_change }}"></canvas>
             </div>
             <div class="price-block">
-                <span>{{ m.price }}</span>
-                <em class="{{ 'pos' if m.day_change >= 0 else 'neg' }}">{{ "%+.2f"|format(m.day_change) }}%</em>
+                <span class="m-price" data-symbol="{{ m.symbol }}">{{ m.price }}</span>
+                <em class="m-change {{ 'pos' if m.day_change >= 0 else 'neg' }}" data-symbol="{{ m.symbol }}">{{ "%+.2f"|format(m.day_change) }}%</em>
             </div>
         </div>
         {% endfor %}

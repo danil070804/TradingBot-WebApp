@@ -225,6 +225,15 @@ def t(lang: str | None, key: str, **kwargs) -> str:
     return text.format(**kwargs) if kwargs else text
 
 
+def tr(lang: str | None, ru: str, en: str, uk: str) -> str:
+    code = normalize_lang(lang)
+    if code == "en":
+        return en
+    if code == "uk":
+        return uk
+    return ru
+
+
 def support_contact_text() -> str:
     raw = (config.support_url or "").strip()
     if not raw:
@@ -1252,14 +1261,18 @@ async def cmd_start(message: Message):
             await send_profile(message)
         else:
             # На случай, если правила приняты, но настройки не завершены
-            await message.answer("🌐 Выберите язык интерфейса:", reply_markup=language_keyboard())
+            lang = normalize_lang(user_row["language"])
+            await message.answer(
+                tr(lang, "🌐 Выберите язык интерфейса:", "🌐 Choose interface language:", "🌐 Оберіть мову інтерфейсу:"),
+                reply_markup=language_keyboard(),
+            )
 
 
 @dp.callback_query(F.data == "accept_rules")
 async def on_accept_rules(callback: CallbackQuery):
     await set_accepted_rules(callback.from_user.id)
     await callback.message.edit_reply_markup()
-    await callback.message.answer("🌐 Выберите язык интерфейса:", reply_markup=language_keyboard())
+    await callback.message.answer("🌐 Choose interface language / Выберите язык / Оберіть мову:", reply_markup=language_keyboard())
     await callback.answer()
 
 
@@ -1268,7 +1281,7 @@ async def on_language_selected(callback: CallbackQuery):
     lang_code = callback.data.split(":", 1)[1]
     await set_language(callback.from_user.id, lang_code)
     await callback.message.edit_reply_markup()
-    await callback.message.answer("💱 Выберите валюту:", reply_markup=currency_keyboard())
+    await callback.message.answer(tr(lang_code, "💱 Выберите валюту:", "💱 Choose currency:", "💱 Оберіть валюту:"), reply_markup=currency_keyboard())
     await callback.answer()
 
 
@@ -1301,21 +1314,21 @@ def ecn_assets_keyboard(rows):
     return kb.as_markup()
 
 
-def ecn_direction_keyboard(asset_id: int):
+def ecn_direction_keyboard(asset_id: int, lang: str = "ru"):
     kb = InlineKeyboardBuilder()
-    kb.button(text="📈 Повышение", callback_data=f"ecn_dir:up:{asset_id}")
-    kb.button(text="📉 Понижение", callback_data=f"ecn_dir:down:{asset_id}")
+    kb.button(text=tr(lang, "📈 Повышение", "📈 Up", "📈 Вгору"), callback_data=f"ecn_dir:up:{asset_id}")
+    kb.button(text=tr(lang, "📉 Понижение", "📉 Down", "📉 Вниз"), callback_data=f"ecn_dir:down:{asset_id}")
     kb.adjust(2)
     return kb.as_markup()
 
 
-def ecn_time_keyboard():
+def ecn_time_keyboard(lang: str = "ru"):
     kb = InlineKeyboardBuilder()
-    kb.button(text="30 сек.", callback_data="ecn_time:30")
-    kb.button(text="1 мин.", callback_data="ecn_time:60")
-    kb.button(text="3 мин.", callback_data="ecn_time:180")
-    kb.button(text="5 мин.", callback_data="ecn_time:300")
-    kb.button(text="10 мин.", callback_data="ecn_time:600")
+    kb.button(text=tr(lang, "30 сек.", "30 sec", "30 с"), callback_data="ecn_time:30")
+    kb.button(text=tr(lang, "1 мин.", "1 min", "1 хв"), callback_data="ecn_time:60")
+    kb.button(text=tr(lang, "3 мин.", "3 min", "3 хв"), callback_data="ecn_time:180")
+    kb.button(text=tr(lang, "5 мин.", "5 min", "5 хв"), callback_data="ecn_time:300")
+    kb.button(text=tr(lang, "10 мин.", "10 min", "10 хв"), callback_data="ecn_time:600")
     kb.adjust(2)
     return kb.as_markup()
 
@@ -1357,21 +1370,22 @@ async def start_ecn_flow(msg, state: FSMContext):
         tg_user = msg.from_user
 
     user_row = await get_user_row(tg_user)
+    lang = normalize_lang(user_row["language"])
     balance = user_row["balance"] or 0.0
     currency = user_row["currency"] or "USD"
 
     if balance <= 0:
         await message.answer(
-            f"⚠️ На вашем балансе 0 {currency}. Пополните баланс, чтобы открыть сделку."
+            tr(lang, f"⚠️ На вашем балансе 0 {currency}. Пополните баланс, чтобы открыть сделку.", f"⚠️ Your balance is 0 {currency}. Top up balance to open a deal.", f"⚠️ На вашому балансі 0 {currency}. Поповніть баланс, щоб відкрити угоду.")
         )
         return
 
     assets = await get_ecn_assets()
     if not assets:
-        await message.answer("❗ Список активов ECN пока пуст. Обратитесь к администратору.")
+        await message.answer(tr(lang, "❗ Список активов ECN пока пуст. Обратитесь к администратору.", "❗ ECN assets list is empty. Contact admin.", "❗ Список активів ECN порожній. Зверніться до адміністратора."))
         return
 
-    text_lines = ["Самые востребованные активы:"]
+    text_lines = [tr(lang, "Самые востребованные активы:", "Top assets:", "Топ активи:")]
     for row in assets:
         text_lines.append(f"└ {row['name']}")
     text = "\n".join(text_lines)
@@ -1384,19 +1398,21 @@ async def start_ecn_flow(msg, state: FSMContext):
 async def ecn_choose_asset(callback: CallbackQuery, state: FSMContext):
     asset_id = int(callback.data.split(":", 1)[1])
     assets = await get_ecn_assets()
+    user_row = await get_user_row(callback.from_user)
+    lang = normalize_lang(user_row["language"])
     asset = next((a for a in assets if a["id"] == asset_id), None)
     if not asset:
-        await callback.answer("Актив не найден.", show_alert=True)
+        await callback.answer(tr(lang, "Актив не найден.", "Asset not found.", "Актив не знайдено."), show_alert=True)
         return
 
     await state.update_data(asset_id=asset_id, asset_name=asset["name"])
     await state.set_state(ECNStates.choosing_direction)
 
     text = (
-        f"Открытие сделки [{asset['name']}]\n"
-        "Выберите, в какую сторону пойдет график:"
+        f"{tr(lang, 'Открытие сделки', 'Open deal', 'Відкриття угоди')} [{asset['name']}]\n"
+        f"{tr(lang, 'Выберите, в какую сторону пойдет график:', 'Choose direction:', 'Оберіть напрям:')}"
     )
-    await callback.message.answer(text, reply_markup=ecn_direction_keyboard(asset_id))
+    await callback.message.answer(text, reply_markup=ecn_direction_keyboard(asset_id, lang))
     await callback.answer()
 
 
@@ -1405,13 +1421,15 @@ async def ecn_choose_direction(callback: CallbackQuery, state: FSMContext):
     _, direction, asset_id_str = callback.data.split(":")
     asset_id = int(asset_id_str)
     data = await state.get_data()
+    user_row = await get_user_row(callback.from_user)
+    lang = normalize_lang(user_row["language"])
     asset_name = data.get("asset_name")
 
     if not asset_name or data.get("asset_id") != asset_id:
         assets = await get_ecn_assets()
         asset = next((a for a in assets if a["id"] == asset_id), None)
         if not asset:
-            await callback.answer("Актив не найден.", show_alert=True)
+            await callback.answer(tr(lang, "Актив не найден.", "Asset not found.", "Актив не знайдено."), show_alert=True)
             return
         asset_name = asset["name"]
         await state.update_data(asset_id=asset_id, asset_name=asset_name)
@@ -1423,9 +1441,9 @@ async def ecn_choose_direction(callback: CallbackQuery, state: FSMContext):
     currency = user_row["currency"] or "USD"
 
     text = (
-        f"Открытие сделки [{asset_name}]\n"
-        f"Направление: {'Повышение' if direction == 'up' else 'Понижение'}\n\n"
-        f"Введите сумму для открытия сделки в {currency}:"
+        f"{tr(lang, 'Открытие сделки', 'Open deal', 'Відкриття угоди')} [{asset_name}]\n"
+        f"{tr(lang, 'Направление', 'Direction', 'Напрям')}: {tr(lang, 'Повышение', 'Up', 'Вгору') if direction == 'up' else tr(lang, 'Понижение', 'Down', 'Вниз')}\n\n"
+        f"{tr(lang, 'Введите сумму для открытия сделки', 'Enter amount to open deal', 'Введіть суму для відкриття угоди')} {currency}:"
     )
     await callback.message.answer(text)
     await callback.answer()
@@ -1439,12 +1457,13 @@ async def ecn_enter_amount(message: Message, state: FSMContext):
 
     # Проверяем баланс пользователя
     user_row = await get_user_row(message.from_user)
+    lang = normalize_lang(user_row["language"])
     balance = user_row["balance"] or 0.0
     currency = user_row["currency"] or "USD"
 
     if balance <= 0:
         await message.answer(
-            f"⚠️ На вашем балансе 0 {currency}. Пополните баланс, чтобы открыть сделку."
+            tr(lang, f"⚠️ На вашем балансе 0 {currency}. Пополните баланс, чтобы открыть сделку.", f"⚠️ Your balance is 0 {currency}. Top up balance to open a deal.", f"⚠️ На вашому балансі 0 {currency}. Поповніть баланс, щоб відкрити угоду.")
         )
         await state.clear()
         return
@@ -1454,12 +1473,12 @@ async def ecn_enter_amount(message: Message, state: FSMContext):
         if amount <= 0:
             raise ValueError
     except ValueError:
-        await message.answer("❗ Введите положительное число (сумму сделки).")
+        await message.answer(tr(lang, "❗ Введите положительное число (сумму сделки).", "❗ Enter a positive number (deal amount).", "❗ Введіть додатне число (суму угоди)."))
         return
 
     if amount > balance:
         await message.answer(
-            f"⚠️ Недостаточно средств. На балансе {balance:.2f} {currency}."
+            tr(lang, f"⚠️ Недостаточно средств. На балансе {balance:.2f} {currency}.", f"⚠️ Not enough funds. Balance: {balance:.2f} {currency}.", f"⚠️ Недостатньо коштів. Баланс: {balance:.2f} {currency}.")
         )
         return
 
@@ -1467,12 +1486,12 @@ async def ecn_enter_amount(message: Message, state: FSMContext):
     await state.set_state(ECNStates.choosing_expiration)
 
     text = (
-        f"Открытие сделки [{asset_name}]\n"
-        f"Направление: {'Повышение' if direction == 'up' else 'Понижение'}\n"
-        f"Сумма: {amount:.2f} {currency}\n\n"
-        "Выберите, через сколько времени должна произойти фиксация:"
+        f"{tr(lang, 'Открытие сделки', 'Open deal', 'Відкриття угоди')} [{asset_name}]\n"
+        f"{tr(lang, 'Направление', 'Direction', 'Напрям')}: {tr(lang, 'Повышение', 'Up', 'Вгору') if direction == 'up' else tr(lang, 'Понижение', 'Down', 'Вниз')}\n"
+        f"{tr(lang, 'Сумма', 'Amount', 'Сума')}: {amount:.2f} {currency}\n\n"
+        f"{tr(lang, 'Выберите время фиксации:', 'Choose expiration time:', 'Оберіть час експірації:')}"
     )
-    await message.answer(text, reply_markup=ecn_time_keyboard())
+    await message.answer(text, reply_markup=ecn_time_keyboard(lang))
 
 
 @dp.callback_query(F.data.startswith("ecn_time:"))
@@ -1484,16 +1503,17 @@ async def ecn_choose_time(callback: CallbackQuery, state: FSMContext):
     amount = data.get("amount")
 
     user_row = await get_user_row(callback.from_user)
+    lang = normalize_lang(user_row["language"])
     currency = user_row["currency"] or "USD"
     balance = user_row["balance"] or 0.0
 
     if not amount or amount <= 0:
-        await callback.answer("Сумма сделки не определена. Начните заново.", show_alert=True)
+        await callback.answer(tr(lang, "Сумма сделки не определена. Начните заново.", "Deal amount is not set. Start again.", "Суму угоди не визначено. Почніть заново."), show_alert=True)
         await state.clear()
         return
 
     if amount > balance:
-        await callback.answer("Недостаточно средств для открытия сделки.", show_alert=True)
+        await callback.answer(tr(lang, "Недостаточно средств для открытия сделки.", "Insufficient funds to open deal.", "Недостатньо коштів для відкриття угоди."), show_alert=True)
         await state.clear()
         return
 
@@ -1501,14 +1521,14 @@ async def ecn_choose_time(callback: CallbackQuery, state: FSMContext):
 
     await state.clear()
 
-    direction_text = "Повышение" if direction == "up" else "Понижение"
+    direction_text = tr(lang, "Повышение", "Up", "Вгору") if direction == "up" else tr(lang, "Понижение", "Down", "Вниз")
 
     text = (
-        "Зарегистрирована заявка на сделку\n"
-        f"└ Актив: {asset_name}\n"
-        f"└ Направление: {direction_text}\n"
-        f"└ Сумма: {amount:.2f} {currency}\n"
-        f"└ Время до фиксации: {seconds} сек."
+        f"{tr(lang, 'Зарегистрирована заявка на сделку', 'Deal request created', 'Зареєстровано запит на угоду')}\n"
+        f"└ {tr(lang, 'Актив', 'Asset', 'Актив')}: {asset_name}\n"
+        f"└ {tr(lang, 'Направление', 'Direction', 'Напрям')}: {direction_text}\n"
+        f"└ {tr(lang, 'Сумма', 'Amount', 'Сума')}: {amount:.2f} {currency}\n"
+        f"└ {tr(lang, 'Время до фиксации', 'Time left', 'Час до фіксації')}: {seconds} {tr(lang, 'сек.', 'sec', 'с')}"
     )
 
     msg = await callback.message.answer(text)
@@ -1538,17 +1558,19 @@ async def run_demo_deal(
     currency: str,
     seconds: int,
 ):
+    user = await get_user_by_tg_id(user_tg_id)
+    lang = normalize_lang(user["language"] if user else "ru")
     start_price = round(random.uniform(10, 100_000), 2)
 
     remaining = seconds
     while remaining > 0:
         try:
             text = (
-                "Зарегистрирована заявка на сделку\n"
-                f"└ Актив: {asset_name}\n"
-                f"└ Направление: {'Повышение' if direction == 'up' else 'Понижение'}\n"
-                f"└ Сумма: {amount:.2f} {currency}\n"
-                f"└ Время до фиксации: {remaining} сек."
+                f"{tr(lang, 'Зарегистрирована заявка на сделку', 'Deal request created', 'Зареєстровано запит на угоду')}\n"
+                f"└ {tr(lang, 'Актив', 'Asset', 'Актив')}: {asset_name}\n"
+                f"└ {tr(lang, 'Направление', 'Direction', 'Напрям')}: {tr(lang, 'Повышение', 'Up', 'Вгору') if direction == 'up' else tr(lang, 'Понижение', 'Down', 'Вниз')}\n"
+                f"└ {tr(lang, 'Сумма', 'Amount', 'Сума')}: {amount:.2f} {currency}\n"
+                f"└ {tr(lang, 'Время до фиксации', 'Time left', 'Час до фіксації')}: {remaining} {tr(lang, 'сек.', 'sec', 'с')}"
             )
             await bot.edit_message_text(
                 chat_id=chat_id,
@@ -1591,19 +1613,19 @@ async def run_demo_deal(
     if is_win:
         await change_balance(user_tg_id, amount + (amount * payout_rate))
 
-    header = f"Завершенная сделка [{asset_name}]"
+    header = f"{tr(lang, 'Завершенная сделка', 'Completed deal', 'Завершена угода')} [{asset_name}]"
     result_lines = [
         header,
-        f"Позиция: {'Повышение' if direction == 'up' else 'Понижение'}",
-        f"Сумма: {amount:.2f} {currency}",
-        f"Начальный курс: {start_price:.2f} USD",
-        f"Курс в конце сделки: {end_price:.2f} USD ({change_percent:.3f}%)",
+        f"{tr(lang, 'Позиция', 'Position', 'Позиція')}: {tr(lang, 'Повышение', 'Up', 'Вгору') if direction == 'up' else tr(lang, 'Понижение', 'Down', 'Вниз')}",
+        f"{tr(lang, 'Сумма', 'Amount', 'Сума')}: {amount:.2f} {currency}",
+        f"{tr(lang, 'Начальный курс', 'Start price', 'Початкова ціна')}: {start_price:.2f} USD",
+        f"{tr(lang, 'Курс в конце сделки', 'End price', 'Кінцева ціна')}: {end_price:.2f} USD ({change_percent:.3f}%)",
     ]
 
     if is_win:
-        result_lines.append(f"✅ Успешная сделка. Вы получили {profit:.2f} {currency}")
+        result_lines.append(tr(lang, f"✅ Успешная сделка. Вы получили {profit:.2f} {currency}", f"✅ Winning deal. You received {profit:.2f} {currency}", f"✅ Успішна угода. Ви отримали {profit:.2f} {currency}"))
     else:
-        result_lines.append(f"❌ Сделка безуспешная. -{amount:.2f} {currency}")
+        result_lines.append(tr(lang, f"❌ Сделка неуспешная. -{amount:.2f} {currency}", f"❌ Losing deal. -{amount:.2f} {currency}", f"❌ Неуспішна угода. -{amount:.2f} {currency}"))
 
     await save_deal(
         user_tg_id=user_tg_id,
@@ -1714,15 +1736,16 @@ async def on_pay_crypto(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     amount = data.get("deposit_amount")
     user_row = await get_user_row(callback.from_user)
+    lang = normalize_lang(user_row["language"])
     currency = user_row["currency"] or "USD"
     if amount is None:
-        await callback.message.answer("Сумма пополнения не найдена. Начните заново.")
+        await callback.message.answer(tr(lang, "Сумма пополнения не найдена. Начните заново.", "Deposit amount not found. Start again.", "Суму поповнення не знайдено. Почніть заново."))
         await callback.answer()
         return
     text = (
-        f"💎 Способ оплаты: <b>Crypto bot</b>\n\n"
-        f"Сумма к оплате: <b>{amount:.2f} {currency}</b>.\n\n"
-        "Перейдите по ссылке для оплаты, затем нажмите «✅Проверить оплату»."
+        f"💎 {tr(lang, 'Способ оплаты', 'Payment method', 'Спосіб оплати')}: <b>Crypto bot</b>\n\n"
+        f"{tr(lang, 'Сумма к оплате', 'Amount to pay', 'Сума до оплати')}: <b>{amount:.2f} {currency}</b>.\n\n"
+        f"{tr(lang, 'Перейдите по ссылке для оплаты, затем нажмите «✅Проверить оплату».', 'Open payment link, then tap \"✅Check payment\".', 'Перейдіть за посиланням для оплати, потім натисніть \"✅Перевірити оплату\".')}"
     )
     await callback.message.answer(text, reply_markup=crypto_payment_keyboard())
     await callback.answer()
@@ -1733,16 +1756,17 @@ async def on_pay_trc20(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     amount = data.get("deposit_amount")
     user_row = await get_user_row(callback.from_user)
+    lang = normalize_lang(user_row["language"])
     currency = user_row["currency"] or "USD"
     if amount is None:
-        await callback.message.answer("Сумма пополнения не найдена. Начните заново.")
+        await callback.message.answer(tr(lang, "Сумма пополнения не найдена. Начните заново.", "Deposit amount not found. Start again.", "Суму поповнення не знайдено. Почніть заново."))
         await callback.answer()
         return
     text = (
-        "👛 Способ оплаты: <b>TRC20 USDT</b>\n\n"
-        f"Сумма к оплате: <b>{amount:.2f} {currency}</b>.\n\n"
-        "Отправьте эту сумму на адрес TRC20 USDT:\n"
-        f"<code>{config.trc20_address or 'адрес не задан админом'}</code>"
+        f"👛 {tr(lang, 'Способ оплаты', 'Payment method', 'Спосіб оплати')}: <b>TRC20 USDT</b>\n\n"
+        f"{tr(lang, 'Сумма к оплате', 'Amount to pay', 'Сума до оплати')}: <b>{amount:.2f} {currency}</b>.\n\n"
+        f"{tr(lang, 'Отправьте эту сумму на адрес TRC20 USDT:', 'Send this amount to TRC20 USDT address:', 'Надішліть цю суму на адресу TRC20 USDT:')}\n"
+        f"<code>{config.trc20_address or tr(lang, 'адрес не задан админом', 'address not set by admin', 'адресу не задано адміністратором')}</code>"
     )
     await callback.message.answer(text)
     await state.clear()
@@ -1754,19 +1778,20 @@ async def on_pay_card(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     amount = data.get("deposit_amount")
     user_row = await get_user_row(callback.from_user)
+    lang = normalize_lang(user_row["language"])
     currency = user_row["currency"] or "USD"
     if amount is None:
-        await callback.message.answer("Сумма пополнения не найдена. Начните заново.")
+        await callback.message.answer(tr(lang, "Сумма пополнения не найдена. Начните заново.", "Deposit amount not found. Start again.", "Суму поповнення не знайдено. Почніть заново."))
         await callback.answer()
         return
-    requisites = config.card_requisites or "Реквизиты пока не заданы админом."
+    requisites = config.card_requisites or tr(lang, "Реквизиты пока не заданы админом.", "Requisites are not set by admin.", "Реквізити ще не задані адміністратором.")
     support = support_contact_text()
     text = (
-        "💳 Способ оплаты: <b>Банковская карта</b>\n\n"
-        f"Сумма к оплате: <b>{amount:.2f} {currency}</b>\n\n"
-        "Для оплаты картой и подтверждения платежа свяжитесь с поддержкой.\n"
-        f"Реквизиты: <code>{requisites}</code>\n\n"
-        f"Поддержка: {support}"
+        f"💳 {tr(lang, 'Способ оплаты', 'Payment method', 'Спосіб оплати')}: <b>{tr(lang, 'Банковская карта', 'Bank card', 'Банківська картка')}</b>\n\n"
+        f"{tr(lang, 'Сумма к оплате', 'Amount to pay', 'Сума до оплати')}: <b>{amount:.2f} {currency}</b>\n\n"
+        f"{tr(lang, 'Для оплаты картой и подтверждения платежа свяжитесь с поддержкой.', 'For card payment and confirmation, contact support.', 'Для оплати карткою та підтвердження платежу зверніться в підтримку.')}\n"
+        f"{tr(lang, 'Реквизиты', 'Requisites', 'Реквізити')}: <code>{requisites}</code>\n\n"
+        f"{tr(lang, 'Поддержка', 'Support', 'Підтримка')}: {support}"
     )
     await callback.message.answer(text, reply_markup=card_payment_keyboard())
     await state.clear()
@@ -1778,9 +1803,10 @@ async def on_check_payment(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     amount = data.get("deposit_amount")
     user_row = await get_user_row(callback.from_user)
+    lang = normalize_lang(user_row["language"])
     currency = user_row["currency"] or "USD"
     if amount is None:
-        await callback.message.answer("Сумма не найдена. Начните пополнение заново.")
+        await callback.message.answer(tr(lang, "Сумма не найдена. Начните пополнение заново.", "Amount not found. Start deposit again.", "Суму не знайдено. Почніть поповнення заново."))
         await callback.answer()
         return
 
@@ -1816,8 +1842,12 @@ async def on_check_payment(callback: CallbackQuery, state: FSMContext):
             pass
 
     await callback.message.answer(
-        "✅ Запрос на проверку оплаты отправлен администратору. После подтверждения "
-        "админ начислит средства на баланс."
+        tr(
+            lang,
+            "✅ Запрос на проверку оплаты отправлен администратору. После подтверждения админ начислит средства на баланс.",
+            "✅ Payment verification request sent to admin. After confirmation, funds will be credited.",
+            "✅ Запит на перевірку оплати відправлено адміну. Після підтвердження кошти будуть зараховані.",
+        )
     )
     await state.clear()
     await callback.answer()
@@ -1825,7 +1855,9 @@ async def on_check_payment(callback: CallbackQuery, state: FSMContext):
 
 @dp.callback_query(F.data == "check_payment_card")
 async def on_check_payment_card(callback: CallbackQuery, state: FSMContext):
-    await callback.message.answer("Для пополнения картой используйте кнопку поддержки и отправьте подтверждение оператору.")
+    user_row = await get_user_row(callback.from_user)
+    lang = normalize_lang(user_row["language"])
+    await callback.message.answer(tr(lang, "Для пополнения картой используйте кнопку поддержки и отправьте подтверждение оператору.", "For bank card deposit, use support button and send payment proof to operator.", "Для поповнення карткою використайте кнопку підтримки та надішліть підтвердження оператору."))
     await callback.answer()
 
 
@@ -1834,9 +1866,10 @@ async def on_check_payment_card(callback: CallbackQuery, state: FSMContext):
 @dp.callback_query(F.data == "withdraw")
 async def on_withdraw(callback: CallbackQuery, state: FSMContext):
     user_row = await get_user_row(callback.from_user)
+    lang = normalize_lang(user_row["language"])
     currency = user_row["currency"] or "USD"
     await callback.message.answer(
-        f"📤 На какую сумму вы хотите вывести средства? Введите сумму в {currency}."
+        tr(lang, f"📤 На какую сумму вы хотите вывести средства? Введите сумму в {currency}.", f"📤 How much do you want to withdraw? Enter amount in {currency}.", f"📤 На яку суму ви хочете вивести кошти? Вкажіть суму в {currency}.")
     )
     await state.set_state(WithdrawStates.waiting_amount)
     await callback.answer()
@@ -1845,6 +1878,7 @@ async def on_withdraw(callback: CallbackQuery, state: FSMContext):
 @dp.message(WithdrawStates.waiting_amount)
 async def withdraw_amount_entered(message: Message, state: FSMContext):
     user_row = await get_user_row(message.from_user)
+    lang = normalize_lang(user_row["language"])
     currency = user_row["currency"] or "USD"
     balance = user_row["balance"] or 0.0
     try:
@@ -1852,16 +1886,15 @@ async def withdraw_amount_entered(message: Message, state: FSMContext):
         if amount <= 0:
             raise ValueError
     except ValueError:
-        await message.answer("❗ Введите корректную положительную сумму.")
+        await message.answer(tr(lang, "❗ Введите корректную положительную сумму.", "❗ Enter a valid positive amount.", "❗ Введіть коректну додатну суму."))
         return
     if amount > balance:
-        await message.answer(f"❗ Недостаточно средств. Доступно: {balance:.2f} {currency}.")
+        await message.answer(tr(lang, f"❗ Недостаточно средств. Доступно: {balance:.2f} {currency}.", f"❗ Not enough funds. Available: {balance:.2f} {currency}.", f"❗ Недостатньо коштів. Доступно: {balance:.2f} {currency}."))
         await state.clear()
         return
     await state.update_data(withdraw_amount=amount)
     await message.answer(
-        f"Вы хотите вывести <b>{amount:.2f} {currency}</b>.\n\n"
-        "Выберите способ вывода:",
+        tr(lang, f"Вы хотите вывести <b>{amount:.2f} {currency}</b>.\n\nВыберите способ вывода:", f"You want to withdraw <b>{amount:.2f} {currency}</b>.\n\nChoose withdraw method:", f"Ви хочете вивести <b>{amount:.2f} {currency}</b>.\n\nОберіть спосіб виведення:"),
         reply_markup=withdraw_method_keyboard(),
     )
 

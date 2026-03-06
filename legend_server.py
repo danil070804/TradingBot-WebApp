@@ -742,6 +742,13 @@ async def markets(request: Request):
     )
 
 
+@app.get("/api/markets/live", response_class=JSONResponse)
+async def api_markets_live():
+    assets = await fetch_all("SELECT id, name FROM ecn_assets ORDER BY id ASC LIMIT 200")
+    rows = generate_market_rows(assets)
+    return JSONResponse({"ok": True, "items": rows})
+
+
 @app.get("/trade", response_class=HTMLResponse)
 async def trade(request: Request):
     tg_id = await get_current_user_id(request)

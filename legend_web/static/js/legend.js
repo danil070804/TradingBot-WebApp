@@ -535,6 +535,36 @@ function bindMarketMiniCharts() {
     });
 }
 
+async function refreshMarketsLive() {
+    const priceNodes = document.querySelectorAll(".m-price[data-symbol]");
+    const changeNodes = document.querySelectorAll(".m-change[data-symbol]");
+    if (!priceNodes.length && !changeNodes.length) return;
+    try {
+        const resp = await fetch("/api/markets/live");
+        if (!resp.ok) return;
+        const data = await resp.json();
+        if (!data.ok || !Array.isArray(data.items)) return;
+        const bySym = new Map();
+        data.items.forEach((x) => bySym.set((x.symbol || "").toUpperCase(), x));
+        priceNodes.forEach((node) => {
+            const sym = String(node.dataset.symbol || "").toUpperCase();
+            const row = bySym.get(sym);
+            if (!row) return;
+            node.textContent = `${row.price}`;
+        });
+        changeNodes.forEach((node) => {
+            const sym = String(node.dataset.symbol || "").toUpperCase();
+            const row = bySym.get(sym);
+            if (!row) return;
+            node.textContent = `${row.day_change >= 0 ? "+" : ""}${Number(row.day_change).toFixed(2)}%`;
+            node.classList.toggle("pos", Number(row.day_change) >= 0);
+            node.classList.toggle("neg", Number(row.day_change) < 0);
+        });
+    } catch (_) {
+        // no-op
+    }
+}
+
 function bindLangSwitch() {
     const buttons = document.querySelectorAll(".lang-btn");
     if (!buttons.length) return;
@@ -650,3 +680,5 @@ refreshTape();
 refreshOpenPositions();
 setInterval(refreshTape, 2200);
 setInterval(refreshOpenPositions, 2200);
+refreshMarketsLive();
+setInterval(refreshMarketsLive, 1700);
