@@ -341,9 +341,32 @@ function bindMarketSocket() {
     const state = buildCandleState();
     if (tfSelect) {
         state.tf = Number(tfSelect.value || 30);
+    }
+
+    const primeCandleHistory = async () => {
+        const sym = encodeURIComponent(pairSelect.value || "BTC");
+        const tf = Number(state.tf || 30);
+        try {
+            const resp = await fetch(`/api/market/candles?symbol=${sym}&tf=${tf}&limit=80`);
+            const data = await resp.json();
+            if (!resp.ok || !data.ok || !Array.isArray(data.candles)) return;
+            state.candles = data.candles.map((c) => ({
+                bucket: Number(c.t),
+                open: Number(c.o),
+                high: Number(c.h),
+                low: Number(c.l),
+                close: Number(c.c),
+            }));
+            drawCandles(canvas, state.candles);
+        } catch (_) {
+            // no-op
+        }
+    };
+
+    if (tfSelect) {
         tfSelect.addEventListener("change", () => {
             state.tf = Number(tfSelect.value || 30);
-            state.candles = [];
+            primeCandleHistory();
         });
     }
 
@@ -386,6 +409,7 @@ function bindMarketSocket() {
 
     ws.addEventListener("open", () => {
         subscribe();
+        primeCandleHistory();
         if (fallbackTimer) {
             clearInterval(fallbackTimer);
             fallbackTimer = null;
@@ -393,7 +417,7 @@ function bindMarketSocket() {
     });
 
     pairSelect.addEventListener("change", () => {
-        state.candles = [];
+        primeCandleHistory();
         if (ws.readyState === WebSocket.OPEN) subscribe();
     });
 

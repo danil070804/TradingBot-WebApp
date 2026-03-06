@@ -621,6 +621,44 @@ def build_orderbook(symbol: str, levels: int = 10) -> tuple[list[dict], list[dic
     return asks, bids, mark
 
 
+def build_synthetic_candles(symbol: str, tf_sec: int, limit: int = 80) -> list[dict]:
+    spec = ASSET_SPECS.get(symbol, {"start": MARKET_PRICE_STATE.get(symbol, 100.0), "vol": 0.006})
+    tf = max(5, int(tf_sec))
+    n = max(20, min(240, int(limit)))
+    vol = float(spec.get("vol", 0.006))
+    current = float(MARKET_PRICE_STATE.get(symbol, spec.get("start", 100.0)))
+    now = int(time.time())
+
+    seed = current * (1 + random.uniform(-vol * 9.0, vol * 9.0))
+    price = max(0.00001, seed)
+    candles: list[dict] = []
+
+    for i in range(n, 0, -1):
+        t = now - i * tf
+        pull = ((current - price) / max(current, 0.00001)) * 0.08
+        drift = random.uniform(-vol * 0.24, vol * 0.24) + pull
+        o = price
+        c = max(0.00001, o * (1 + drift))
+        h = max(o, c) * (1 + random.uniform(0.00005, vol * 0.08))
+        l = min(o, c) * (1 - random.uniform(0.00005, vol * 0.08))
+        candles.append(
+            {
+                "t": t,
+                "o": round(o, 6),
+                "h": round(h, 6),
+                "l": round(l, 6),
+                "c": round(c, 6),
+            }
+        )
+        price = c
+
+    if candles:
+        candles[-1]["c"] = round(current, 6)
+        candles[-1]["h"] = round(max(candles[-1]["h"], current), 6)
+        candles[-1]["l"] = round(min(candles[-1]["l"], current), 6)
+    return candles
+
+
 async def market_feed_loop():
     while True:
         MARKET_TAPE.appendleft(generate_tape_tick())
@@ -1391,6 +1429,13 @@ async def api_market_snapshot(symbol: str = "BTC"):
     )
 
 
+@app.get("/api/market/candles", response_class=JSONResponse)
+async def api_market_candles(symbol: str = "BTC", tf: int = 30, limit: int = 80):
+    sym = symbol_from_asset_name(symbol)
+    candles = build_synthetic_candles(sym, tf_sec=tf, limit=limit)
+    return JSONResponse({"ok": True, "symbol": sym, "tf": int(tf), "candles": candles})
+
+
 @app.websocket("/ws/market")
 async def ws_market(websocket: WebSocket):
     await websocket.accept()
@@ -1460,35 +1505,26 @@ async def settle_web_trade(trade_id: str) -> dict | None:
     if now_ts < float(trade.get("close_ts", now_ts)):
         return trade
 
-    luck_percent = await bot.get_luck_percent_for_client(tg_id)
-    win_prob = max(0.0, min(1.0, (luck_percent / 100.0) if luck_percent is not None else 0.5))
-    is_win = random.random() < win_prob
-    asset_key = (asset_name or "").lower()
-    if "bitcoin" in asset_key or "btc" in asset_key:
-        base_vol = 0.28
-    elif "doge" in asset_key or "pepe" in asset_key or "shiba" in asset_key:
-        base_vol = 1.3
-    elif "sol" in asset_key or "avax" in asset_key or "injective" in asset_key:
-        base_vol = 0.85
-    else:
-        base_vol = 0.55
-    impulse = random.uniform(0.8, 1.8)
-    change_percent = random.uniform(base_vol * 0.35, base_vol * impulse) * max(1, leverage / 6)
+    raw_move = (live_mark - start_price) / max(start_price, 0.00001)
+    change_percent = abs(raw_move) * 100.0
     if trade.get("close_reason") == "tp":
         end_price = float(trade["tp_price"])
-        is_win = True
     elif trade.get("close_reason") == "sl":
         end_price = float(trade["sl_price"])
-        is_win = False
-    elif (direction == "up" and is_win) or (direction == "down" and not is_win):
-        end_price = start_price * (1 + change_percent / 100)
     else:
-        end_price = start_price * (1 - change_percent / 100)
+        end_price = float(live_mark)
 
-    payout_rate = random.choice([0.55, 0.6, 0.62, 0.65])
-    profit = amount * payout_rate if is_win else -amount
-    if is_win:
-        await bot.change_balance(tg_id, amount + (amount * payout_rate))
+    move = (end_price - start_price) / max(start_price, 0.00001)
+    signed_move = move if direction == "up" else -move
+    gross_profit = amount * signed_move * max(1, leverage)
+    max_profit = amount * 1.2
+    max_loss = amount
+    profit = max(-max_loss, min(max_profit, gross_profit))
+    is_win = profit > 0
+    credit = max(0.0, amount + profit)
+    if credit > 0:
+        await bot.change_balance(tg_id, credit)
+    change_percent = abs(move) * 100.0
 
     await bot.save_deal(
         user_tg_id=tg_id,
