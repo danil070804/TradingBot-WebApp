@@ -1486,7 +1486,7 @@ async def ws_market(websocket: WebSocket):
                     "tick": tick,
                 }
             )
-            await asyncio.sleep(2.0)
+            await asyncio.sleep(3.5)
     except WebSocketDisconnect:
         return
 

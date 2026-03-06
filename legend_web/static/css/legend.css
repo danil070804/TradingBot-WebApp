@@ -370,7 +370,7 @@ select, input {
     justify-content: space-between;
     font-size: 12px;
     padding: 6px 8px;
-    animation: rise .24s ease;
+    transition: color .2s ease, background-color .2s ease;
 }
 .book-row.ask { background: linear-gradient(90deg, rgba(255, 111, 123, 0.08), transparent); color: #ff9aa2; }
 .book-row.bid { background: linear-gradient(90deg, rgba(125, 255, 133, 0.08), transparent); color: #9ff7a5; }

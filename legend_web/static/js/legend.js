@@ -374,6 +374,35 @@ function bindMarketSocket() {
     const ws = new WebSocket(`${protocol}://${window.location.host}/ws/market`);
     let fallbackTimer = null;
     let lastCandleUpdateMs = 0;
+    let lastBookUpdateMs = 0;
+
+    const ensureBookRows = (wrap, type, count) => {
+        while (wrap.children.length < count) {
+            const row = document.createElement("div");
+            row.className = `book-row ${type}`;
+            row.innerHTML = "<span>--</span><em>--</em>";
+            wrap.appendChild(row);
+        }
+        while (wrap.children.length > count) {
+            wrap.removeChild(wrap.lastElementChild);
+        }
+    };
+
+    const patchBookRows = (wrap, rows) => {
+        if (!wrap || !Array.isArray(rows)) return;
+        ensureBookRows(wrap, wrap.id === "orderbook-asks" ? "ask" : "bid", rows.length);
+        for (let i = 0; i < rows.length; i += 1) {
+            const r = rows[i];
+            const el = wrap.children[i];
+            if (!el) continue;
+            const priceEl = el.querySelector("span");
+            const qtyEl = el.querySelector("em");
+            const priceText = String(r.price);
+            const qtyText = String(r.qty);
+            if (priceEl && priceEl.textContent !== priceText) priceEl.textContent = priceText;
+            if (qtyEl && qtyEl.textContent !== qtyText) qtyEl.textContent = qtyText;
+        }
+    };
 
     const subscribe = () => {
         ws.send(JSON.stringify({ type: "subscribe", symbol: pairSelect.value || "BTC" }));
@@ -382,13 +411,12 @@ function bindMarketSocket() {
     const applyMarketData = (data) => {
         markEl.textContent = data.mark;
         updateMarketStats(data);
-        asksWrap.innerHTML = (data.asks || [])
-            .map((r) => `<div class="book-row ask"><span>${r.price}</span><em>${r.qty}</em></div>`)
-            .join("");
-        bidsWrap.innerHTML = (data.bids || [])
-            .map((r) => `<div class="book-row bid"><span>${r.price}</span><em>${r.qty}</em></div>`)
-            .join("");
         const nowMs = Date.now();
+        if (nowMs - lastBookUpdateMs >= 4500) {
+            patchBookRows(asksWrap, data.asks || []);
+            patchBookRows(bidsWrap, data.bids || []);
+            lastBookUpdateMs = nowMs;
+        }
         if (nowMs - lastCandleUpdateMs >= 3500) {
             pushCandle(state, Number(data.mark), Number(data.ts || Math.floor(Date.now() / 1000)));
             drawCandles(canvas, state.candles);
@@ -409,7 +437,7 @@ function bindMarketSocket() {
             } catch (_) {
                 // no-op
             }
-        }, 1100);
+        }, 3200);
     };
 
     ws.addEventListener("open", () => {
