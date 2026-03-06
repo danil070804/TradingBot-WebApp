@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Сделки | Legend Trading{% endblock %}
+{% block content %}
+<section class="card">
+    <div class="section-title">История сделок</div>
+    <div class="list">
+        {% for d in deals %}
+        <div class="row">
+            <div>
+                <b>#{{ d.id }} {{ d.asset_name }} {{ "UP" if d.direction == "up" else "DOWN" }}</b>
+                <small>{{ d.amount }} {{ d.currency }} | {{ d.created_at }}</small>
+            </div>
+            <div class="{{ 'pos' if d.is_win else 'neg' }}">{{ "%+.2f"|format(d.profit) }}</div>
+        </div>
+        {% else %}
+        <div class="empty">История пока пустая.</div>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Главная | Legend Trading{% endblock %}
+{% block content %}
+<section class="card hero">
+    <h1>Общий баланс</h1>
+    <div class="balance">{{ "%.2f"|format((user.balance if user else 0) or 0) }} {{ (user.currency if user else "USD") or "USD" }}</div>
+    <div class="hint">ID: {{ tg_id }}</div>
+</section>
+
+<section class="metrics">
+    <article class="card metric">
+        <h3>Успешные</h3>
+        <p>{{ stats.wins }}</p>
+    </article>
+    <article class="card metric">
+        <h3>Неуспешные</h3>
+        <p>{{ stats.losses }}</p>
+    </article>
+    <article class="card metric">
+        <h3>PnL</h3>
+        <p class="{{ 'pos' if stats.total_profit >= 0 else 'neg' }}">{{ "%+.2f"|format(stats.total_profit) }}</p>
+    </article>
+</section>
+
+<section class="card">
+    <div class="section-title">Популярные пары</div>
+    <div class="tickers">
+        {% for m in markets %}
+        <div class="ticker">
+            <strong>{{ m.symbol }}</strong>
+            <span>{{ m.price }}</span>
+            <em class="{{ 'pos' if m.day_change >= 0 else 'neg' }}">{{ "%+.2f"|format(m.day_change) }}%</em>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="card">
+    <div class="section-title">Последние сделки</div>
+    <div class="list">
+        {% for d in deals %}
+        <div class="row">
+            <div>
+                <b>{{ d.asset_name }}</b>
+                <small>{{ d.created_at }}</small>
+            </div>
+            <div class="{{ 'pos' if d.is_win else 'neg' }}">{{ "%+.2f"|format(d.profit) }}</div>
+        </div>
+        {% else %}
+        <div class="empty">Сделок пока нет.</div>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

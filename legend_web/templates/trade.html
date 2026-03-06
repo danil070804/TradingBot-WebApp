@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Торговля | Legend Trading{% endblock %}
+{% block content %}
+<section class="card">
+    <div class="section-title">Открытие сделки</div>
+    <form id="trade-form" class="form-grid">
+        <input type="hidden" name="tg_id" value="{{ tg_id }}">
+        <label>Актив
+            <select name="asset_name">
+                {% for a in assets %}
+                <option value="{{ a.name }}">{{ a.name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Сумма (мин. 100)
+            <input type="number" step="0.01" min="100" name="amount" value="100">
+        </label>
+        <label>Плечо
+            <input type="number" name="leverage" min="1" max="50" value="10">
+        </label>
+        <label>Экспирация
+            <select name="seconds">
+                <option value="10">10с</option>
+                <option value="30" selected>30с</option>
+                <option value="60">1м</option>
+                <option value="300">5м</option>
+            </select>
+        </label>
+        <div class="direction-group">
+            <button type="button" class="dir-btn active" data-dir="up">ЛОНГ</button>
+            <button type="button" class="dir-btn" data-dir="down">ШОРТ</button>
+        </div>
+        <input type="hidden" name="direction" id="direction-input" value="up">
+        <button class="submit" type="submit">Создать сделку</button>
+    </form>
+    <div class="hint">Баланс: {{ "%.2f"|format((user.balance if user else 0) or 0) }} {{ (user.currency if user else "USD") or "USD" }}</div>
+    <div id="trade-result" class="result-box"></div>
+</section>
+{% endblock %}

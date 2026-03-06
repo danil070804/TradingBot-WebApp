@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Обмен | Legend Trading{% endblock %}
+{% block content %}
+<section class="card">
+    <div class="section-title">Обмен валют</div>
+    <form id="exchange-form" class="form-grid">
+        <input type="hidden" name="tg_id" value="{{ tg_id }}">
+        <label>Отдаю
+            <select name="from_currency">
+                <option>USD</option>
+                <option>EUR</option>
+                <option>RUB</option>
+            </select>
+        </label>
+        <label>Получаю
+            <select name="to_currency">
+                <option>BTC</option>
+                <option>ETH</option>
+                <option>USDT</option>
+            </select>
+        </label>
+        <label>Сумма
+            <input type="number" name="amount" min="1" step="0.01" value="100">
+        </label>
+        <button class="submit alt" type="submit">Обменять</button>
+    </form>
+    <div class="hint">Баланс: {{ "%.2f"|format((user.balance if user else 0) or 0) }} {{ (user.currency if user else "USD") or "USD" }}</div>
+    <div id="exchange-result" class="result-box"></div>
+</section>
+{% endblock %}

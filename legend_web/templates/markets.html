@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Рынки | Legend Trading{% endblock %}
+{% block content %}
+<section class="card">
+    <div class="section-title">Рынки</div>
+    <div class="list">
+        {% for m in markets %}
+        <div class="row markets-row">
+            <div>
+                <b>{{ m.symbol }}</b>
+                <small>{{ m.name }}</small>
+            </div>
+            <div class="price-block">
+                <span>{{ m.price }}</span>
+                <em class="{{ 'pos' if m.day_change >= 0 else 'neg' }}">{{ "%+.2f"|format(m.day_change) }}%</em>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}
