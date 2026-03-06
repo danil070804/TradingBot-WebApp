@@ -10,7 +10,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import Message, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import Message, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton, WebAppInfo
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from dotenv import load_dotenv
 import asyncio
@@ -31,6 +31,7 @@ class Config:
     crypto_bot_url: str
     trc20_address: str
     support_url: str
+    webapp_url: str
 
 
 config = Config(
@@ -40,6 +41,7 @@ config = Config(
     crypto_bot_url=os.getenv("CRYPTO_BOT_URL", ""),
     trc20_address=os.getenv("TRC20_ADDRESS", ""),
     support_url=os.getenv("SUPPORT_URL", "https://t.me/your_support_chat"),
+    webapp_url=(os.getenv("WEBAPP_URL") or os.getenv("WEBHOOK_BASE_URL") or "").rstrip("/"),
 )
 
 bot = Bot(token=config.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
@@ -779,8 +781,13 @@ def currency_keyboard():
     return kb.as_markup()
 
 def main_menu_keyboard():
+    keyboard_rows = []
+    if config.webapp_url:
+        keyboard_rows.append(
+            [KeyboardButton(text="🚀 Открыть приложение", web_app=WebAppInfo(url=config.webapp_url))]
+        )
     return ReplyKeyboardMarkup(
-        keyboard=[
+        keyboard=keyboard_rows + [
             [KeyboardButton(text="📁 Портфель")],
             [KeyboardButton(text="📈 Открыть ECN")],
             [
