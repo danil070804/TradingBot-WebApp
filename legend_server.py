@@ -66,7 +66,8 @@ ASSET_SPECS = {
     "LTC": {"name": "Litecoin", "start": 86.0, "vol": 0.008, "qty_min": 0.2, "qty_max": 240.0},
 }
 MARKET_PRICE_STATE = {k: v["start"] for k, v in ASSET_SPECS.items()}
-MARKET_DAY_STATS = {k: {"high": v["start"], "low": v["start"]} for k, v in ASSET_SPECS.items()}
+MARKET_DAY_STATS = {k: {"open": v["start"], "high": v["start"], "low": v["start"]} for k, v in ASSET_SPECS.items()}
+MARKET_MOMENTUM_STATE = {k: 0.0 for k in ASSET_SPECS.keys()}
 
 WEB_I18N = {
     "ru": {
@@ -540,14 +541,24 @@ def next_symbol_price(symbol: str) -> float:
     spec = ASSET_SPECS.get(symbol)
     if not spec:
         base = MARKET_PRICE_STATE.get(symbol, random.uniform(0.3, 800.0))
-        vol = 0.01
+        vol = 0.006
+        anchor = base
     else:
         base = MARKET_PRICE_STATE.get(symbol, spec["start"])
         vol = spec["vol"]
-    drift = (random.random() - 0.5) * 2 * vol
-    updated = max(0.00001, base * (1 + drift))
+        anchor = spec["start"]
+
+    momentum = MARKET_MOMENTUM_STATE.get(symbol, 0.0)
+    noise = (random.random() - 0.5) * 2 * (vol * 0.22)
+    mean_reversion = ((anchor - base) / max(anchor, 0.00001)) * 0.02
+    momentum = momentum * 0.72 + noise + mean_reversion
+    max_step = max(0.00002, vol * 0.24)
+    momentum = max(-max_step, min(max_step, momentum))
+    MARKET_MOMENTUM_STATE[symbol] = momentum
+
+    updated = max(0.00001, base * (1 + momentum))
     MARKET_PRICE_STATE[symbol] = updated
-    stats = MARKET_DAY_STATS.setdefault(symbol, {"high": updated, "low": updated})
+    stats = MARKET_DAY_STATS.setdefault(symbol, {"open": updated, "high": updated, "low": updated})
     stats["high"] = max(stats["high"], updated)
     stats["low"] = min(stats["low"], updated)
     return updated
@@ -558,7 +569,9 @@ def generate_market_rows(assets) -> list[dict]:
     for asset in assets:
         symbol = symbol_from_asset_name(asset["name"])
         price = next_symbol_price(symbol)
-        day_change = round((random.random() - 0.5) * 18.0, 2)
+        stats = MARKET_DAY_STATS.get(symbol) or {"open": price}
+        day_open = float(stats.get("open", price) or price)
+        day_change = round(((price - day_open) / day_open) * 100, 2) if day_open else 0.0
         rows.append(
             {
                 "id": asset["id"],
@@ -1398,7 +1411,7 @@ async def ws_market(websocket: WebSocket):
             tick = generate_tape_tick()
             MARKET_TAPE.appendleft(tick)
             spread = max(0.00001, asks[0]["price"] - bids[0]["price"])
-            day_stats = MARKET_DAY_STATS.get(symbol, {"high": mark, "low": mark})
+            day_stats = MARKET_DAY_STATS.get(symbol, {"open": mark, "high": mark, "low": mark})
             await websocket.send_json(
                 {
                     "type": "market",
@@ -1413,7 +1426,7 @@ async def ws_market(websocket: WebSocket):
                     "tick": tick,
                 }
             )
-            await asyncio.sleep(0.85)
+            await asyncio.sleep(1.2)
     except WebSocketDisconnect:
         return
 
