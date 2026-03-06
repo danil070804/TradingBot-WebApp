@@ -102,6 +102,8 @@ WEB_I18N = {
         "trade_countdown": "До завершения",
         "trade_status_open": "Сделка открыта",
         "trade_status_closed": "Сделка закрыта",
+        "trade_open_positions": "Открытые позиции",
+        "trade_close_now": "Закрыть сейчас",
         "deals_title": "История сделок",
         "deals_empty": "История пока пустая.",
         "deposit_title": "Пополнение баланса",
@@ -142,6 +144,10 @@ WEB_I18N = {
         "js_trade_waiting": "До завершения",
         "js_trade_balance": "Новый баланс",
         "js_trade_rate": "Курс",
+        "js_reason_time": "По времени",
+        "js_reason_tp": "Take Profit",
+        "js_reason_sl": "Stop Loss",
+        "js_reason_manual": "Ручное закрытие",
         "js_network_error": "Сетевая ошибка",
         "js_exchange_processing": "Обрабатываем обмен...",
         "js_exchange_error": "не удалось обменять",
@@ -193,6 +199,8 @@ WEB_I18N = {
         "trade_countdown": "Time left",
         "trade_status_open": "Trade opened",
         "trade_status_closed": "Trade closed",
+        "trade_open_positions": "Open Positions",
+        "trade_close_now": "Close Now",
         "deals_title": "Deals History",
         "deals_empty": "No history yet.",
         "deposit_title": "Balance Top Up",
@@ -233,6 +241,10 @@ WEB_I18N = {
         "js_trade_waiting": "Time left",
         "js_trade_balance": "New balance",
         "js_trade_rate": "Rate",
+        "js_reason_time": "By timer",
+        "js_reason_tp": "Take Profit",
+        "js_reason_sl": "Stop Loss",
+        "js_reason_manual": "Manual close",
         "js_network_error": "Network error",
         "js_exchange_processing": "Processing exchange...",
         "js_exchange_error": "failed to exchange",
@@ -284,6 +296,8 @@ WEB_I18N = {
         "trade_countdown": "До завершення",
         "trade_status_open": "Угода відкрита",
         "trade_status_closed": "Угода закрита",
+        "trade_open_positions": "Відкриті позиції",
+        "trade_close_now": "Закрити зараз",
         "deals_title": "Історія угод",
         "deals_empty": "Історія поки порожня.",
         "deposit_title": "Поповнення балансу",
@@ -324,6 +338,10 @@ WEB_I18N = {
         "js_trade_waiting": "До завершення",
         "js_trade_balance": "Новий баланс",
         "js_trade_rate": "Курс",
+        "js_reason_time": "За часом",
+        "js_reason_tp": "Take Profit",
+        "js_reason_sl": "Stop Loss",
+        "js_reason_manual": "Ручне закриття",
         "js_network_error": "Мережева помилка",
         "js_exchange_processing": "Обробляємо обмін...",
         "js_exchange_error": "не вдалося обміняти",
@@ -1183,6 +1201,60 @@ async def api_exchange(
     return JSONResponse({"ok": True, "rate": round(rate, 4), "received": received, "tg_id": tg_id, "from": from_currency, "to": to_currency})
 
 
+@app.get("/api/trade/open_positions", response_class=JSONResponse)
+async def api_trade_open_positions(tg_id: int):
+    items = []
+    now = time.time()
+    for tr in ACTIVE_WEB_TRADES.values():
+        if int(tr.get("tg_id", 0)) != int(tg_id):
+            continue
+        if tr.get("status") != "open":
+            continue
+        items.append(
+            {
+                "trade_id": tr["id"],
+                "asset_name": tr["asset_name"],
+                "direction": tr["direction"],
+                "amount": tr["amount"],
+                "remaining": max(0, int(tr["close_ts"] - now)),
+            }
+        )
+    items.sort(key=lambda x: x["remaining"])
+    return JSONResponse({"ok": True, "items": items[:20]})
+
+
+class TradeClosePayload(BaseModel):
+    tg_id: int
+    trade_id: str
+
+
+@app.post("/api/trade/close", response_class=JSONResponse)
+async def api_trade_close(payload: TradeClosePayload):
+    tr = ACTIVE_WEB_TRADES.get(payload.trade_id)
+    if not tr:
+        return JSONResponse({"ok": False, "error": "Trade not found"}, status_code=404)
+    if int(tr.get("tg_id", 0)) != int(payload.tg_id):
+        return JSONResponse({"ok": False, "error": "Forbidden"}, status_code=403)
+    if tr.get("status") == "closed":
+        return JSONResponse({"ok": True, "already_closed": True})
+
+    tr["close_ts"] = time.time()
+    tr["close_reason"] = "manual"
+    closed = await settle_web_trade(payload.trade_id)
+    if not closed:
+        return JSONResponse({"ok": False, "error": "Trade not found"}, status_code=404)
+    return JSONResponse(
+        {
+            "ok": True,
+            "trade_id": payload.trade_id,
+            "is_win": bool(closed["is_win"]),
+            "profit": float(closed["profit"]),
+            "balance": float(closed["balance"]),
+            "close_reason": closed.get("close_reason", "manual"),
+        }
+    )
+
+
 class DepositRequestPayload(BaseModel):
     tg_id: int
     amount: float
@@ -1315,11 +1387,11 @@ async def settle_web_trade(trade_id: str) -> dict | None:
     symbol = symbol_from_asset_name(asset_name)
     live_mark = next_symbol_price(symbol)
 
-    if trade.get("tp_price"):
+    if trade.get("close_reason") != "manual" and trade.get("tp_price"):
         if (direction == "up" and live_mark >= trade["tp_price"]) or (direction == "down" and live_mark <= trade["tp_price"]):
             trade["close_ts"] = time.time()
             trade["close_reason"] = "tp"
-    if trade.get("sl_price"):
+    if trade.get("close_reason") != "manual" and trade.get("sl_price"):
         if (direction == "up" and live_mark <= trade["sl_price"]) or (direction == "down" and live_mark >= trade["sl_price"]):
             trade["close_ts"] = time.time()
             trade["close_reason"] = "sl"
@@ -1401,7 +1473,22 @@ async def ws_user(websocket: WebSocket):
     try:
         while True:
             user = await fetch_one("SELECT balance, currency FROM users WHERE tg_id = ?", (tg_id,))
-            open_count = sum(1 for tr in ACTIVE_WEB_TRADES.values() if tr.get("tg_id") == tg_id and tr.get("status") == "open")
+            now = time.time()
+            open_positions = []
+            for tr in ACTIVE_WEB_TRADES.values():
+                if tr.get("tg_id") != tg_id or tr.get("status") != "open":
+                    continue
+                open_positions.append(
+                    {
+                        "trade_id": tr["id"],
+                        "asset_name": tr["asset_name"],
+                        "direction": tr["direction"],
+                        "amount": tr["amount"],
+                        "remaining": max(0, int(tr["close_ts"] - now)),
+                    }
+                )
+            open_positions.sort(key=lambda x: x["remaining"])
+            open_count = len(open_positions)
             latest_deal = await fetch_one(
                 "SELECT id, asset_name, profit, created_at FROM deals WHERE user_tg_id = ? ORDER BY id DESC LIMIT 1",
                 (tg_id,),
@@ -1412,6 +1499,7 @@ async def ws_user(websocket: WebSocket):
                     "balance": float(user["balance"] if user else 0.0),
                     "currency": str(user["currency"] if user and user["currency"] else "USD"),
                     "open_trades": open_count,
+                    "open_positions": open_positions[:10],
                     "latest_deal": dict(latest_deal) if latest_deal else None,
                 }
             )
