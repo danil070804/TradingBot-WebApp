@@ -89,7 +89,7 @@ I18N = {
         "profile_id": "└ Идентификатор: <code>{id}</code>",
         "profile_username": "└ Username: @{username}",
         "profile_username_none": "└ Username: —",
-        "profile_language": "└ Язык: {lang}",
+        "profile_language": "└ Язык: {lang_value}",
         "profile_currency": "└ Валюта: {currency}",
         "profile_verification": "└ Верификация: Нет",
         "profile_worker": "└ Воркер: <code>{worker}</code>",
@@ -102,7 +102,7 @@ I18N = {
         "profile_balance_title": "💰 <b>Баланс</b>",
         "profile_balance_value": "└ Баланс: {balance:.2f} {currency}",
         "profile_pending_value": "└ На выводе: {pending:.2f} {currency}",
-        "settings_title": "🧩 <b>Настройки</b>\n\n📘 Язык интерфейса: <b>{lang}</b>\n💱 Валюта: <b>{cur}</b>\n\nВыберите, что хотите изменить:",
+        "settings_title": "🧩 <b>Настройки</b>\n\n📘 Язык интерфейса: <b>{lang_value}</b>\n💱 Валюта: <b>{cur}</b>\n\nВыберите, что хотите изменить:",
         "settings_choose_lang": "🌐 Выберите язык интерфейса:",
         "settings_choose_currency": "💱 Выберите валюту:",
         "settings_btn_lang": "🌐Язык интерфейса",
@@ -137,7 +137,7 @@ I18N = {
         "profile_id": "└ ID: <code>{id}</code>",
         "profile_username": "└ Username: @{username}",
         "profile_username_none": "└ Username: —",
-        "profile_language": "└ Language: {lang}",
+        "profile_language": "└ Language: {lang_value}",
         "profile_currency": "└ Currency: {currency}",
         "profile_verification": "└ Verification: No",
         "profile_worker": "└ Worker: <code>{worker}</code>",
@@ -150,7 +150,7 @@ I18N = {
         "profile_balance_title": "💰 <b>Balance</b>",
         "profile_balance_value": "└ Balance: {balance:.2f} {currency}",
         "profile_pending_value": "└ Pending withdraw: {pending:.2f} {currency}",
-        "settings_title": "🧩 <b>Settings</b>\n\n📘 Interface language: <b>{lang}</b>\n💱 Currency: <b>{cur}</b>\n\nChoose what to change:",
+        "settings_title": "🧩 <b>Settings</b>\n\n📘 Interface language: <b>{lang_value}</b>\n💱 Currency: <b>{cur}</b>\n\nChoose what to change:",
         "settings_choose_lang": "🌐 Choose interface language:",
         "settings_choose_currency": "💱 Choose currency:",
         "settings_btn_lang": "🌐Language",
@@ -185,7 +185,7 @@ I18N = {
         "profile_id": "└ Ідентифікатор: <code>{id}</code>",
         "profile_username": "└ Username: @{username}",
         "profile_username_none": "└ Username: —",
-        "profile_language": "└ Мова: {lang}",
+        "profile_language": "└ Мова: {lang_value}",
         "profile_currency": "└ Валюта: {currency}",
         "profile_verification": "└ Верифікація: Ні",
         "profile_worker": "└ Воркер: <code>{worker}</code>",
@@ -198,7 +198,7 @@ I18N = {
         "profile_balance_title": "💰 <b>Баланс</b>",
         "profile_balance_value": "└ Баланс: {balance:.2f} {currency}",
         "profile_pending_value": "└ На виводі: {pending:.2f} {currency}",
-        "settings_title": "🧩 <b>Налаштування</b>\n\n📘 Мова інтерфейсу: <b>{lang}</b>\n💱 Валюта: <b>{cur}</b>\n\nОберіть, що хочете змінити:",
+        "settings_title": "🧩 <b>Налаштування</b>\n\n📘 Мова інтерфейсу: <b>{lang_value}</b>\n💱 Валюта: <b>{cur}</b>\n\nОберіть, що хочете змінити:",
         "settings_choose_lang": "🌐 Оберіть мову інтерфейсу:",
         "settings_choose_currency": "💱 Оберіть валюту:",
         "settings_btn_lang": "🌐Мова інтерфейсу",
@@ -1623,7 +1623,7 @@ async def send_profile(callback_or_msg):
         t(lang, "profile_title"),
         t(lang, "profile_id", id=tg_user.id),
         t(lang, "profile_username", username=tg_user.username) if tg_user.username else t(lang, "profile_username_none"),
-        t(lang, "profile_language", lang=lang.upper()),
+        t(lang, "profile_language", lang_value=lang.upper()),
         t(lang, "profile_currency", currency=currency),
         t(lang, "profile_verification"),
         t(lang, "profile_worker", worker=worker_id) if worker_id else t(lang, "profile_worker_none"),
@@ -2049,7 +2049,7 @@ async def on_settings(callback: CallbackQuery):
     user_row = await get_user_row(callback.from_user)
     lang = normalize_lang(user_row["language"])
     cur = user_row["currency"] or "не выбрана"
-    text = t(lang, "settings_title", lang=lang.upper(), cur=cur)
+    text = t(lang, "settings_title", lang_value=lang.upper(), cur=cur)
     await callback.message.answer(text, reply_markup=settings_keyboard(lang))
     await callback.answer()
 
