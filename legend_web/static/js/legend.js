@@ -417,8 +417,16 @@ function bindMarketSocket() {
         });
         volumeSeries = lwChart.addHistogramSeries({
             priceFormat: { type: "volume" },
-            priceScaleId: "",
-            scaleMargins: { top: 0.76, bottom: 0 },
+            priceScaleId: "vol",
+            lastValueVisible: false,
+            priceLineVisible: false,
+        });
+        lwChart.priceScale("vol").applyOptions({
+            visible: false,
+            scaleMargins: { top: 0.82, bottom: 0.02 },
+        });
+        lwChart.priceScale("right").applyOptions({
+            scaleMargins: { top: 0.06, bottom: 0.22 },
         });
         onResize = () => {
             lwChart.applyOptions({ width: tvChartEl.clientWidth || 430 });
@@ -476,7 +484,7 @@ function bindMarketSocket() {
                 candles.map((c) => ({
                     time: c.time,
                     value: c.volume || 0,
-                    color: c.close >= c.open ? "rgba(0,210,201,0.45)" : "rgba(255,55,95,0.45)",
+                    color: c.close >= c.open ? "rgba(0,210,201,0.22)" : "rgba(255,55,95,0.22)",
                 }))
             );
             lwChart.timeScale().fitContent();
@@ -525,7 +533,7 @@ function bindMarketSocket() {
             volumeSeries.update({
                 time: state.lastBar.time,
                 value: state.lastBar.volume || 0,
-                color: state.lastBar.close >= state.lastBar.open ? "rgba(0,210,201,0.45)" : "rgba(255,55,95,0.45)",
+                color: state.lastBar.close >= state.lastBar.open ? "rgba(0,210,201,0.22)" : "rgba(255,55,95,0.22)",
             });
             if (liveLockEnabled) lwChart.timeScale().scrollToRealTime();
         } else {
