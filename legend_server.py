@@ -80,7 +80,8 @@ ASSET_SPECS = {
     "LTC": {"name": "Litecoin", "start": 86.0, "vol": 0.008, "qty_min": 0.2, "qty_max": 240.0},
 }
 MARKET_PRICE_STATE = {k: v["start"] for k, v in ASSET_SPECS.items()}
-MARKET_DAY_STATS = {k: {"open": v["start"], "high": v["start"], "low": v["start"]} for k, v in ASSET_SPECS.items()}
+_now_ts = int(time.time())
+MARKET_DAY_STATS = {k: {"open": v["start"], "high": v["start"], "low": v["start"], "ts": _now_ts} for k, v in ASSET_SPECS.items()}
 MARKET_MOMENTUM_STATE = {k: 0.0 for k in ASSET_SPECS.keys()}
 MARKET_REGIME_STATE = {k: {"drift": 0.0, "until": 0} for k in ASSET_SPECS.keys()}
 MARKET_PRICE_HISTORY = {k: deque(maxlen=MARKET_HISTORY_MAXLEN) for k in ASSET_SPECS.keys()}
@@ -685,13 +686,26 @@ def next_symbol_price(symbol: str, ts: int | None = None) -> float:
     momentum = momentum * 0.86 + regime_drift + noise + mean_reversion
     max_step = max(0.00002, vol * 0.14)
     momentum = max(-max_step, min(max_step, momentum))
-    MARKET_MOMENTUM_STATE[symbol] = momentum
 
     updated = max(0.00001, base * (1 + momentum))
+    min_price = max(0.00001, anchor * 0.55)
+    max_price = max(min_price * 1.02, anchor * 1.65)
+    if updated < min_price:
+        updated = min_price * (1 + random.uniform(0.0004, 0.0025))
+        momentum = abs(momentum) * 0.45
+    elif updated > max_price:
+        updated = max_price * (1 - random.uniform(0.0004, 0.0025))
+        momentum = -abs(momentum) * 0.45
+    MARKET_MOMENTUM_STATE[symbol] = momentum
     MARKET_PRICE_STATE[symbol] = updated
-    stats = MARKET_DAY_STATS.setdefault(symbol, {"open": updated, "high": updated, "low": updated})
+    stats = MARKET_DAY_STATS.setdefault(symbol, {"open": updated, "high": updated, "low": updated, "ts": tick_ts})
+    if tick_ts - int(stats.get("ts", tick_ts)) > 86400:
+        stats["open"] = updated
+        stats["high"] = updated
+        stats["low"] = updated
     stats["high"] = max(stats["high"], updated)
     stats["low"] = min(stats["low"], updated)
+    stats["ts"] = tick_ts
     hist = MARKET_PRICE_HISTORY.setdefault(symbol, deque(maxlen=MARKET_HISTORY_MAXLEN))
     if hist and hist[-1]["t"] == tick_ts:
         hist[-1]["p"] = updated
@@ -800,14 +814,20 @@ def seed_symbol_history(symbol: str, points: int = 5800, step_sec: int = 5, forc
         ts += step_sec
         trend = max(-vol * 0.08, min(vol * 0.08, trend + random.uniform(-vol * 0.01, vol * 0.01)))
         noise = random.uniform(-vol * 0.06, vol * 0.06)
-        momentum = momentum * 0.92 + trend + noise
-        step = max(-vol * 0.16, min(vol * 0.16, momentum))
+        mean_reversion = ((start - price) / max(start, 0.00001)) * 0.018
+        momentum = momentum * 0.9 + trend + noise + mean_reversion
+        step = max(-vol * 0.12, min(vol * 0.12, momentum))
         price = max(0.00001, price * (1 + step))
+        lower = max(0.00001, start * 0.55)
+        upper = max(lower * 1.02, start * 1.65)
+        price = max(lower, min(upper, price))
         hist.append({"t": ts, "p": price})
     MARKET_PRICE_STATE[symbol] = price
-    stats = MARKET_DAY_STATS.setdefault(symbol, {"open": start, "high": price, "low": price})
-    stats["high"] = max(stats["high"], max(p["p"] for p in hist))
-    stats["low"] = min(stats["low"], min(p["p"] for p in hist))
+    stats = MARKET_DAY_STATS.setdefault(symbol, {"open": price, "high": price, "low": price, "ts": now})
+    stats["open"] = price
+    stats["high"] = price
+    stats["low"] = price
+    stats["ts"] = now
 
 
 def build_candles_from_history(symbol: str, tf_sec: int, limit: int = 80) -> list[dict]:
@@ -859,17 +879,28 @@ def build_candles_from_history(symbol: str, tf_sec: int, limit: int = 80) -> lis
         ordered = prefix + ordered
 
     out = ordered[-n:]
-    return [
-        {
-            "t": c["t"],
-            "o": round(c["o"], 6),
-            "h": round(c["h"], 6),
-            "l": round(c["l"], 6),
-            "c": round(c["c"], 6),
-            "v": round(max(1.0, c["v"] * 1000.0), 2),
-        }
-        for c in out
-    ]
+    spec = ASSET_SPECS.get(symbol, {"vol": 0.006})
+    wick_ratio = max(0.0005, float(spec.get("vol", 0.006)) * 0.9)
+    result = []
+    for c in out:
+        o = float(c["o"])
+        close = float(c["c"])
+        hi = max(float(c["h"]), o, close)
+        lo = min(float(c["l"]), o, close)
+        body = max(abs(close - o), max(abs(o), abs(close), 0.00001) * wick_ratio * 0.35, 0.00001)
+        hi = max(hi, max(o, close) + body * random.uniform(0.08, 0.45))
+        lo = min(lo, min(o, close) - body * random.uniform(0.08, 0.45))
+        result.append(
+            {
+                "t": c["t"],
+                "o": round(o, 6),
+                "h": round(max(hi, o, close), 6),
+                "l": round(max(0.00001, min(lo, o, close)), 6),
+                "c": round(close, 6),
+                "v": round(max(1.0, float(c.get("v", 0.0)) * 700.0 + body * 1800.0), 2),
+            }
+        )
+    return result
 
 
 async def market_feed_loop():

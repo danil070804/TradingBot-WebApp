@@ -629,11 +629,19 @@ function bindMarketSocket() {
     let lastHistorySyncMs = 0;
     let lastMarketMessageMs = 0;
     let reconnectDelayMs = 1200;
+    let wsFailStreak = 0;
+    let wsDisabledUntil = 0;
+    let pollingOnlyMode = false;
     let disposed = false;
 
-    const setFeedState = (live) => {
+    const setFeedState = (live, source = "ws") => {
         if (liveDot) liveDot.classList.toggle("live", !!live);
-        if (liveText) liveText.textContent = live ? "Market Feed: live" : "Market Feed: reconnecting";
+        if (!liveText) return;
+        if (source === "poll") {
+            liveText.textContent = live ? "Market Feed: live (polling)" : "Market Feed: polling";
+            return;
+        }
+        liveText.textContent = live ? "Market Feed: live" : "Market Feed: reconnecting";
     };
     const stopTimer = (id) => {
         if (!id) return null;
@@ -698,7 +706,7 @@ function bindMarketSocket() {
         ws.send(JSON.stringify({ type: "subscribe", symbol: getActiveSymbol() }));
     };
 
-    const applyMarketData = (data) => {
+    const applyMarketData = (data, source = "ws") => {
         if (disposed) return;
         const markValue = Number(data.mark);
         if (!Number.isFinite(markValue) || markValue <= 0) return;
@@ -706,7 +714,7 @@ function bindMarketSocket() {
             stopFallback();
         }
         lastMarketMessageMs = Date.now();
-        setFeedState(true);
+        setFeedState(true, source);
         markEl.textContent = `${data.mark}`;
         markEl.classList.remove("loading");
         updateMarketStats(data);
@@ -729,17 +737,19 @@ function bindMarketSocket() {
 
     const startFallback = () => {
         if (disposed || fallbackTimer) return;
-        fallbackTimer = setInterval(async () => {
+        const pollOnce = async () => {
             try {
                 const sym = encodeURIComponent(getActiveSymbol());
                 const resp = await fetch(`/api/market/snapshot?symbol=${sym}`);
                 if (!resp.ok) return;
                 const data = await resp.json();
-                if (data.ok) applyMarketData(data);
+                if (data.ok) applyMarketData(data, "poll");
             } catch (_) {
                 // no-op
             }
-        }, 4500);
+        };
+        pollOnce();
+        fallbackTimer = setInterval(pollOnce, 3200);
     };
 
     const bootstrapSnapshot = async () => {
@@ -749,7 +759,7 @@ function bindMarketSocket() {
             const resp = await fetch(`/api/market/snapshot?symbol=${sym}`);
             if (!resp.ok) return;
             const data = await resp.json();
-            if (data.ok) applyMarketData(data);
+            if (data.ok) applyMarketData(data, "poll");
         } catch (_) {
             // no-op
         }
@@ -772,13 +782,24 @@ function bindMarketSocket() {
 
     const connectWs = () => {
         if (disposed) return;
+        const now = Date.now();
+        if (now < wsDisabledUntil) {
+            if (!fallbackTimer) startFallback();
+            setFeedState(Boolean(lastMarketMessageMs && now - lastMarketMessageMs < 12000), "poll");
+            reconnectTimer = stopTimer(reconnectTimer);
+            reconnectTimer = setTimeout(() => connectWs(), wsDisabledUntil - now + 80);
+            return;
+        }
         if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
         ws = new WebSocket(`${protocol}://${window.location.host}/ws/market`);
 
         ws.addEventListener("open", () => {
             if (disposed) return;
             reconnectDelayMs = 1200;
-            setFeedState(true);
+            wsFailStreak = 0;
+            pollingOnlyMode = false;
+            wsDisabledUntil = 0;
+            setFeedState(true, "ws");
             lastMarketMessageMs = Date.now();
             subscribe();
             primeCandleHistory();
@@ -794,18 +815,25 @@ function bindMarketSocket() {
                 return;
             }
             if (!data || data.type !== "market") return;
-            applyMarketData(data);
+            applyMarketData(data, "ws");
         });
 
         ws.addEventListener("close", () => {
             if (disposed) return;
-            setFeedState(false);
+            wsFailStreak += 1;
+            const nowTs = Date.now();
+            if (wsFailStreak >= 3) {
+                pollingOnlyMode = true;
+                wsDisabledUntil = nowTs + 120000;
+            }
             startFallback();
+            setFeedState(Boolean(lastMarketMessageMs && nowTs - lastMarketMessageMs < 12000), pollingOnlyMode ? "poll" : "ws");
             reconnectDelayMs = Math.min(7000, Math.round(reconnectDelayMs * 1.35));
-            reconnectTimer = setTimeout(
-                () => connectWs(),
-                reconnectDelayMs + Math.floor(Math.random() * 240)
-            );
+            reconnectTimer = stopTimer(reconnectTimer);
+            const waitMs = pollingOnlyMode
+                ? Math.max(reconnectDelayMs + Math.floor(Math.random() * 240), wsDisabledUntil - nowTs)
+                : reconnectDelayMs + Math.floor(Math.random() * 240);
+            reconnectTimer = setTimeout(() => connectWs(), waitMs);
         });
 
         ws.addEventListener("error", () => {
@@ -817,19 +845,30 @@ function bindMarketSocket() {
     // If WS is silent for too long, rely on snapshot polling but don't force fake reconnect states while socket is open.
     silenceTimer = setInterval(() => {
         if (disposed) return;
-        const isOpen = Boolean(ws && ws.readyState === WebSocket.OPEN);
-        if (!isOpen) {
-            setFeedState(false);
+        const nowTs = Date.now();
+        const hasFreshData = Boolean(lastMarketMessageMs && nowTs - lastMarketMessageMs < 12000);
+        if (pollingOnlyMode || nowTs < wsDisabledUntil) {
             startFallback();
+            setFeedState(hasFreshData, "poll");
             return;
         }
-        if (lastMarketMessageMs && Date.now() - lastMarketMessageMs > 18000) {
+        const isOpen = Boolean(ws && ws.readyState === WebSocket.OPEN);
+        if (!isOpen) {
             startFallback();
+            setFeedState(hasFreshData, hasFreshData ? "poll" : "ws");
+            return;
         }
+        if (lastMarketMessageMs && nowTs - lastMarketMessageMs > 18000) {
+            startFallback();
+            setFeedState(hasFreshData, hasFreshData ? "poll" : "ws");
+            return;
+        }
+        setFeedState(true, "ws");
     }, 3000);
 
     // Seed first values quickly and then connect WS stream.
     bootstrapSnapshot();
+    startFallback();
     connectWs();
 }
 
