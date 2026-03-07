@@ -1733,7 +1733,7 @@ async def ws_market(websocket: WebSocket):
     try:
         while True:
             try:
-                raw = await asyncio.wait_for(websocket.receive_text(), timeout=0.01)
+                raw = await asyncio.wait_for(websocket.receive_text(), timeout=0.2)
                 payload = json.loads(raw)
                 if isinstance(payload, dict) and payload.get("type") == "subscribe":
                     incoming = str(payload.get("symbol") or "").strip()
@@ -1775,6 +1775,10 @@ async def ws_market(websocket: WebSocket):
             )
             await asyncio.sleep(1.25)
     except WebSocketDisconnect:
+        return
+    except Exception:
+        with contextlib.suppress(Exception):
+            await websocket.close()
         return
 
 

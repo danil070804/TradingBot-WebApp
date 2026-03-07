@@ -41,6 +41,13 @@ body.perf-lite .bottom-nav a.active {
     animation: none !important;
 }
 
+body.perf-lite .card,
+body.perf-lite .content,
+body.perf-lite .page-bg::after {
+    animation: none !important;
+    transition: none !important;
+}
+
 body.perf-lite .topbar {
     backdrop-filter: none;
 }

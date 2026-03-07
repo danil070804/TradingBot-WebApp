@@ -620,7 +620,7 @@ function bindMarketSocket() {
     }
 
     const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-    const ws = new WebSocket(`${protocol}://${window.location.host}/ws/market`);
+    let ws = null;
     let fallbackTimer = null;
     let silenceTimer = null;
     let reconnectTimer = null;
@@ -628,6 +628,7 @@ function bindMarketSocket() {
     let lastBookUpdateMs = 0;
     let lastHistorySyncMs = 0;
     let lastMarketMessageMs = 0;
+    let reconnectDelayMs = 1200;
     let disposed = false;
 
     const setFeedState = (live) => {
@@ -640,9 +641,12 @@ function bindMarketSocket() {
         clearTimeout(id);
         return null;
     };
+    const stopFallback = () => {
+        fallbackTimer = stopTimer(fallbackTimer);
+    };
     const cleanup = (closeSocket = false) => {
         disposed = true;
-        fallbackTimer = stopTimer(fallbackTimer);
+        stopFallback();
         silenceTimer = stopTimer(silenceTimer);
         reconnectTimer = stopTimer(reconnectTimer);
         brandingTimer = stopTimer(brandingTimer);
@@ -650,13 +654,14 @@ function bindMarketSocket() {
             window.removeEventListener("resize", onResize);
             onResize = null;
         }
-        if (closeSocket && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+        if (closeSocket && ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
             try {
                 ws.close();
             } catch (_) {
                 // no-op
             }
         }
+        ws = null;
     };
     MARKET_SOCKET_RUNTIME = { cleanup };
 
@@ -689,25 +694,30 @@ function bindMarketSocket() {
     };
 
     const subscribe = () => {
-        if (disposed || ws.readyState !== WebSocket.OPEN) return;
+        if (disposed || !ws || ws.readyState !== WebSocket.OPEN) return;
         ws.send(JSON.stringify({ type: "subscribe", symbol: getActiveSymbol() }));
     };
 
     const applyMarketData = (data) => {
         if (disposed) return;
+        const markValue = Number(data.mark);
+        if (!Number.isFinite(markValue) || markValue <= 0) return;
+        if (fallbackTimer && ws && ws.readyState === WebSocket.OPEN) {
+            stopFallback();
+        }
         lastMarketMessageMs = Date.now();
         setFeedState(true);
-        markEl.textContent = data.mark;
+        markEl.textContent = `${data.mark}`;
         markEl.classList.remove("loading");
         updateMarketStats(data);
         const nowMs = Date.now();
-        if (nowMs - lastBookUpdateMs >= 4500) {
+        if (nowMs - lastBookUpdateMs >= 5200) {
             patchBookRows(asksWrap, data.asks || []);
             patchBookRows(bidsWrap, data.bids || []);
             lastBookUpdateMs = nowMs;
         }
-        if (nowMs - lastCandleUpdateMs >= 2000) {
-            updateLiveBar(Number(data.mark), Number(data.ts || Math.floor(Date.now() / 1000)));
+        if (nowMs - lastCandleUpdateMs >= 2600) {
+            updateLiveBar(markValue, Number(data.ts || Math.floor(Date.now() / 1000)));
             lastCandleUpdateMs = nowMs;
         }
         if (nowMs - lastHistorySyncMs >= 18000) {
@@ -729,7 +739,7 @@ function bindMarketSocket() {
             } catch (_) {
                 // no-op
             }
-        }, 4200);
+        }, 4500);
     };
 
     const bootstrapSnapshot = async () => {
@@ -745,71 +755,82 @@ function bindMarketSocket() {
         }
     };
 
-    ws.addEventListener("open", () => {
-        if (disposed) return;
-        subscribe();
-        setFeedState(true);
-        lastMarketMessageMs = Date.now();
-        primeCandleHistory();
-        bootstrapSnapshot();
-        if (fallbackTimer) {
-            clearInterval(fallbackTimer);
-            fallbackTimer = null;
-        }
-    });
-
     pairSelect.addEventListener("change", () => {
         if (disposed) return;
         if (chartSymbolSelect && chartSymbolSelect !== pairSelect) chartSymbolSelect.value = pairSelect.value;
         primeCandleHistory();
-        if (ws.readyState === WebSocket.OPEN) subscribe();
+        if (ws && ws.readyState === WebSocket.OPEN) subscribe();
     });
     if (chartSymbolSelect && chartSymbolSelect !== pairSelect) {
         chartSymbolSelect.addEventListener("change", () => {
             if (disposed) return;
             if (pairSelect) pairSelect.value = chartSymbolSelect.value;
             primeCandleHistory();
-            if (ws.readyState === WebSocket.OPEN) subscribe();
+            if (ws && ws.readyState === WebSocket.OPEN) subscribe();
         });
     }
 
-    ws.addEventListener("message", (event) => {
-        let data = null;
-        try {
-            data = JSON.parse(event.data);
-        } catch (_) {
-            return;
-        }
-        if (!data || data.type !== "market") return;
-        applyMarketData(data);
-    });
-
-    ws.addEventListener("close", () => {
+    const connectWs = () => {
         if (disposed) return;
-        setFeedState(false);
-        startFallback();
-        reconnectTimer = setTimeout(() => bindMarketSocket(), 1200);
-    });
+        if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+        ws = new WebSocket(`${protocol}://${window.location.host}/ws/market`);
 
-    ws.addEventListener("error", () => {
-        if (disposed) return;
-        setFeedState(false);
-        startFallback();
-    });
+        ws.addEventListener("open", () => {
+            if (disposed) return;
+            reconnectDelayMs = 1200;
+            setFeedState(true);
+            lastMarketMessageMs = Date.now();
+            subscribe();
+            primeCandleHistory();
+            bootstrapSnapshot();
+            stopFallback();
+        });
 
-    // If WS is open but silent for too long, automatically rely on snapshot polling.
-    silenceTimer = setInterval(() => {
-        if (disposed) return;
-        if (!lastMarketMessageMs) return;
-        if (Date.now() - lastMarketMessageMs > 9000) {
+        ws.addEventListener("message", (event) => {
+            let data = null;
+            try {
+                data = JSON.parse(event.data);
+            } catch (_) {
+                return;
+            }
+            if (!data || data.type !== "market") return;
+            applyMarketData(data);
+        });
+
+        ws.addEventListener("close", () => {
+            if (disposed) return;
             setFeedState(false);
             startFallback();
-        }
-    }, 2500);
+            reconnectDelayMs = Math.min(7000, Math.round(reconnectDelayMs * 1.35));
+            reconnectTimer = setTimeout(
+                () => connectWs(),
+                reconnectDelayMs + Math.floor(Math.random() * 240)
+            );
+        });
 
-    // Always seed first values quickly.
+        ws.addEventListener("error", () => {
+            if (disposed) return;
+            startFallback();
+        });
+    };
+
+    // If WS is silent for too long, rely on snapshot polling but don't force fake reconnect states while socket is open.
+    silenceTimer = setInterval(() => {
+        if (disposed) return;
+        const isOpen = Boolean(ws && ws.readyState === WebSocket.OPEN);
+        if (!isOpen) {
+            setFeedState(false);
+            startFallback();
+            return;
+        }
+        if (lastMarketMessageMs && Date.now() - lastMarketMessageMs > 18000) {
+            startFallback();
+        }
+    }, 3000);
+
+    // Seed first values quickly and then connect WS stream.
     bootstrapSnapshot();
-    setFeedState(false);
+    connectWs();
 }
 
 function bindUserSocket() {
