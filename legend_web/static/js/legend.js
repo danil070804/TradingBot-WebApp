@@ -2,6 +2,16 @@ const LEGEND_LABELS = window.LEGEND_LABELS || {};
 const L = (key, fallback) => LEGEND_LABELS[key] || fallback;
 let MARKET_SOCKET_RUNTIME = null;
 
+function applyRuntimeProfile() {
+    const body = document.body;
+    if (!body) return;
+    const isTelegram = Boolean(window.Telegram && window.Telegram.WebApp);
+    const lowViewport = Math.min(window.innerWidth || 0, window.innerHeight || 0) <= 430;
+    if (isTelegram || lowViewport) {
+        body.classList.add("perf-lite");
+    }
+}
+
 function reasonLabel(reason) {
     if (reason === "tp") return L("js_reason_tp", "Take Profit");
     if (reason === "sl") return L("js_reason_sl", "Stop Loss");
@@ -434,6 +444,7 @@ function bindMarketSocket() {
             }
         }, 14000);
     } else if (canvas) {
+        if (tvChartEl) tvChartEl.style.display = "none";
         canvas.style.display = "block";
     }
 
@@ -1076,6 +1087,7 @@ async function refreshTape() {
     }
 }
 
+applyRuntimeProfile();
 initTelegramAuth();
 bindDirectionButtons();
 bindTradeControls();
