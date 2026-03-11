@@ -274,14 +274,78 @@ def support_contact_text() -> str:
 
 
 def build_menu_info_text(lang: str) -> str:
-    news_url = (config.news_url or "").strip() or "—"
-    user_agreement_url = (config.user_agreement_url or "").strip() or "—"
     return tr(
         lang,
-        f"ℹ️ Информация\n\n📣 Новости: {news_url}\n📄 Пользовательское соглашение: {user_agreement_url}",
-        f"ℹ️ Information\n\n📣 News: {news_url}\n📄 User agreement: {user_agreement_url}",
-        f"ℹ️ Інформація\n\n📣 Новини: {news_url}\n📄 Угода користувача: {user_agreement_url}",
+        "ℹ️ <b>Legend Trading | Информация</b>\n\n"
+        "╭ <b>Что доступно</b>\n"
+        "├ Актуальные новости платформы\n"
+        "├ Официальные материалы и документы\n"
+        "╰ Быстрые переходы по важным разделам\n\n"
+        "Выберите нужный пункт через кнопки ниже.",
+        "ℹ️ <b>Legend Trading | Information</b>\n\n"
+        "╭ <b>Available here</b>\n"
+        "├ Platform news and updates\n"
+        "├ Official materials and documents\n"
+        "╰ Quick access to key sections\n\n"
+        "Use the buttons below to open the required section.",
+        "ℹ️ <b>Legend Trading | Інформація</b>\n\n"
+        "╭ <b>Доступно тут</b>\n"
+        "├ Актуальні новини платформи\n"
+        "├ Офіційні матеріали та документи\n"
+        "╰ Швидкий доступ до важливих розділів\n\n"
+        "Оберіть потрібний пункт через кнопки нижче.",
     )
+
+
+def info_section_keyboard(lang: str = "ru"):
+    kb = InlineKeyboardBuilder()
+    if (config.news_url or "").strip():
+        kb.button(
+            text=tr(lang, "📣 Новости", "📣 News", "📣 Новини"),
+            url=config.news_url.strip(),
+        )
+    if (config.user_agreement_url or "").strip():
+        kb.button(
+            text=tr(lang, "📄 Соглашение", "📄 Agreement", "📄 Угода"),
+            url=config.user_agreement_url.strip(),
+        )
+    kb.adjust(2)
+    return kb.as_markup()
+
+
+def build_menu_support_text(lang: str) -> str:
+    return tr(
+        lang,
+        "🌐 <b>Техническая поддержка</b>\n\n"
+        "╭ <b>Поможем по вопросам</b>\n"
+        "├ Пополнение и вывод средств\n"
+        "├ Верификация и проверка аккаунта\n"
+        "╰ Технические вопросы по платформе\n\n"
+        "Для быстрого перехода используйте кнопку ниже.",
+        "🌐 <b>Technical Support</b>\n\n"
+        "╭ <b>We can help with</b>\n"
+        "├ Deposits and withdrawals\n"
+        "├ Verification and account checks\n"
+        "╰ Technical questions about the platform\n\n"
+        "Use the button below for quick access.",
+        "🌐 <b>Технічна підтримка</b>\n\n"
+        "╭ <b>Допоможемо з питаннями</b>\n"
+        "├ Поповнення та виведення коштів\n"
+        "├ Верифікація та перевірка акаунта\n"
+        "╰ Технічні питання щодо платформи\n\n"
+        "Для швидкого переходу використайте кнопку нижче.",
+    )
+
+
+def support_section_keyboard(lang: str = "ru"):
+    kb = InlineKeyboardBuilder()
+    if config.support_url:
+        kb.button(
+            text=tr(lang, "🛟 Открыть поддержку", "🛟 Open support", "🛟 Відкрити підтримку"),
+            url=config.support_url,
+        )
+    kb.adjust(1)
+    return kb.as_markup()
 
 
 def format_trade_duration(lang: str, seconds: int) -> str:
@@ -984,7 +1048,7 @@ async def send_section_message(target: Message, section_key: str, text: str, rep
     if photo_id:
         with contextlib.suppress(Exception):
             return await target.answer_photo(photo=photo_id, caption=text, reply_markup=reply_markup)
-    return await target.answer(text, reply_markup=reply_markup)
+    return await target.answer(text, reply_markup=reply_markup, disable_web_page_preview=True)
 
 
 def bot_section_media_keyboard():
@@ -2719,7 +2783,7 @@ async def menu_info(message: Message):
     user_row = await get_user_row(message.from_user)
     lang = normalize_lang(user_row["language"])
     text = build_menu_info_text(lang)
-    await send_section_message(message, "info", text, reply_markup=main_menu_keyboard(lang))
+    await send_section_message(message, "info", text, reply_markup=info_section_keyboard(lang))
 
 
 @dp.message(F.text.in_({"🌐 Поддержка", "🌐 Support", "🌐 Тех. Підтримка"}))
@@ -2751,8 +2815,8 @@ async def menu_support(message: Message):
     await send_section_message(
         message,
         "support",
-        t(lang, "menu_support_text", url=config.support_url),
-        reply_markup=main_menu_keyboard(lang),
+        build_menu_support_text(lang),
+        reply_markup=support_section_keyboard(lang),
     )
 
 
@@ -2789,9 +2853,18 @@ async def start_ecn_flow(msg, state: FSMContext):
 
     text = tr(
         lang,
-        "Выберите актив для сделки. Список разбит на страницы, чтобы не раздувать чат.",
-        "Choose an asset for the trade. The list is split into pages to keep the chat compact.",
-        "Оберіть актив для угоди. Список розбитий на сторінки, щоб не перевантажувати чат.",
+        "📈 <b>Открытие сделки</b>\n\n"
+        "╭ <b>Шаг 1 из 3</b>\n"
+        "├ Выберите актив для входа\n"
+        "╰ Список разбит на страницы для удобной навигации",
+        "📈 <b>Open Trade</b>\n\n"
+        "╭ <b>Step 1 of 3</b>\n"
+        "├ Choose the asset for entry\n"
+        "╰ The list is split into pages for easy navigation",
+        "📈 <b>Відкриття угоди</b>\n\n"
+        "╭ <b>Крок 1 із 3</b>\n"
+        "├ Оберіть актив для входу\n"
+        "╰ Список поділено на сторінки для зручної навігації",
     )
 
     await send_section_message(message, "open_ecn", text, reply_markup=ecn_assets_page_keyboard(assets, page=0))
