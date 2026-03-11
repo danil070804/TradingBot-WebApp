@@ -2356,6 +2356,15 @@ def support_reply_hint_keyboard(lang: str = "ru"):
         ),
         callback_data="support_reply_hint",
     )
+    kb.button(
+        text=tr(
+            lang,
+            "⏹ Завершить диалог",
+            "⏹ End chat",
+            "⏹ Завершити діалог",
+        ),
+        callback_data="support_end_chat",
+    )
     kb.adjust(1)
     return kb.as_markup()
 
@@ -4818,6 +4827,39 @@ async def wc_chat_stop(callback: CallbackQuery):
 @dp.callback_query(F.data == "support_reply_hint")
 async def support_reply_hint(callback: CallbackQuery):
     await callback.answer("Напишите сообщение прямо в этот чат. Оно уйдёт технической поддержке.", show_alert=True)
+
+
+@dp.callback_query(F.data == "support_end_chat")
+async def support_end_chat(callback: CallbackQuery):
+    client_id = callback.from_user.id
+    worker_id = ACTIVE_DIALOGS_CLIENT.pop(client_id, None)
+    if not worker_id:
+        await callback.answer("Диалог уже завершён.", show_alert=True)
+        return
+
+    ACTIVE_DIALOGS_WORKER.pop(worker_id, None)
+    await log_activity_for_worker_client(
+        client_tg_id=client_id,
+        actor_tg_id=client_id,
+        actor_source="bot",
+        event_type="bot_support_chat_stopped_by_client",
+        title="Диалог с поддержкой",
+        details="Клиент завершил диалог с техподдержкой в Telegram-боте.",
+    )
+    ticket = await get_latest_open_support_ticket(client_id)
+    if ticket:
+        await update_support_ticket_status(
+            int(ticket["id"]),
+            "closed",
+            assigned_to=str(worker_id),
+            last_message="Диалог завершён клиентом в Telegram-боте",
+        )
+
+    with contextlib.suppress(Exception):
+        await bot.send_message(worker_id, f"⏹ Клиент <code>{client_id}</code> завершил диалог с поддержкой.")
+
+    await callback.message.answer("⏹ Диалог с технической поддержкой завершён.")
+    await callback.answer("Диалог завершён")
 
 
 @dp.callback_query(F.data.startswith("support_reply_start:"))
