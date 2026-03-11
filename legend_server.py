@@ -1387,6 +1387,7 @@ async def market_price_loop():
 async def lifespan(app: FastAPI):
     global polling_task, market_feed_task, market_price_task
     await bot.init_db()
+    await bot.resume_open_trade_monitors()
     await refresh_asset_market_map()
     await MARKET_SERVICE.start()
     if MARKET_DEV_FALLBACK:

@@ -63,6 +63,7 @@ ACTIVE_DIALOGS_CLIENT: dict[int, int] = {}
 # worker_id -> client_id
 ACTIVE_DIALOGS_WORKER: dict[int, int] = {}
 ACTIVE_DEAL_TASKS: set[asyncio.Task] = set()
+ACTIVE_TRADE_MONITORS: dict[str, asyncio.Task] = {}
 
 
 class DepositStates(StatesGroup):
@@ -1042,6 +1043,15 @@ async def get_open_trades_for_user(user_tg_id: int):
         return await cur.fetchall()
 
 
+async def get_all_open_trade_ids() -> list[str]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "SELECT trade_id FROM active_trades WHERE status = 'open'"
+        )
+        rows = await cur.fetchall()
+        return [str(row[0]) for row in rows]
+
+
 async def attach_trade_message(trade_id: str, chat_id: int, message_id: int):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
@@ -1261,9 +1271,9 @@ async def notify_trade_opened(trade_id: str):
     )
     try:
         msg = await bot.send_message(int(trade["user_tg_id"]), text)
+        await attach_trade_message(trade_id, int(msg.chat.id), int(msg.message_id))
     except Exception:
-        return
-    await attach_trade_message(trade_id, int(msg.chat.id), int(msg.message_id))
+        pass
     spawn_trade_monitor(trade_id)
 
 
@@ -1302,7 +1312,24 @@ async def monitor_trade(trade_id: str):
 
 
 def spawn_trade_monitor(trade_id: str):
-    return spawn_background_task(monitor_trade(trade_id))
+    existing = ACTIVE_TRADE_MONITORS.get(trade_id)
+    if existing and not existing.done():
+        return existing
+
+    task = spawn_background_task(monitor_trade(trade_id))
+    ACTIVE_TRADE_MONITORS[trade_id] = task
+
+    def _clear_monitor(done_task: asyncio.Task):
+        if ACTIVE_TRADE_MONITORS.get(trade_id) is done_task:
+            ACTIVE_TRADE_MONITORS.pop(trade_id, None)
+
+    task.add_done_callback(_clear_monitor)
+    return task
+
+
+async def resume_open_trade_monitors():
+    for trade_id in await get_all_open_trade_ids():
+        spawn_trade_monitor(trade_id)
 
 
 async def set_accepted_rules(tg_id: int):
@@ -2503,7 +2530,7 @@ async def menu_info(message: Message):
     await send_section_message(message, "info", text, reply_markup=main_menu_keyboard(lang))
 
 
-@dp.message(F.text.in_({"🌐 Тех. Поддержка", "🌐 Support", "🌐 Тех. Підтримка"}))
+@dp.message(F.text.in_({"🌐 Поддержка", "🌐 Support", "🌐 Тех. Підтримка"}))
 async def menu_support(message: Message):
     user_row = await get_user_row(message.from_user)
     lang = normalize_lang(user_row["language"])
@@ -4580,6 +4607,7 @@ async def dialog_router(message: Message):
 async def main():
     global BOT_USERNAME
     await init_db()
+    await resume_open_trade_monitors()
     me = await bot.get_me()
     BOT_USERNAME = me.username
     await dp.start_polling(bot)

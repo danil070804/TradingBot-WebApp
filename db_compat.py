@@ -45,9 +45,10 @@ def _normalize_query_for_pg(query: str) -> str:
 
 
 class _PGCursor:
-    def __init__(self, rows: list[Any] | None = None, lastrowid: int | None = None):
+    def __init__(self, rows: list[Any] | None = None, lastrowid: int | None = None, rowcount: int = 0):
         self._rows = rows or []
         self.lastrowid = lastrowid
+        self.rowcount = rowcount
 
     async def fetchone(self):
         if not self._rows:
@@ -80,18 +81,21 @@ class _PGConnectionCtx:
 
         if q_upper.startswith("SELECT") or q_upper.startswith("WITH"):
             rows = await self.conn.fetch(q, *params)
-            return _PGCursor(rows=rows)
+            return _PGCursor(rows=rows, rowcount=len(rows))
 
         if q_upper.startswith("INSERT") and "RETURNING" not in q_upper:
             try:
                 row = await self.conn.fetchrow(q + " RETURNING id", *params)
-                return _PGCursor(lastrowid=int(row["id"]) if row and "id" in row else None)
+                return _PGCursor(
+                    lastrowid=int(row["id"]) if row and "id" in row else None,
+                    rowcount=1 if row else 0,
+                )
             except Exception:
-                await self.conn.execute(q, *params)
-                return _PGCursor()
+                status = await self.conn.execute(q, *params)
+                return _PGCursor(rowcount=_parse_pg_rowcount(status))
 
-        await self.conn.execute(q, *params)
-        return _PGCursor()
+        status = await self.conn.execute(q, *params)
+        return _PGCursor(rowcount=_parse_pg_rowcount(status))
 
     async def executemany(self, query: str, seq_of_params):
         q = _normalize_query_for_pg(query)
@@ -106,3 +110,13 @@ def connect(path_or_dsn: str):
     if dsn and _is_postgres_dsn(dsn):
         return _PGConnectionCtx(dsn)
     return sqlite_driver.connect(path_or_dsn)
+
+
+def _parse_pg_rowcount(status: str) -> int:
+    parts = str(status or "").strip().split()
+    if not parts:
+        return 0
+    try:
+        return int(parts[-1])
+    except (TypeError, ValueError):
+        return 0
