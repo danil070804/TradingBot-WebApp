@@ -1180,6 +1180,8 @@ async def generate_market_rows(assets) -> list[dict]:
     rows = []
     prewarm_left = 5
     for asset in assets:
+        asset_name = str(asset["name"] or "")
+        display_symbol = symbol_from_asset_name(asset_name)
         ticker = ticker_from_asset_name(asset["name"])
         quote = MARKET_SERVICE.get_quote(ticker) or {}
         if not quote and prewarm_left > 0:
@@ -1187,20 +1189,23 @@ async def generate_market_rows(assets) -> list[dict]:
             prewarm_left -= 1
         price = float(quote.get("mark") or 0)
         day_change = float(quote.get("day_change") or 0.0)
-        if price <= 0:
-            legacy_symbol = symbol_from_asset_name(asset["name"])
+        uses_legacy_market = price <= 0 or (ticker == "BTCUSDT" and display_symbol != "BTC")
+        if uses_legacy_market:
+            legacy_symbol = display_symbol
             price = next_symbol_price(legacy_symbol)
             stats = MARKET_DAY_STATS.get(legacy_symbol) or {"open": price}
             day_open = float(stats.get("open", price) or price)
             day_change = round(((price - day_open) / day_open) * 100, 2) if day_open else 0.0
-        symbol = ticker_to_symbol(ticker)
         rows.append(
             {
                 "id": asset["id"],
-                "name": asset["name"],
-                "symbol": symbol,
+                "name": asset_name,
+                "symbol": display_symbol,
+                "market_ref": asset_name,
+                "ticker": ticker,
                 "price": _format_price(price),
                 "day_change": round(day_change, 2),
+                "market_mode": "synthetic" if uses_legacy_market else "live",
             }
         )
     return rows
@@ -2928,6 +2933,8 @@ async def api_market_tape():
 @app.get("/api/market/snapshot", response_class=JSONResponse)
 async def api_market_snapshot(symbol: str = "BTC"):
     ticker = ticker_from_symbol_input(symbol)
+    requested_name = (symbol or "").strip()
+    requested_display_symbol = symbol_from_asset_name(requested_name)
     await refresh_depth_quick(ticker, levels=10, min_interval=2.0, wait_sec=0.8)
     quote = MARKET_SERVICE.get_quote(ticker) or {}
     asks, bids = MARKET_SERVICE.get_depth(ticker, levels=10)
@@ -2935,8 +2942,9 @@ async def api_market_snapshot(symbol: str = "BTC"):
     spread = float(quote.get("spread") or 0)
     day_high = float(quote.get("high") or mark)
     day_low = float(quote.get("low") or mark)
-    if mark <= 0:
-        legacy_symbol = legacy_symbol_from_symbol_or_ticker(symbol)
+    uses_legacy_market = mark <= 0 or (ticker == "BTCUSDT" and requested_display_symbol != "BTC")
+    if uses_legacy_market:
+        legacy_symbol = requested_display_symbol if requested_display_symbol != "UNKN" else legacy_symbol_from_symbol_or_ticker(symbol)
         asks, bids, legacy_mark = build_orderbook(legacy_symbol, levels=10)
         spread = max(0.00001, asks[0]["price"] - bids[0]["price"])
         day_stats = MARKET_DAY_STATS.get(legacy_symbol, {"open": legacy_mark, "high": legacy_mark, "low": legacy_mark})
@@ -2948,7 +2956,10 @@ async def api_market_snapshot(symbol: str = "BTC"):
     return JSONResponse(
         {
             "ok": True,
-            "symbol": ticker_to_symbol(ticker),
+            "symbol": requested_display_symbol if requested_display_symbol != "UNKN" else ticker_to_symbol(ticker),
+            "asset_name": requested_name or ticker_to_symbol(ticker),
+            "ticker": ticker,
+            "market_mode": "synthetic" if uses_legacy_market else "live",
             "ts": int(time.time()),
             "mark": _format_price(mark),
             "spread": round(float(spread), 5 if mark < 1 else 2),

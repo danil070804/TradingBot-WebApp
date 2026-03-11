@@ -87,6 +87,13 @@ function bindTradeForm() {
     const progress = document.getElementById("trade-progress");
     const submitBtn = form ? form.querySelector('button[type="submit"]') : null;
     if (!form || !result) return;
+    const selectedAsset = new URLSearchParams(window.location.search).get("asset");
+    if (selectedAsset) {
+        const assetSelect = form.querySelector('select[name="asset_name"]');
+        if (assetSelect) {
+            assetSelect.value = selectedAsset;
+        }
+    }
     let busy = false;
     form.addEventListener("submit", async (e) => {
         e.preventDefault();
@@ -1109,7 +1116,7 @@ async function refreshMarketsLive() {
         const data = await resp.json();
         if (!data.ok || !Array.isArray(data.items)) return;
         const bySym = new Map();
-        data.items.forEach((x) => bySym.set((x.symbol || "").toUpperCase(), x));
+        data.items.forEach((x) => bySym.set(String(x.market_ref || x.name || x.symbol || "").toUpperCase(), x));
         priceNodes.forEach((node) => {
             const sym = String(node.dataset.symbol || "").toUpperCase();
             const row = bySym.get(sym);
@@ -1127,6 +1134,105 @@ async function refreshMarketsLive() {
     } catch (_) {
         // no-op
     }
+}
+
+function renderDealDetailFromRow(row) {
+    const card = document.getElementById("deal-detail-card");
+    const content = document.getElementById("deal-detail-content");
+    if (!card || !content || !row) return;
+    const id = row.dataset.dealId || "—";
+    const asset = row.dataset.asset || "—";
+    const direction = row.dataset.direction === "up" ? "UP / LONG" : "DOWN / SHORT";
+    const amount = Number(row.dataset.amount || 0);
+    const currency = row.dataset.currency || "USD";
+    const profit = Number(row.dataset.profit || 0);
+    const createdAt = row.dataset.createdAt || "—";
+    const isWin = Number(row.dataset.isWin || 0) === 1;
+    content.innerHTML = `
+        <div class="detail-hero">
+            <div>
+                <strong>#${id}</strong>
+                <small>${asset} · ${direction}</small>
+            </div>
+            <span class="detail-badge ${isWin ? "pos" : "neg"}">${isWin ? "Profit" : "Loss"}</span>
+        </div>
+        <div class="detail-grid">
+            <div class="detail-cell"><span>Amount</span><b>${amount.toFixed(2)} ${currency}</b></div>
+            <div class="detail-cell"><span>PnL</span><b class="${profit >= 0 ? "pos" : "neg"}">${profit >= 0 ? "+" : ""}${profit.toFixed(2)}</b></div>
+            <div class="detail-cell"><span>Opened</span><b>${createdAt}</b></div>
+            <div class="detail-cell"><span>Status</span><b>${isWin ? "Closed in plus" : "Closed in minus"}</b></div>
+        </div>
+        <div class="detail-note">
+            ${isWin ? "This position closed in profit and the result was credited to the account balance." : "This position closed with a negative result according to the final market movement."}
+        </div>
+    `;
+    card.hidden = false;
+}
+
+function bindDealHistoryCards() {
+    const rows = document.querySelectorAll(".deal-history-row");
+    if (!rows.length) return;
+    rows.forEach((row, index) => {
+        row.addEventListener("click", () => renderDealDetailFromRow(row));
+        if (index === 0) renderDealDetailFromRow(row);
+    });
+}
+
+function renderMarketDetail(snapshot, sourceRow) {
+    const card = document.getElementById("market-detail-card");
+    const content = document.getElementById("market-detail-content");
+    if (!card || !content || !snapshot) return;
+    const asks = Array.isArray(snapshot.asks) ? snapshot.asks.slice(0, 3) : [];
+    const bids = Array.isArray(snapshot.bids) ? snapshot.bids.slice(0, 3) : [];
+    const bookHtml = [
+        ...asks.map((item) => `<div class="detail-book-row ask"><span>${item.price}</span><b>${item.qty}</b></div>`),
+        ...bids.map((item) => `<div class="detail-book-row bid"><span>${item.price}</span><b>${item.qty}</b></div>`),
+    ].join("");
+    const marketRef = encodeURIComponent(sourceRow?.dataset.marketRef || snapshot.asset_name || snapshot.symbol || "BTC");
+    content.innerHTML = `
+        <div class="detail-hero">
+            <div>
+                <strong>${snapshot.symbol || "—"}</strong>
+                <small>${snapshot.asset_name || sourceRow?.dataset.marketName || "Market"}</small>
+            </div>
+            <span class="detail-badge ${snapshot.market_mode === "live" ? "pos" : ""}">${snapshot.market_mode === "live" ? "Live" : "Synthetic"}</span>
+        </div>
+        <div class="detail-grid">
+            <div class="detail-cell"><span>Mark</span><b>${snapshot.mark}</b></div>
+            <div class="detail-cell"><span>Spread</span><b>${snapshot.spread}</b></div>
+            <div class="detail-cell"><span>24H High</span><b>${snapshot.high}</b></div>
+            <div class="detail-cell"><span>24H Low</span><b>${snapshot.low}</b></div>
+        </div>
+        <div class="detail-actions">
+            <a class="detail-link" href="/trade?asset=${marketRef}">Open Trade</a>
+            <a class="detail-link" href="/trade/chart?symbol=${marketRef}">Open Chart</a>
+        </div>
+        <div class="detail-note">
+            ${snapshot.tick ? `Latest tape: ${(snapshot.tick.side || "").toUpperCase()} • ${snapshot.tick.price} • ${snapshot.tick.qty}` : "Open the chart or trade directly from this market card."}
+        </div>
+        <div class="detail-book">${bookHtml}</div>
+    `;
+    card.hidden = false;
+}
+
+function bindMarketCards() {
+    const rows = document.querySelectorAll(".market-card");
+    if (!rows.length) return;
+    const loadSnapshot = async (row) => {
+        const ref = row.dataset.marketRef || row.dataset.marketSymbol || "BTC";
+        try {
+            const resp = await fetch(`/api/market/snapshot?symbol=${encodeURIComponent(ref)}`);
+            const data = await resp.json();
+            if (!resp.ok || !data.ok) return;
+            renderMarketDetail(data, row);
+        } catch (_) {
+            // no-op
+        }
+    };
+    rows.forEach((row, index) => {
+        row.addEventListener("click", () => loadSnapshot(row));
+        if (index === 0) loadSnapshot(row);
+    });
 }
 
 function bindLangSwitch() {
@@ -1730,6 +1836,8 @@ bindMarketSocket();
 bindUserSocket();
 bindOpenPositionsActions();
 bindMarketMiniCharts();
+bindMarketCards();
+bindDealHistoryCards();
 hydrateInitialTradeState();
 
 const tapeWrap = document.getElementById("market-tape-list");

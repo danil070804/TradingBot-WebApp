@@ -5,18 +5,30 @@
     <div class="section-title">{{ labels.markets_title if labels else "Рынки" }}</div>
     <div class="list">
         {% for m in markets %}
-        <div class="row markets-row">
+        <button
+            type="button"
+            class="row markets-row market-card"
+            data-market-ref="{{ m.market_ref }}"
+            data-market-symbol="{{ m.symbol }}"
+            data-market-name="{{ m.name }}"
+            data-market-ticker="{{ m.ticker }}"
+            data-market-mode="{{ m.market_mode }}"
+        >
             <div>
                 <b>{{ m.symbol }}</b>
                 <small>{{ m.name }}</small>
                 <canvas class="mini-spark" width="120" height="28" data-price="{{ m.price }}" data-change="{{ m.day_change }}"></canvas>
             </div>
             <div class="price-block">
-                <span class="m-price" data-symbol="{{ m.symbol }}">{{ m.price }}</span>
-                <em class="m-change {{ 'pos' if m.day_change >= 0 else 'neg' }}" data-symbol="{{ m.symbol }}">{{ "%+.2f"|format(m.day_change) }}%</em>
+                <span class="m-price" data-symbol="{{ m.market_ref }}">{{ m.price }}</span>
+                <em class="m-change {{ 'pos' if m.day_change >= 0 else 'neg' }}" data-symbol="{{ m.market_ref }}">{{ "%+.2f"|format(m.day_change) }}%</em>
             </div>
-        </div>
+        </button>
         {% endfor %}
     </div>
+</section>
+<section class="card market-detail-card" id="market-detail-card" hidden>
+    <div class="section-title">Обзор рынка</div>
+    <div id="market-detail-content" class="market-detail-content"></div>
 </section>
 {% endblock %}

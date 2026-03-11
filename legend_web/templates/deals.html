@@ -5,17 +5,32 @@
     <div class="section-title">{{ labels.deals_title if labels else "История сделок" }}</div>
     <div class="list">
         {% for d in deals %}
-        <div class="row">
+        <button
+            type="button"
+            class="row deal-history-row"
+            data-deal-id="{{ d.id }}"
+            data-asset="{{ d.asset_name }}"
+            data-direction="{{ d.direction }}"
+            data-amount="{{ d.amount }}"
+            data-currency="{{ d.currency }}"
+            data-profit="{{ d.profit }}"
+            data-created-at="{{ d.created_at }}"
+            data-is-win="{{ 1 if d.is_win else 0 }}"
+        >
             <div>
                 <b>#{{ d.id }} {{ d.asset_name }} {{ "UP" if d.direction == "up" else "DOWN" }}</b>
                 <small>{{ d.amount }} {{ d.currency }} | {{ d.created_at }}</small>
             </div>
             <div class="{{ 'pos' if d.is_win else 'neg' }}">{{ "%+.2f"|format(d.profit) }}</div>
-        </div>
+        </button>
         {% else %}
         <div class="empty">{{ labels.deals_empty if labels else "История пока пустая." }}</div>
         {% endfor %}
     </div>
+</section>
+<section class="card deal-detail-card" id="deal-detail-card" hidden>
+    <div class="section-title">Результат сделки</div>
+    <div id="deal-detail-content" class="deal-detail-content"></div>
 </section>
 <section class="card">
     <div class="section-title">{{ labels.live_tape if labels else "Лента рынка (live)" }}</div>
