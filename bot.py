@@ -317,6 +317,39 @@ class WorkerLuckStates(StatesGroup):
     waiting_luck_percent = State()
 
 
+async def get_table_columns(db, table_name: str, is_pg: bool) -> set[str]:
+    if is_pg:
+        cur = await db.execute(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = current_schema() AND table_name = ?
+            """,
+            (table_name,),
+        )
+        rows = await cur.fetchall()
+        return {row["column_name"] for row in rows}
+
+    cur = await db.execute(f"PRAGMA table_info({table_name})")
+    rows = await cur.fetchall()
+    return {row["name"] for row in rows}
+
+
+async def add_column_if_missing(
+    db,
+    table_name: str,
+    column_name: str,
+    pg_definition: str,
+    sqlite_definition: str,
+    is_pg: bool,
+):
+    columns = await get_table_columns(db, table_name, is_pg)
+    if column_name in columns:
+        return
+    definition = pg_definition if is_pg else sqlite_definition
+    await db.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
+
+
 async def init_db():
     is_pg = aiosqlite.using_postgres()
 
