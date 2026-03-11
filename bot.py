@@ -111,7 +111,7 @@ I18N = {
         "deposit_choose_method": "📥 <b>Пополнение баланса</b>\n\nСумма: <b>{amount:.2f} {currency}</b>\n\nВыберите удобный способ оплаты:",
         "deposit_cancelled": "❌ Заявка на пополнение отменена.",
         "profile_title": "🧾 <b>Личный кабинет</b>",
-        "menu_welcome": "👋 <b>{name}</b>, добро пожаловать в Legend Trading.\n\nЗдесь вы можете управлять балансом, открывать сделки, отслеживать результат и работать с аккаунтом в одном окне.\n\nВыберите нужный раздел ниже:",
+        "menu_welcome": "👋 <b>{name}</b>, добро пожаловать в Legend Trading.\n\n╭ <b>Ваш рабочий центр</b>\n├ Управляйте балансом и заявками\n├ Открывайте сделки и отслеживайте результат\n╰ Все ключевые разделы доступны ниже\n\nВыберите нужное действие:",
         "menu_info_text": "ℹ️ Информация\n\n📣 Новости: https://www.youtube.com/channel/UCVj_rwnR1p-7Da15L8MwRNQ\n📄 Пользовательское соглашение: https://telegra.ph/Polzovatelskoe-soglashenie-03-27-13",
         "menu_support_text": "📩 Связаться с поддержкой можно по ссылке ниже:\n{url}",
         "profile_id": "• ID аккаунта: <code>{id}</code>",
@@ -130,7 +130,7 @@ I18N = {
         "profile_balance_title": "💰 <b>Финансы</b>",
         "profile_balance_value": "• Доступный баланс: {balance:.2f} {currency}",
         "profile_pending_value": "• На выводе: {pending:.2f} {currency}",
-        "settings_title": "🧩 <b>Настройки профиля</b>\n\n• Язык интерфейса: <b>{lang_value}</b>\n• Валюта счёта: <b>{cur}</b>\n\nВыберите, что хотите изменить:",
+        "settings_title": "🧩 <b>Настройки профиля</b>\n\n╭ <b>Текущая конфигурация</b>\n├ Язык интерфейса: <b>{lang_value}</b>\n╰ Валюта счёта: <b>{cur}</b>\n\nВыберите параметр, который хотите изменить:",
         "settings_choose_lang": "🌐 Выберите язык интерфейса:",
         "settings_choose_currency": "💱 Выберите валюту:",
         "settings_btn_lang": "🌐 Язык интерфейса",
@@ -138,6 +138,8 @@ I18N = {
         "settings_btn_back": "⬅️ Вернуться в профиль",
         "my_deals_empty": "📑 У вас пока нет завершённых сделок.",
         "my_deals_title": "📑 <b>История последних сделок</b>",
+        "my_deals_hint": "Нажмите на нужную сделку, чтобы снова открыть её полный результат.",
+        "my_deals_back_to_list": "⬅️ К истории сделок",
     },
     "en": {
         "open_app": "🚀 Open App",
@@ -159,7 +161,7 @@ I18N = {
         "deposit_choose_method": "You want to top up <b>{amount:.2f} {currency}</b>.\n\nChoose payment method:",
         "deposit_cancelled": "❌ Deposit canceled.",
         "profile_title": "🧾 <b>Profile</b>",
-        "menu_welcome": "👋 Welcome, <b>{name}</b>!\n\nThis is a Telegram crypto futures trading bot.\nYou can manage your account, balance, and deals here.\n\n👇 Choose a section:",
+        "menu_welcome": "👋 <b>{name}</b>, welcome to Legend Trading.\n\n╭ <b>Your control center</b>\n├ Manage balance and requests\n├ Open deals and review results\n╰ All key sections are available below\n\nChoose an action:",
         "menu_info_text": "ℹ️ Information\n\n📣 News: https://www.youtube.com/channel/UCVj_rwnR1p-7Da15L8MwRNQ\n📄 User agreement: https://telegra.ph/Polzovatelskoe-soglashenie-03-27-13",
         "menu_support_text": "📩 Contact technical support here:\n{url}",
         "profile_id": "└ ID: <code>{id}</code>",
@@ -178,7 +180,7 @@ I18N = {
         "profile_balance_title": "💰 <b>Balance</b>",
         "profile_balance_value": "└ Balance: {balance:.2f} {currency}",
         "profile_pending_value": "└ Pending withdraw: {pending:.2f} {currency}",
-        "settings_title": "🧩 <b>Settings</b>\n\n📘 Interface language: <b>{lang_value}</b>\n💱 Currency: <b>{cur}</b>\n\nChoose what to change:",
+        "settings_title": "🧩 <b>Settings</b>\n\n╭ <b>Current setup</b>\n├ Interface language: <b>{lang_value}</b>\n╰ Account currency: <b>{cur}</b>\n\nChoose what to change:",
         "settings_choose_lang": "🌐 Choose interface language:",
         "settings_choose_currency": "💱 Choose currency:",
         "settings_btn_lang": "🌐Language",
@@ -186,6 +188,8 @@ I18N = {
         "settings_btn_back": "⬅️Back to profile",
         "my_deals_empty": "📑 You have no completed deals yet.",
         "my_deals_title": "📑 <b>Recent deals</b>",
+        "my_deals_hint": "Tap any deal to open its full result again.",
+        "my_deals_back_to_list": "⬅️ Back to deals",
     },
     "uk": {
         "open_app": "🚀 Відкрити застосунок",
@@ -207,7 +211,7 @@ I18N = {
         "deposit_choose_method": "Ви хочете поповнити баланс на <b>{amount:.2f} {currency}</b>.\n\nОберіть спосіб оплати:",
         "deposit_cancelled": "❌ Поповнення скасовано.",
         "profile_title": "🧾 <b>Профіль</b>",
-        "menu_welcome": "👋 Вітаю, <b>{name}</b>!\n\nЦе Telegram-бот криптоплатформи для торгівлі ф'ючерсами.\nТут ви можете керувати акаунтом, балансом і угодами.\n\n👇 Оберіть розділ:",
+        "menu_welcome": "👋 <b>{name}</b>, ласкаво просимо до Legend Trading.\n\n╭ <b>Ваш центр керування</b>\n├ Керуйте балансом і заявками\n├ Відкривайте угоди та переглядайте результат\n╰ Усі ключові розділи доступні нижче\n\nОберіть потрібну дію:",
         "menu_info_text": "ℹ️ Інформація\n\n📣 Новини: https://www.youtube.com/channel/UCVj_rwnR1p-7Da15L8MwRNQ\n📄 Угода користувача: https://telegra.ph/Polzovatelskoe-soglashenie-03-27-13",
         "menu_support_text": "📩 Зв'язатися з техпідтримкою можна тут:\n{url}",
         "profile_id": "└ Ідентифікатор: <code>{id}</code>",
@@ -226,7 +230,7 @@ I18N = {
         "profile_balance_title": "💰 <b>Баланс</b>",
         "profile_balance_value": "└ Баланс: {balance:.2f} {currency}",
         "profile_pending_value": "└ На виводі: {pending:.2f} {currency}",
-        "settings_title": "🧩 <b>Налаштування</b>\n\n📘 Мова інтерфейсу: <b>{lang_value}</b>\n💱 Валюта: <b>{cur}</b>\n\nОберіть, що хочете змінити:",
+        "settings_title": "🧩 <b>Налаштування</b>\n\n╭ <b>Поточна конфігурація</b>\n├ Мова інтерфейсу: <b>{lang_value}</b>\n╰ Валюта рахунку: <b>{cur}</b>\n\nОберіть параметр, який хочете змінити:",
         "settings_choose_lang": "🌐 Оберіть мову інтерфейсу:",
         "settings_choose_currency": "💱 Оберіть валюту:",
         "settings_btn_lang": "🌐Мова інтерфейсу",
@@ -234,6 +238,8 @@ I18N = {
         "settings_btn_back": "⬅️До профілю",
         "my_deals_empty": "📑 У вас ще немає завершених угод.",
         "my_deals_title": "📑 <b>Останні угоди</b>",
+        "my_deals_hint": "Натисніть на потрібну угоду, щоб знову відкрити її повний результат.",
+        "my_deals_back_to_list": "⬅️ До історії угод",
     },
 }
 
@@ -1095,6 +1101,34 @@ def profile_back_keyboard(lang: str = "ru", extra_cancel: tuple[str, str] | None
     return kb.as_markup()
 
 
+def worker_client_back_keyboard(wc_id: int, label: str = "⬅️ К карточке реферала"):
+    kb = InlineKeyboardBuilder()
+    kb.button(text=label, callback_data=f"wc_profile:{wc_id}")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def my_deals_history_keyboard(rows, lang: str = "ru"):
+    kb = InlineKeyboardBuilder()
+    for row in rows:
+        is_win = bool(row["is_win"])
+        status = "✅" if is_win else "❌"
+        pnl = float(row["profit"] or 0.0)
+        button_text = f"{status} #{row['id']} {row['asset_name']}  {pnl:+.2f} {row['currency']}"
+        kb.button(text=button_text, callback_data=f"deal_view:{row['id']}")
+    kb.button(text=t(lang, "settings_btn_back"), callback_data="open_profile")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def my_deal_result_keyboard(deal_id: int, lang: str = "ru"):
+    kb = InlineKeyboardBuilder()
+    kb.button(text=t(lang, "my_deals_back_to_list"), callback_data="my_deals")
+    kb.button(text=t(lang, "settings_btn_back"), callback_data="open_profile")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
 async def get_effective_min_trade_amount(client_tg_id: int, currency: str | None) -> float:
     global_min = convert_usdt_to_currency(await get_global_min_trade_usdt(), currency)
     trade_settings = await get_client_trade_settings(client_tg_id)
@@ -1586,6 +1620,19 @@ async def get_user_deals(user_tg_id: int, limit: int = 10):
             (user_tg_id, limit),
         )
         return await cur.fetchall()
+
+
+async def get_user_deal_by_id(user_tg_id: int, deal_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            """SELECT *
+               FROM deals
+               WHERE user_tg_id = ? AND id = ?
+               LIMIT 1""",
+            (user_tg_id, deal_id),
+        )
+        return await cur.fetchone()
 
 
 async def save_referral(worker_tg_id: int, invited_tg_id: int):
@@ -2385,9 +2432,12 @@ DEFAULT_MIN_DEPOSIT_USDT = 10.0
 LEGACY_DEFAULT_MIN_TRADE_AMOUNT = 100.0
 BOT_SECTION_MEDIA = {
     "portfolio": {"setting": "bot_photo_portfolio", "title": "Портфель"},
+    "settings": {"setting": "bot_photo_settings", "title": "Настройки профиля"},
     "open_ecn": {"setting": "bot_photo_open_ecn", "title": "Открыть сделку"},
     "support": {"setting": "bot_photo_support", "title": "Тех. поддержка"},
     "info": {"setting": "bot_photo_info", "title": "О сервисе"},
+    "deposit": {"setting": "bot_photo_deposit", "title": "Пополнение"},
+    "withdraw": {"setting": "bot_photo_withdraw", "title": "Вывод"},
     "worker_panel": {"setting": "bot_photo_worker_panel", "title": "Панель воркера"},
     "admin_panel": {"setting": "bot_photo_admin_panel", "title": "Админка"},
 }
@@ -2769,7 +2819,8 @@ def worker_client_profile_keyboard(wc_id: int, flags: dict, balance: float, curr
     )
     kb.button(text="💬 Начать диалог", callback_data=f"wc_chat_start:{wc_id}")
     kb.button(text="⬅️ К базе рефералов", callback_data="worker_sheeps")
-    kb.adjust(2, 2, 2, 2, 2, 1, 1)
+    kb.button(text="⬅️ К панели воркера", callback_data="open_worker_panel")
+    kb.adjust(2, 2, 2, 2, 2, 1, 1, 1)
     return kb.as_markup()
 
 def is_admin_id(user_id: int) -> bool:
@@ -3476,7 +3527,9 @@ async def on_deposit(callback: CallbackQuery, state: FSMContext):
     user_row = await get_user_row(callback.from_user)
     lang = normalize_lang(user_row["language"])
     currency = user_row["currency"] or "USD"
-    await callback.message.answer(
+    await send_section_message(
+        callback.message,
+        "deposit",
         t(lang, "deposit_enter_amount", currency=currency),
         reply_markup=profile_back_keyboard(lang, (t(lang, "deposit_cancel"), "cancel_deposit")),
     )
@@ -3673,7 +3726,9 @@ async def on_withdraw(callback: CallbackQuery, state: FSMContext):
     user_row = await get_user_row(callback.from_user)
     lang = normalize_lang(user_row["language"])
     currency = user_row["currency"] or "USD"
-    await callback.message.answer(
+    await send_section_message(
+        callback.message,
+        "withdraw",
         tr(lang, f"📤 На какую сумму вы хотите вывести средства? Введите сумму в {currency}.", f"📤 How much do you want to withdraw? Enter amount in {currency}.", f"📤 На яку суму ви хочете вивести кошти? Вкажіть суму в {currency}."),
         reply_markup=profile_back_keyboard(lang, ("❌ Отмена", "wd_cancel")),
     )
@@ -4016,7 +4071,7 @@ async def on_settings(callback: CallbackQuery, state: FSMContext):
     lang = normalize_lang(user_row["language"])
     cur = user_row["currency"] or "не выбрана"
     text = t(lang, "settings_title", lang_value=lang.upper(), cur=cur)
-    await callback.message.answer(text, reply_markup=settings_keyboard(lang))
+    await send_section_message(callback.message, "settings", text, reply_markup=settings_keyboard(lang))
     await callback.answer()
 
 
@@ -4024,7 +4079,7 @@ async def on_settings(callback: CallbackQuery, state: FSMContext):
 async def on_settings_lang(callback: CallbackQuery):
     user_row = await get_user_row(callback.from_user)
     lang = normalize_lang(user_row["language"])
-    await callback.message.answer(t(lang, "settings_choose_lang"), reply_markup=language_keyboard())
+    await send_section_message(callback.message, "settings", t(lang, "settings_choose_lang"), reply_markup=language_keyboard())
     await callback.answer()
 
 
@@ -4032,7 +4087,7 @@ async def on_settings_lang(callback: CallbackQuery):
 async def on_settings_currency(callback: CallbackQuery):
     user_row = await get_user_row(callback.from_user)
     lang = normalize_lang(user_row["language"])
-    await callback.message.answer(t(lang, "settings_choose_currency"), reply_markup=currency_keyboard())
+    await send_section_message(callback.message, "settings", t(lang, "settings_choose_currency"), reply_markup=currency_keyboard())
     await callback.answer()
 
 
@@ -4046,19 +4101,24 @@ async def on_my_deals(callback: CallbackQuery, state: FSMContext):
         await callback.message.answer(t(lang, "my_deals_empty"), reply_markup=profile_back_keyboard(lang))
         await callback.answer()
         return
+    text = f"{t(lang, 'my_deals_title')}\n\n{t(lang, 'my_deals_hint')}"
+    await callback.message.answer(text, reply_markup=my_deals_history_keyboard(rows, lang))
+    await callback.answer()
 
-    lines = [t(lang, "my_deals_title"), ""]
-    for row in rows:
-        side = tr(lang, "ЛОНГ", "LONG", "ЛОНГ") if row["direction"] == "up" else tr(lang, "ШОРТ", "SHORT", "ШОРТ")
-        outcome = "✅" if row["is_win"] else "❌"
-        lines.append(
-            f"{outcome} <b>#{row['id']} {row['asset_name']}</b>\n"
-            f"• Позиция: {side}\n"
-            f"• Сумма: {row['amount']:.2f} {row['currency']}\n"
-            f"• PnL: {row['profit']:+.2f} {row['currency']}"
-        )
 
-    await callback.message.answer("\n".join(lines), reply_markup=profile_back_keyboard(lang))
+@dp.callback_query(F.data.startswith("deal_view:"))
+async def on_my_deal_view(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
+    user_row = await get_user_row(callback.from_user)
+    lang = normalize_lang(user_row["language"])
+    deal_id = int(callback.data.split(":", 1)[1])
+    deal = await get_user_deal_by_id(callback.from_user.id, deal_id)
+    if not deal:
+        await callback.message.answer("❗ Сделка не найдена или недоступна.", reply_markup=profile_back_keyboard(lang))
+        await callback.answer()
+        return
+    text = await format_trade_result_message(deal)
+    await callback.message.answer(text, reply_markup=my_deal_result_keyboard(deal_id, lang))
     await callback.answer()
 
 # ---------- WORKER PANEL ----------
@@ -4209,24 +4269,25 @@ async def open_worker_client_profile(msg: Message, wc_id: int):
         f"📄 <b>Карточка реферала</b> <code>/n{wc_id}</code>\n\n"
         f"╭ <b>Профиль клиента</b>\n"
         f"├ Имя: <b>{profile_name}</b>\n"
-        f"├ ID: <code>{row['client_tg_id']}</code>\n"
+        f"├ Telegram ID: <code>{row['client_tg_id']}</code>\n"
         f"├ Username: {username}\n"
-        f"├ Язык: {lang}\n"
-        f"╰ Последняя активность: {activity_text}\n\n"
+        f"├ Язык интерфейса: <b>{lang}</b>\n"
+        f"╰ Последняя активность: <b>{activity_text}</b>\n\n"
         f"╭ <b>Финансы и торговые лимиты</b>\n"
-        f"├ Баланс: <b>{balance:.2f} {currency}</b>\n"
-        f"├ Мин. депозит: <b>{float(min_dep):.2f} {currency}</b>\n"
+        f"├ Баланс клиента: <b>{balance:.2f} {currency}</b>\n"
+        f"├ Мин. пополнение: <b>{float(min_dep):.2f} {currency}</b>\n"
         f"├ Мин. вывод: <b>{float(min_wd):.2f} {currency}</b>\n"
         f"├ Мин. сделка: <b>{float(min_trade):.2f} {currency}</b>\n"
-        f"├ Коэффициент: <b>{float(trade_coefficient):.2f}</b>\n"
-        f"╰ Удача: <b>{luck_text}</b>\n\n"
-        f"╭ <b>Статусы</b>\n"
+        f"├ Торговый коэффициент: <b>{float(trade_coefficient):.2f}</b>\n"
+        f"╰ Удача по клиенту: <b>{luck_text}</b>\n\n"
+        f"╭ <b>Статусы доступа</b>\n"
         f"├ Торговля: <b>{status_trade}</b>\n"
-        f"├ Вывод: <b>{status_withdraw}</b>\n"
+        f"├ Вывод средств: <b>{status_withdraw}</b>\n"
         f"├ Верификация: <b>{status_verify}</b>\n"
         f"├ Авто-отклонение: <b>{auto_reject_text}</b>\n"
         f"├ Избранное: <b>{status_favorite}</b>\n"
-        f"╰ Блокировка: <b>{status_block}</b>"
+        f"╰ Блокировка: <b>{status_block}</b>\n\n"
+        f"Выберите действие ниже, чтобы обновить лимиты, статусы или перевести клиента."
     )
     await msg.answer(
         text,
@@ -4252,13 +4313,21 @@ async def wc_luck(callback: CallbackQuery, state: FSMContext):
 
     current_luck = await get_luck_for_worker_client(callback.from_user.id, row["client_tg_id"])
     if current_luck is None:
-        text = "☘️ Для этого клиента удача пока не задана.\n\nВведите значение от <b>0</b> до <b>100</b>:"
+        text = (
+            "☘️ <b>Настройка удачи клиента</b>\n\n"
+            "Для этого клиента персональная удача пока не задана.\n"
+            "Введите значение от <b>0</b> до <b>100</b>, чтобы задать вероятность положительного закрытия сделки."
+        )
     else:
-        text = f"☘️ Текущая удача клиента: <b>{current_luck:.2f}%</b>\n\nВведите новое значение от <b>0</b> до <b>100</b>:"
+        text = (
+            "☘️ <b>Настройка удачи клиента</b>\n\n"
+            f"Текущее значение: <b>{current_luck:.2f}%</b>\n"
+            "Введите новое значение от <b>0</b> до <b>100</b>."
+        )
 
     await state.update_data(wc_id=wc_id)
     await state.set_state(WorkerLuckStates.waiting_luck_percent)
-    await callback.message.answer(text)
+    await callback.message.answer(text, reply_markup=worker_client_back_keyboard(wc_id))
     await callback.answer()
 
 
@@ -4283,7 +4352,11 @@ async def wc_luck_percent_entered(message: Message, state: FSMContext):
     worker_id = message.from_user.id
     client_id = row["client_tg_id"]
     await set_client_luck(worker_id, client_id, luck_percent)
-    await message.answer(f"✅ Удача клиента обновлена: <b>{luck_percent:.2f}%</b>.")
+    await message.answer(
+        "✅ <b>Параметр обновлён</b>\n\n"
+        f"Для клиента <code>/n{wc_id}</code> установлена удача <b>{luck_percent:.2f}%</b>.",
+        reply_markup=worker_client_back_keyboard(wc_id),
+    )
     await state.clear()
 
 
@@ -4294,7 +4367,11 @@ async def wc_adj_balance(callback: CallbackQuery, state: FSMContext):
     wc_id = int(callback.data.split(":", 1)[1])
     await state.update_data(wc_id=wc_id)
     await state.set_state(WorkerClientStates.waiting_balance_amount)
-    await callback.message.answer("💰 Укажите сумму, на которую нужно увеличить баланс клиента:")
+    await callback.message.answer(
+        "💰 <b>Корректировка баланса</b>\n\n"
+        "Укажите сумму, на которую нужно увеличить баланс клиента.",
+        reply_markup=worker_client_back_keyboard(wc_id),
+    )
     await callback.answer()
 
 
@@ -4316,7 +4393,10 @@ async def wc_adj_balance_amount(message: Message, state: FSMContext):
         return
     client_id = row["client_tg_id"]
     await change_balance(client_id, amount)
-    await message.answer(f"✅ Баланс клиента увеличен на <b>{amount:.2f}</b>.")
+    await message.answer(
+        f"✅ Баланс клиента увеличен на <b>{amount:.2f}</b>.",
+        reply_markup=worker_client_back_keyboard(wc_id),
+    )
     try:
         await bot.send_message(client_id, f"💰 Ваш баланс пополнен на <b>{amount:.2f}</b>.")
     except Exception:
@@ -4328,7 +4408,11 @@ async def wc_min_dep_cb(callback: CallbackQuery, state: FSMContext):
     wc_id = int(callback.data.split(":", 1)[1])
     await state.update_data(wc_id=wc_id)
     await state.set_state(WorkerClientStates.waiting_min_dep)
-    await callback.message.answer("📨 Укажите минимальную сумму пополнения для этого клиента:")
+    await callback.message.answer(
+        "📥 <b>Минимальное пополнение</b>\n\n"
+        "Укажите минимальную сумму пополнения для этого клиента.",
+        reply_markup=worker_client_back_keyboard(wc_id),
+    )
     await callback.answer()
 
 
@@ -4344,7 +4428,10 @@ async def wc_min_dep_set(message: Message, state: FSMContext):
         await message.answer("❗ Введите неотрицательное число.")
         return
     await update_worker_client_field(wc_id, "min_deposit", value)
-    await message.answer(f"✅ Минимальное пополнение для клиента обновлено: <b>{value:.2f}</b>")
+    await message.answer(
+        f"✅ Минимальное пополнение для клиента обновлено: <b>{value:.2f}</b>",
+        reply_markup=worker_client_back_keyboard(wc_id),
+    )
     await state.clear()
 
 
@@ -4353,7 +4440,11 @@ async def wc_min_wd_cb(callback: CallbackQuery, state: FSMContext):
     wc_id = int(callback.data.split(":", 1)[1])
     await state.update_data(wc_id=wc_id)
     await state.set_state(WorkerClientStates.waiting_min_wd)
-    await callback.message.answer("📨 Укажите минимальную сумму вывода для этого клиента:")
+    await callback.message.answer(
+        "📤 <b>Минимальный вывод</b>\n\n"
+        "Укажите минимальную сумму вывода для этого клиента.",
+        reply_markup=worker_client_back_keyboard(wc_id),
+    )
     await callback.answer()
 
 
@@ -4369,7 +4460,10 @@ async def wc_min_wd_set(message: Message, state: FSMContext):
         await message.answer("❗ Введите неотрицательное число.")
         return
     await update_worker_client_field(wc_id, "min_withdraw", value)
-    await message.answer(f"✅ Минимальный вывод для клиента обновлён: <b>{value:.2f}</b>")
+    await message.answer(
+        f"✅ Минимальный вывод для клиента обновлён: <b>{value:.2f}</b>",
+        reply_markup=worker_client_back_keyboard(wc_id),
+    )
     await state.clear()
 
 
@@ -4391,7 +4485,8 @@ async def wc_min_trade_cb(callback: CallbackQuery, state: FSMContext):
         f"Текущая валюта счёта: <b>{currency}</b>\n"
         f"Глобальная база: <b>{global_min_trade_usdt:.2f} USDT</b>\n"
         f"Эквивалент в валюте клиента: <b>{effective_global_min:.2f} {currency}</b>\n\n"
-        f"Отправьте новое значение минимальной сделки в <b>{currency}</b>."
+        f"Отправьте новое значение минимальной сделки в <b>{currency}</b>.",
+        reply_markup=worker_client_back_keyboard(wc_id),
     )
     await callback.answer()
 
@@ -4421,7 +4516,8 @@ async def wc_min_trade_set(message: Message, state: FSMContext):
         f"├ Клиент: <code>/n{wc_id}</code>\n"
         f"├ Новое значение: <b>{value:.2f} {currency}</b>\n"
         f"├ Эквивалент: <b>{value_in_usdt:.2f} USDT</b>\n"
-        f"╰ Глобальная база системы: <b>{global_min_trade_usdt:.2f} USDT</b>"
+        f"╰ Глобальная база системы: <b>{global_min_trade_usdt:.2f} USDT</b>",
+        reply_markup=worker_client_back_keyboard(wc_id),
     )
     await state.clear()
 

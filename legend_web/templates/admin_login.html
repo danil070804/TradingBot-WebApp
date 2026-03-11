@@ -28,7 +28,29 @@
         </section>
     </main>
 </div>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script>
+async function initTelegramAdminAuth() {
+    if (!window.Telegram || !window.Telegram.WebApp) return;
+    const wa = window.Telegram.WebApp;
+    wa.ready();
+    wa.expand();
+    if (!wa.initData) return;
+    try {
+        const resp = await fetch("/api/auth/telegram", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ init_data: wa.initData })
+        });
+        const data = await resp.json();
+        if (resp.ok && data.ok) {
+            window.location.href = "/admin";
+        }
+    } catch (_) {
+        // no-op
+    }
+}
+
 document.getElementById("admin-login-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const result = document.getElementById("admin-login-result");
@@ -45,6 +67,8 @@ document.getElementById("admin-login-form").addEventListener("submit", async (e)
     }
     result.innerHTML = `<span class="neg">Ошибка входа</span>`;
 });
+
+initTelegramAdminAuth();
 </script>
 </body>
 </html>
