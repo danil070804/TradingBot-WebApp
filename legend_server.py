@@ -1365,6 +1365,79 @@ async def worker_page(request: Request):
     )
 
 
+@app.get("/worker/client/{wc_id}", response_class=HTMLResponse)
+async def worker_client_page(request: Request, wc_id: int):
+    tg_id = await get_current_user_id(request)
+    if not tg_id:
+        return RedirectResponse(url="/", status_code=302)
+
+    user = await fetch_one("SELECT is_worker FROM users WHERE tg_id = ?", (tg_id,))
+    if not user or not bool(user["is_worker"]):
+        return RedirectResponse(url="/profile", status_code=302)
+
+    lang, labels = await get_request_lang_labels(request, tg_id)
+    client = await fetch_one(
+        """
+        SELECT wc.id, wc.worker_tg_id, wc.client_tg_id, wc.min_deposit, wc.min_withdraw, wc.verified, wc.withdraw_enabled,
+               wc.trading_enabled, wc.favorite, wc.blocked, wc.created_at,
+               u.first_name, u.username, u.language, u.currency, u.balance, u.created_at AS user_created_at
+        FROM worker_clients wc
+        LEFT JOIN users u ON u.tg_id = wc.client_tg_id
+        WHERE wc.id = ? AND wc.worker_tg_id = ?
+        LIMIT 1
+        """,
+        (wc_id, tg_id),
+    )
+    if not client:
+        return RedirectResponse(url="/worker", status_code=302)
+
+    client_tg_id = int(client["client_tg_id"])
+    stats = await bot.get_user_deal_stats(client_tg_id)
+    pending = await bot.get_user_pending_withdraw_sum(client_tg_id)
+    luck = await bot.get_luck_for_worker_client(tg_id, client_tg_id)
+    deposits = await fetch_all(
+        "SELECT id, amount, currency, method, status, created_at FROM deposit_requests WHERE user_tg_id = ? ORDER BY id DESC LIMIT 20",
+        (client_tg_id,),
+    )
+    withdrawals = await fetch_all(
+        "SELECT id, amount, currency, method, status, created_at FROM withdrawals WHERE user_tg_id = ? ORDER BY id DESC LIMIT 20",
+        (client_tg_id,),
+    )
+    deals = await fetch_all(
+        "SELECT id, asset_name, direction, amount, currency, profit, is_win, created_at FROM deals WHERE user_tg_id = ? ORDER BY id DESC LIMIT 20",
+        (client_tg_id,),
+    )
+    activity = await fetch_all(
+        """
+        SELECT id, title, details, amount, currency, created_at, actor_source, event_type
+        FROM activity_log
+        WHERE worker_tg_id = ? AND client_tg_id = ?
+        ORDER BY id DESC
+        LIMIT 40
+        """,
+        (tg_id, client_tg_id),
+    )
+    return templates.TemplateResponse(
+        "worker_client.html",
+        {
+            "request": request,
+            "page": "worker",
+            "title": "Карточка реферала | Legend Trading",
+            "lang": lang,
+            "labels": labels,
+            "worker_id": tg_id,
+            "client": client,
+            "stats": stats,
+            "pending": pending,
+            "luck": luck,
+            "deposits": deposits,
+            "withdrawals": withdrawals,
+            "deals": deals,
+            "activity": activity,
+        },
+    )
+
+
 @app.get("/api/worker/clients", response_class=JSONResponse)
 async def api_worker_clients(request: Request):
     tg_id = await get_current_user_id(request)

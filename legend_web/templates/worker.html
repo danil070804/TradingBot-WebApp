@@ -10,9 +10,29 @@
 <section class="card">
     <div class="section-title">{{ labels.worker_title if labels else "Панель воркера" }}</div>
     <p class="deposit-lead">Управляйте клиентами, лимитами и статусами из одного окна. Все действия применяются сразу после подтверждения.</p>
+    <div class="worker-toolbar">
+        <input id="worker-search" type="search" placeholder="Поиск по имени, ID или username">
+        <select id="worker-filter">
+            <option value="all">Все</option>
+            <option value="favorite">Избранные</option>
+            <option value="blocked">Заблокированные</option>
+            <option value="verified">С KYC</option>
+            <option value="trade_off">Торговля выкл</option>
+            <option value="withdraw_off">Вывод выкл</option>
+        </select>
+    </div>
     <div id="worker-list" class="list">
         {% for c in clients %}
-        <div class="row worker-row" data-wc-id="{{ c.id }}">
+        <div
+            class="row worker-row"
+            data-wc-id="{{ c.id }}"
+            data-search="#{{ c.id }} {{ c.first_name if c.first_name else 'Пользователь' }} {{ c.client_tg_id }} {{ c.username if c.username else '' }}"
+            data-favorite="{{ 1 if c.favorite else 0 }}"
+            data-blocked="{{ 1 if c.blocked else 0 }}"
+            data-verified="{{ 1 if c.verified else 0 }}"
+            data-trade-enabled="{{ 1 if c.trading_enabled else 0 }}"
+            data-withdraw-enabled="{{ 1 if c.withdraw_enabled else 0 }}"
+        >
             <div class="worker-card-main">
                 <div class="worker-head">
                     <b>#{{ c.id }} {{ c.first_name if c.first_name else "Пользователь" }}</b>
@@ -37,6 +57,7 @@
                 <button class="chip worker-prompt" data-action="set_min_deposit" data-label="Минимальный депозит">Мин. деп</button>
                 <button class="chip worker-prompt" data-action="set_min_withdraw" data-label="Минимальный вывод">Мин. вывод</button>
                 <button class="chip worker-prompt" data-action="add_balance" data-label="Пополнение баланса">+Баланс</button>
+                <a class="chip worker-open" href="/worker/client/{{ c.id }}">Карточка</a>
             </div>
         </div>
         {% else %}

@@ -1075,6 +1075,24 @@ function bindLangSwitch() {
 function bindWorkerPanel() {
     const wrap = document.getElementById("worker-list");
     if (!wrap) return;
+    const search = document.getElementById("worker-search");
+    const filter = document.getElementById("worker-filter");
+
+    const applyWorkerFilters = () => {
+        const q = (search ? search.value : "").trim().toLowerCase();
+        const mode = filter ? filter.value : "all";
+        wrap.querySelectorAll(".worker-row").forEach((row) => {
+            const haystack = String(row.dataset.search || "").toLowerCase();
+            const matchesQuery = !q || haystack.includes(q);
+            let matchesFilter = true;
+            if (mode === "favorite") matchesFilter = row.dataset.favorite === "1";
+            if (mode === "blocked") matchesFilter = row.dataset.blocked === "1";
+            if (mode === "verified") matchesFilter = row.dataset.verified === "1";
+            if (mode === "trade_off") matchesFilter = row.dataset.tradeEnabled === "0";
+            if (mode === "withdraw_off") matchesFilter = row.dataset.withdrawEnabled === "0";
+            row.style.display = matchesQuery && matchesFilter ? "" : "none";
+        });
+    };
 
     const doUpdate = async (wcId, action, value = null) => {
         const resp = await fetch("/api/worker/client/update", {
@@ -1114,6 +1132,10 @@ function bindWorkerPanel() {
             await doUpdate(row.dataset.wcId, btn.dataset.action, val);
         });
     });
+
+    if (search) search.addEventListener("input", applyWorkerFilters);
+    if (filter) filter.addEventListener("change", applyWorkerFilters);
+    applyWorkerFilters();
 }
 
 function renderTape(items) {
