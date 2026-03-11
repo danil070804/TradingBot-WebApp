@@ -111,8 +111,8 @@
             </div>
 
             <div class="direction-group">
-                <button type="button" class="dir-btn active" data-dir="up">{{ labels.trade_long if labels else "ЛОНГ" }}</button>
-                <button type="button" class="dir-btn" data-dir="down">{{ labels.trade_short if labels else "ШОРТ" }}</button>
+                <button type="button" class="dir-btn long active" data-dir="up">{{ labels.trade_long if labels else "ЛОНГ" }}</button>
+                <button type="button" class="dir-btn short" data-dir="down">{{ labels.trade_short if labels else "ШОРТ" }}</button>
             </div>
             <input type="hidden" name="direction" id="direction-input" value="up">
             <button class="submit" type="submit">{{ labels.trade_create if labels else "Создать сделку" }}</button>
