@@ -2296,9 +2296,63 @@ async def set_worker_setting(worker_tg_id: int, field: str, value: float):
         )
         await db.commit()
 
+def start_rules_text() -> str:
+    return (
+        "👋 <b>Добро пожаловать в Legend Trading</b>\n\n"
+        "╭ <b>Первичная настройка</b>\n"
+        "├ Ознакомьтесь с правилами сервиса\n"
+        "├ Подтвердите согласие с регламентом\n"
+        "╰ После этого выберите язык и валюту счёта\n\n"
+        "Нажмите кнопку ниже, чтобы продолжить."
+    )
+
+
+def start_language_text(lang: str = "ru") -> str:
+    return tr(
+        lang,
+        "🌐 <b>Шаг 1 из 2 · Язык интерфейса</b>\n\n"
+        "Выберите язык, на котором будет работать бот.\n"
+        "Его можно изменить позже в настройках профиля.",
+        "🌐 <b>Step 1 of 2 · Interface language</b>\n\n"
+        "Choose the language for the bot interface.\n"
+        "You can change it later in profile settings.",
+        "🌐 <b>Крок 1 із 2 · Мова інтерфейсу</b>\n\n"
+        "Оберіть мову, якою працюватиме бот.\n"
+        "Пізніше її можна змінити в налаштуваннях профілю.",
+    )
+
+
+def start_currency_text(lang: str = "ru") -> str:
+    return tr(
+        lang,
+        "💱 <b>Шаг 2 из 2 · Валюта счёта</b>\n\n"
+        "Выберите основную валюту баланса.\n"
+        "Минимальные суммы и расчёты будут автоматически подстраиваться под неё.",
+        "💱 <b>Step 2 of 2 · Account currency</b>\n\n"
+        "Choose the main balance currency.\n"
+        "Minimum limits and calculations will adapt to it automatically.",
+        "💱 <b>Крок 2 із 2 · Валюта рахунку</b>\n\n"
+        "Оберіть основну валюту балансу.\n"
+        "Мінімальні ліміти та розрахунки будуть автоматично підлаштовані під неї.",
+    )
+
+
+def start_complete_text(lang: str = "ru") -> str:
+    return tr(
+        lang,
+        "✅ <b>Стартовая настройка завершена</b>\n\n"
+        "Профиль активирован. Ниже доступно основное меню платформы.",
+        "✅ <b>Initial setup completed</b>\n\n"
+        "Your profile is ready. The main platform menu is available below.",
+        "✅ <b>Початкове налаштування завершено</b>\n\n"
+        "Профіль активовано. Нижче доступне основне меню платформи.",
+    )
+
+
 def rules_keyboard():
     kb = InlineKeyboardBuilder()
-    kb.button(text="✅Accept the rules/Принять правила", callback_data="accept_rules")
+    kb.button(text="📄 Правила сервиса", url=config.user_agreement_url or "https://telegra.ph/Polzovatelskoe-soglashenie-03-27-13")
+    kb.button(text="✅ Принять правила", callback_data="accept_rules")
     kb.adjust(1)
     return kb.as_markup()
 
@@ -2306,37 +2360,24 @@ def rules_keyboard():
 LANG_BUTTONS = [
     ("Русский", "ru"),
     ("English", "en"),
-    ("Deutsch", "de"),
-    ("Español", "es"),
     ("Українська", "uk"),
-    ("Français", "fr"),
-    ("Italiano", "it"),
-    ("Português", "pt"),
-    ("中文", "zh"),
-    ("한국어", "ko"),
-    ("Türkçe", "tr"),
-    ("日本語", "ja"),
-    ("हिन्दी", "hi"),
-    ("Tiếng Việt", "vi"),
-    ("ไทย", "th"),
-    ("Bahasa Indo", "id"),
-    ("Polski", "pl"),
-    ("Nederlands", "nl"),
 ]
 
 
-def language_keyboard():
+def language_keyboard(include_back: bool = False):
     kb = InlineKeyboardBuilder()
     for text, code in LANG_BUTTONS:
         kb.button(text=text, callback_data=f"lang:{code}")
-    kb.adjust(3)
+    if include_back:
+        kb.button(text="⬅️ К правилам", callback_data="start_back_rules")
+        kb.adjust(3, 1)
+    else:
+        kb.adjust(3)
     return kb.as_markup()
 
 
 CURRENCIES = [
-    "RUB", "UAH", "CNY", "MXN", "TRY", "GBP", "CAD", "NOK",
-    "BYN", "USD", "JPY", "BRL", "SGD", "CHF", "NZD",
-    "KZT", "EUR", "SAR", "INR", "KRW", "AUD", "SEK", "DKK",
+    "USD", "EUR", "RUB", "UAH", "GBP", "TRY", "KZT", "JPY", "CNY", "AUD", "CAD", "BRL",
 ]
 
 DEFAULT_MIN_TRADE_USDT = 10.0
@@ -2442,11 +2483,15 @@ TRADE_PRICE_HINTS = {
 }
 
 
-def currency_keyboard():
+def currency_keyboard(include_back: bool = False):
     kb = InlineKeyboardBuilder()
     for cur in CURRENCIES:
         kb.button(text=cur, callback_data=f"cur:{cur}")
-    kb.adjust(4)
+    if include_back:
+        kb.button(text="⬅️ К языку", callback_data="start_back_lang")
+        kb.adjust(4, 4, 4, 1)
+    else:
+        kb.adjust(4, 4, 4)
     return kb.as_markup()
 
 
@@ -2735,7 +2780,8 @@ def is_admin_id(user_id: int) -> bool:
 # --- /start + referral ---
 
 @dp.message(CommandStart())
-async def cmd_start(message: Message):
+async def cmd_start(message: Message, state: FSMContext):
+    await state.clear()
     parts = message.text.split(maxsplit=1)
     if len(parts) > 1:
         payload = parts[1]
@@ -2759,41 +2805,54 @@ async def cmd_start(message: Message):
 
     user_row = await get_user_row(message.from_user)
     if not user_row["accepted_rules"]:
-        text = (
-            "👋 <b>Добро пожаловать в Legend Trading</b>\n\n"
-            "Перед началом работы, пожалуйста, ознакомьтесь с "
-            '<a href="https://telegra.ph/Polzovatelskoe-soglashenie-03-27-13">'
-            "правилами и условиями использования</a>.\n\n"
-            "Нажимая кнопку ниже, вы подтверждаете согласие с регламентом сервиса."
-        )
-        await message.answer(text, reply_markup=rules_keyboard())
+        await message.answer(start_rules_text(), reply_markup=rules_keyboard())
     else:
-        # Если язык и валюта уже выбраны — сразу открываем личный кабинет
         if user_row["language"] and user_row["currency"]:
             await send_profile(message)
         else:
-            # На случай, если правила приняты, но настройки не завершены
             lang = normalize_lang(user_row["language"])
             await message.answer(
-                tr(lang, "🌐 Выберите язык интерфейса:", "🌐 Choose interface language:", "🌐 Оберіть мову інтерфейсу:"),
-                reply_markup=language_keyboard(),
+                start_language_text(lang),
+                reply_markup=language_keyboard(include_back=True),
             )
 
 
 @dp.callback_query(F.data == "accept_rules")
-async def on_accept_rules(callback: CallbackQuery):
+async def on_accept_rules(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
     await set_accepted_rules(callback.from_user.id)
-    await callback.message.edit_reply_markup()
-    await callback.message.answer("🌐 Choose interface language / Выберите язык / Оберіть мову интерфейса:", reply_markup=language_keyboard())
+    await callback.message.edit_text(
+        start_language_text("ru"),
+        reply_markup=language_keyboard(include_back=True),
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "start_back_rules")
+async def start_back_rules(callback: CallbackQuery):
+    await callback.message.edit_text(start_rules_text(), reply_markup=rules_keyboard())
     await callback.answer()
 
 
 @dp.callback_query(F.data.startswith("lang:"))
 async def on_language_selected(callback: CallbackQuery):
-    lang_code = callback.data.split(":", 1)[1]
+    lang_code = normalize_lang(callback.data.split(":", 1)[1])
     await set_language(callback.from_user.id, lang_code)
-    await callback.message.edit_reply_markup()
-    await callback.message.answer(tr(lang_code, "💱 Выберите валюту:", "💱 Choose currency:", "💱 Оберіть валюту:"), reply_markup=currency_keyboard())
+    await callback.message.edit_text(
+        start_currency_text(lang_code),
+        reply_markup=currency_keyboard(include_back=True),
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "start_back_lang")
+async def start_back_lang(callback: CallbackQuery):
+    user_row = await get_user_row(callback.from_user)
+    lang = normalize_lang(user_row["language"])
+    await callback.message.edit_text(
+        start_language_text(lang),
+        reply_markup=language_keyboard(include_back=True),
+    )
     await callback.answer()
 
 
@@ -2801,7 +2860,9 @@ async def on_language_selected(callback: CallbackQuery):
 async def on_currency_selected(callback: CallbackQuery):
     currency = callback.data.split(":", 1)[1]
     await set_currency(callback.from_user.id, currency)
-    await callback.message.edit_reply_markup()
+    user_row = await get_user_row(callback.from_user)
+    lang = normalize_lang(user_row["language"])
+    await callback.message.edit_text(start_complete_text(lang))
     await send_main_menu(callback.message)
     await callback.answer()
 
