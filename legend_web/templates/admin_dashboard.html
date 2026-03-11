@@ -13,6 +13,7 @@
         <section class="card hero">
             <h1>Админ-панель</h1>
             <div class="hint">Управление реквизитами, монетами и параметрами платформы</div>
+            <div class="hint" id="admin-live-status">Admin feed: online</div>
         </section>
 
         <section class="metrics">
@@ -20,6 +21,13 @@
             <article class="card metric"><h3>Workers</h3><p>{{ workers_count }}</p></article>
             <article class="card metric"><h3>Deals</h3><p>{{ deals_count }}</p></article>
             <article class="card metric"><h3>Pending WD</h3><p>{{ pending_withdrawals }}</p></article>
+        </section>
+
+        <section class="metrics" id="admin-kpi-grid">
+            <article class="card metric"><h3>Pending Dep</h3><p>{{ snapshot.metrics.pending_deposits if snapshot.metrics else 0 }}</p></article>
+            <article class="card metric"><h3>Support Open</h3><p>{{ snapshot.metrics.open_support if snapshot.metrics else 0 }}</p></article>
+            <article class="card metric"><h3>Approved Dep</h3><p>{{ "%.2f"|format((snapshot.metrics.approved_deposit_sum if snapshot.metrics else 0) or 0) }}</p></article>
+            <article class="card metric"><h3>Approved WD</h3><p>{{ "%.2f"|format((snapshot.metrics.approved_withdraw_sum if snapshot.metrics else 0) or 0) }}</p></article>
         </section>
 
         <section class="card">
@@ -88,6 +96,121 @@
                         <a class="chip worker-open" href="/admin/user/{{ u.tg_id }}">Карточка</a>
                     </div>
                 </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="card">
+            <div class="section-title">Пополнения</div>
+            <div id="admin-deposit-result" class="result-box"></div>
+            <div id="admin-deposit-list" class="list">
+                {% for d in snapshot.deposits %}
+                <div class="row worker-row admin-queue-row">
+                    <div class="worker-card-main">
+                        <div class="worker-head">
+                            <b>#{{ d.id }} {{ d.first_name if d.first_name else "Пользователь" }}</b>
+                            <span class="worker-badge {% if d.status == 'approved' %}favorite{% elif d.status == 'rejected' %}blocked{% else %}active{% endif %}">{{ d.status }}</span>
+                        </div>
+                        <small>ID {{ d.user_tg_id }} · @{{ d.username if d.username else "-" }}</small>
+                        <small>{{ "%.2f"|format((d.amount or 0)) }} {{ d.currency if d.currency else "USD" }} · {{ d.method }}</small>
+                    </div>
+                    <div class="worker-actions">
+                        <button class="chip admin-deposit-act" data-id="{{ d.id }}" data-action="approve">Подтв.</button>
+                        <button class="chip admin-deposit-act state-block" data-id="{{ d.id }}" data-action="reject">Отклон.</button>
+                    </div>
+                </div>
+                {% else %}
+                <div class="empty">Пополнений пока нет.</div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="card">
+            <div class="section-title">Выводы</div>
+            <div id="admin-withdraw-result" class="result-box"></div>
+            <div id="admin-withdraw-list" class="list">
+                {% for w in snapshot.withdrawals %}
+                <div class="row worker-row admin-queue-row">
+                    <div class="worker-card-main">
+                        <div class="worker-head">
+                            <b>#{{ w.id }} {{ w.first_name if w.first_name else "Пользователь" }}</b>
+                            <span class="worker-badge {% if w.status == 'approved' %}favorite{% elif w.status == 'rejected' %}blocked{% else %}active{% endif %}">{{ w.status }}</span>
+                        </div>
+                        <small>ID {{ w.user_tg_id }} · @{{ w.username if w.username else "-" }}</small>
+                        <small>{{ "%.2f"|format((w.amount or 0)) }} {{ w.currency if w.currency else "USD" }} · {{ w.method }}</small>
+                    </div>
+                    <div class="worker-actions">
+                        <button class="chip admin-withdraw-act" data-id="{{ w.id }}" data-action="approve">Подтв.</button>
+                        <button class="chip admin-withdraw-act state-block" data-id="{{ w.id }}" data-action="reject">Отклон.</button>
+                    </div>
+                </div>
+                {% else %}
+                <div class="empty">Выводов пока нет.</div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="card">
+            <div class="section-title">Support center</div>
+            <div id="admin-support-result" class="result-box"></div>
+            <div id="admin-support-list" class="list">
+                {% for s in snapshot.support %}
+                <div class="row support-row">
+                    <div class="worker-event-main">
+                        <div class="worker-event-top">
+                            <b>#{{ s.id }} {{ s.subject }}</b>
+                            <span class="worker-event-time">{{ s.updated_at }}</span>
+                        </div>
+                        <small>{{ s.first_name if s.first_name else "Пользователь" }} · ID {{ s.client_tg_id }} · @{{ s.username if s.username else "-" }}</small>
+                        <small>{{ s.last_message if s.last_message else "Без комментария" }}</small>
+                    </div>
+                    <div class="worker-actions">
+                        <button class="chip admin-support-act" data-id="{{ s.id }}" data-action="take">Взять</button>
+                        <button class="chip admin-support-act state-fav" data-id="{{ s.id }}" data-action="close">Закрыть</button>
+                    </div>
+                </div>
+                {% else %}
+                <div class="empty">Тикетов пока нет.</div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="card">
+            <div class="section-title">Воркеры</div>
+            <div id="admin-worker-stats" class="list">
+                {% for w in snapshot.worker_stats %}
+                <div class="row">
+                    <div>
+                        <b>{{ w.first_name if w.first_name else "Воркер" }}</b>
+                        <small>ID {{ w.tg_id }} · @{{ w.username if w.username else "-" }}</small>
+                    </div>
+                    <div>{{ w.clients_count }} клиентов / {{ w.favorites_count }} fav</div>
+                </div>
+                {% else %}
+                <div class="empty">Воркеров пока нет.</div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="card">
+            <div class="section-title">Audit log</div>
+            <div id="admin-audit-list" class="list">
+                {% for a in snapshot.audit %}
+                <div class="row worker-event-row">
+                    <div class="worker-event-main">
+                        <div class="worker-event-top">
+                            <b>{{ a.action }}</b>
+                            <span class="worker-event-time">{{ a.created_at }}</span>
+                        </div>
+                        <small>{{ a.details }}</small>
+                        <small>admin: {{ a.admin_actor }} · target: {{ a.target_tg_id if a.target_tg_id else "-" }}</small>
+                    </div>
+                    {% if a.amount is not none %}
+                    <div class="worker-event-amount">{{ "%+.2f"|format((a.amount or 0)) }} {{ a.currency if a.currency else "" }}</div>
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="empty">Аудит пока пуст.</div>
                 {% endfor %}
             </div>
         </section>
@@ -200,6 +323,136 @@ function bindAdminUsers() {
 }
 
 bindAdminUsers();
+
+async function processAdminEntity(url, entityId, action, resultId) {
+    const note = action === "reject" || action === "close" ? (prompt("Комментарий:") || "") : "";
+    const r = await fetch(url, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({entity_id: Number(entityId), action, note})
+    });
+    const data = await r.json();
+    const result = document.getElementById(resultId);
+    if (result) {
+        result.innerHTML = r.ok && data.ok
+            ? `<span class="pos">${data.details || "Сохранено"}</span>`
+            : `<span class="neg">${data.error || "Ошибка"}</span>`;
+    }
+    if (r.ok && data.ok) {
+        setTimeout(() => location.reload(), 450);
+    }
+}
+
+function wireAdminActionButtons() {
+    document.querySelectorAll(".admin-deposit-act").forEach((btn) => {
+        btn.onclick = () => processAdminEntity("/admin/api/deposit/process", btn.dataset.id, btn.dataset.action, "admin-deposit-result");
+    });
+    document.querySelectorAll(".admin-withdraw-act").forEach((btn) => {
+        btn.onclick = () => processAdminEntity("/admin/api/withdraw/process", btn.dataset.id, btn.dataset.action, "admin-withdraw-result");
+    });
+    document.querySelectorAll(".admin-support-act").forEach((btn) => {
+        btn.onclick = () => processAdminEntity("/admin/api/support/process", btn.dataset.id, btn.dataset.action, "admin-support-result");
+    });
+}
+
+function renderSimpleList(targetId, items, emptyHtml, rowBuilder) {
+    const box = document.getElementById(targetId);
+    if (!box) return;
+    box.innerHTML = "";
+    if (!items || !items.length) {
+        box.innerHTML = emptyHtml;
+        return;
+    }
+    items.forEach((item) => box.insertAdjacentHTML("beforeend", rowBuilder(item)));
+}
+
+async function refreshAdminDashboard() {
+    try {
+        const resp = await fetch("/admin/api/dashboard");
+        if (!resp.ok) throw new Error("dashboard");
+        const data = await resp.json();
+        if (!data.ok) throw new Error(data.error || "dashboard");
+        document.getElementById("admin-live-status").textContent = "Admin feed: online";
+        const metrics = data.metrics || {};
+        const kpiCards = document.querySelectorAll("#admin-kpi-grid .metric p");
+        if (kpiCards[0]) kpiCards[0].textContent = Number(metrics.pending_deposits || 0);
+        if (kpiCards[1]) kpiCards[1].textContent = Number(metrics.open_support || 0);
+        if (kpiCards[2]) kpiCards[2].textContent = Number(metrics.approved_deposit_sum || 0).toFixed(2);
+        if (kpiCards[3]) kpiCards[3].textContent = Number(metrics.approved_withdraw_sum || 0).toFixed(2);
+
+        renderSimpleList("admin-deposit-list", data.deposits, '<div class="empty">Пополнений пока нет.</div>', (d) => `
+            <div class="row worker-row admin-queue-row">
+                <div class="worker-card-main">
+                    <div class="worker-head">
+                        <b>#${d.id} ${d.first_name || "Пользователь"}</b>
+                        <span class="worker-badge ${d.status === "approved" ? "favorite" : d.status === "rejected" ? "blocked" : "active"}">${d.status}</span>
+                    </div>
+                    <small>ID ${d.user_tg_id} · @${d.username || "-"}</small>
+                    <small>${Number(d.amount || 0).toFixed(2)} ${d.currency || "USD"} · ${d.method || "-"}</small>
+                </div>
+                <div class="worker-actions">
+                    <button class="chip admin-deposit-act" data-id="${d.id}" data-action="approve">Подтв.</button>
+                    <button class="chip admin-deposit-act state-block" data-id="${d.id}" data-action="reject">Отклон.</button>
+                </div>
+            </div>`);
+        renderSimpleList("admin-withdraw-list", data.withdrawals, '<div class="empty">Выводов пока нет.</div>', (w) => `
+            <div class="row worker-row admin-queue-row">
+                <div class="worker-card-main">
+                    <div class="worker-head">
+                        <b>#${w.id} ${w.first_name || "Пользователь"}</b>
+                        <span class="worker-badge ${w.status === "approved" ? "favorite" : w.status === "rejected" ? "blocked" : "active"}">${w.status}</span>
+                    </div>
+                    <small>ID ${w.user_tg_id} · @${w.username || "-"}</small>
+                    <small>${Number(w.amount || 0).toFixed(2)} ${w.currency || "USD"} · ${w.method || "-"}</small>
+                </div>
+                <div class="worker-actions">
+                    <button class="chip admin-withdraw-act" data-id="${w.id}" data-action="approve">Подтв.</button>
+                    <button class="chip admin-withdraw-act state-block" data-id="${w.id}" data-action="reject">Отклон.</button>
+                </div>
+            </div>`);
+        renderSimpleList("admin-support-list", data.support, '<div class="empty">Тикетов пока нет.</div>', (s) => `
+            <div class="row support-row">
+                <div class="worker-event-main">
+                    <div class="worker-event-top">
+                        <b>#${s.id} ${s.subject || "Тикет"}</b>
+                        <span class="worker-event-time">${s.updated_at || ""}</span>
+                    </div>
+                    <small>${s.first_name || "Пользователь"} · ID ${s.client_tg_id || "-"} · @${s.username || "-"}</small>
+                    <small>${s.last_message || "Без комментария"}</small>
+                </div>
+                <div class="worker-actions">
+                    <button class="chip admin-support-act" data-id="${s.id}" data-action="take">Взять</button>
+                    <button class="chip admin-support-act state-fav" data-id="${s.id}" data-action="close">Закрыть</button>
+                </div>
+            </div>`);
+        renderSimpleList("admin-worker-stats", data.worker_stats, '<div class="empty">Воркеров пока нет.</div>', (w) => `
+            <div class="row">
+                <div>
+                    <b>${w.first_name || "Воркер"}</b>
+                    <small>ID ${w.tg_id} · @${w.username || "-"}</small>
+                </div>
+                <div>${Number(w.clients_count || 0)} клиентов / ${Number(w.favorites_count || 0)} fav</div>
+            </div>`);
+        renderSimpleList("admin-audit-list", data.audit, '<div class="empty">Аудит пока пуст.</div>', (a) => `
+            <div class="row worker-event-row">
+                <div class="worker-event-main">
+                    <div class="worker-event-top">
+                        <b>${a.action || "audit"}</b>
+                        <span class="worker-event-time">${a.created_at || ""}</span>
+                    </div>
+                    <small>${a.details || ""}</small>
+                    <small>admin: ${a.admin_actor || "-"} · target: ${a.target_tg_id || "-"}</small>
+                </div>
+                ${a.amount !== null && a.amount !== undefined ? `<div class="worker-event-amount">${Number(a.amount).toFixed(2)} ${a.currency || ""}</div>` : ""}
+            </div>`);
+        wireAdminActionButtons();
+    } catch (err) {
+        document.getElementById("admin-live-status").textContent = "Admin feed: reconnect";
+    }
+}
+
+wireAdminActionButtons();
+setInterval(refreshAdminDashboard, 8000);
 </script>
 </body>
 </html>

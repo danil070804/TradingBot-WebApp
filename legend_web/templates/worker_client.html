@@ -5,6 +5,7 @@
     <h1>Карточка реферала</h1>
     <div class="balance">{{ "%.2f"|format((client.balance or 0) or 0) }} {{ client.currency if client.currency else "USD" }}</div>
     <div class="hint">{{ client.first_name if client.first_name else "Пользователь" }} · ID {{ client.client_tg_id }} · @{{ client.username if client.username else "-" }}</div>
+    <div class="hint" id="worker-client-live-status">Client feed: online</div>
     <div class="quick-actions">
         <a class="qa-btn" href="/worker">Назад к панели</a>
         <a class="qa-btn" href="/profile?tg_id={{ client.client_tg_id }}">Профиль</a>
@@ -35,17 +36,47 @@
     <div class="worker-meta detail-meta">
         <span>Мин. депозит: {{ "%.2f"|format((client.min_deposit or 0)) }}</span>
         <span>Мин. вывод: {{ "%.2f"|format((client.min_withdraw or 0)) }}</span>
+        <span>Этап: {{ client.funnel_stage if client.funnel_stage else "new" }}</span>
         <span>KYC: {{ "ВКЛ" if client.verified else "ВЫКЛ" }}</span>
         <span>Торговля: {{ "ВКЛ" if client.trading_enabled else "ВЫКЛ" }}</span>
         <span>Вывод: {{ "ВКЛ" if client.withdraw_enabled else "ВЫКЛ" }}</span>
         <span>Избранное: {{ "ДА" if client.favorite else "НЕТ" }}</span>
         <span>Блок: {{ "ДА" if client.blocked else "НЕТ" }}</span>
+        {% if client.last_activity_at %}<span>Последняя активность: {{ client.last_activity_at }}</span>{% endif %}
+    </div>
+</section>
+
+<section class="card">
+    <div class="section-title">CRM</div>
+    <div class="detail-stack">
+        <div>
+            <small>Теги</small>
+            <div class="worker-meta detail-meta">
+                {% for tag in client_tags %}
+                <span>{{ tag }}</span>
+                {% else %}
+                <span>Без тегов</span>
+                {% endfor %}
+            </div>
+        </div>
+        <div>
+            <small>Заметка</small>
+            <div class="crm-note-box">{{ client.crm_note if client.crm_note else "Заметки пока нет." }}</div>
+        </div>
+        <div>
+            <small>Этапы воронки</small>
+            <div class="worker-meta detail-meta">
+                {% for stage in funnel_stages %}
+                <span class="{% if stage == client.funnel_stage %}worker-stage-active{% endif %}">{{ stage }}</span>
+                {% endfor %}
+            </div>
+        </div>
     </div>
 </section>
 
 <section class="card">
     <div class="section-title">История событий</div>
-    <div class="list">
+    <div id="worker-client-activity" class="list">
         {% for item in activity %}
         <div class="row worker-event-row">
             <div class="worker-event-main">
@@ -62,6 +93,26 @@
         </div>
         {% else %}
         <div class="empty">Событий пока нет.</div>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="card">
+    <div class="section-title">Support center</div>
+    <div id="worker-client-support" class="list">
+        {% for item in tickets %}
+        <div class="row support-row">
+            <div class="worker-event-main">
+                <div class="worker-event-top">
+                    <b>#{{ item.id }} {{ item.subject }}</b>
+                    <span class="worker-event-time">{{ item.updated_at }}</span>
+                </div>
+                <small>{{ item.topic }} · {{ item.status }}</small>
+                <small>{{ item.last_message if item.last_message else "Без комментария" }}</small>
+            </div>
+        </div>
+        {% else %}
+        <div class="empty">Тикетов пока нет.</div>
         {% endfor %}
     </div>
 </section>

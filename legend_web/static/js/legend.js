@@ -1077,6 +1077,7 @@ function bindWorkerPanel() {
     if (!wrap) return;
     const search = document.getElementById("worker-search");
     const filter = document.getElementById("worker-filter");
+    const liveStatus = document.getElementById("worker-live-status");
 
     const applyWorkerFilters = () => {
         const q = (search ? search.value : "").trim().toLowerCase();
@@ -1090,6 +1091,8 @@ function bindWorkerPanel() {
             if (mode === "verified") matchesFilter = row.dataset.verified === "1";
             if (mode === "trade_off") matchesFilter = row.dataset.tradeEnabled === "0";
             if (mode === "withdraw_off") matchesFilter = row.dataset.withdrawEnabled === "0";
+            if (mode === "vip") matchesFilter = String(row.dataset.funnelStage || "") === "vip" || String(row.dataset.tags || "").toLowerCase().includes("vip");
+            if (mode === "support") matchesFilter = String(row.dataset.funnelStage || "") === "support_wait";
             row.style.display = matchesQuery && matchesFilter ? "" : "none";
         });
     };
@@ -1133,9 +1136,163 @@ function bindWorkerPanel() {
         });
     });
 
+    wrap.querySelectorAll(".worker-text").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+            const row = btn.closest(".worker-row");
+            if (!row) return;
+            const label = btn.dataset.label || "Значение";
+            const val = prompt(`${label}:`);
+            if (val === null) return;
+            await doUpdate(row.dataset.wcId, btn.dataset.action, val);
+        });
+    });
+
+    const renderSummary = (summary) => {
+        const grid = document.getElementById("worker-summary-grid");
+        if (!grid || !summary) return;
+        const cards = grid.querySelectorAll(".stat-card b");
+        if (cards[0]) cards[0].textContent = Number(summary.total_clients || 0);
+        if (cards[1]) cards[1].textContent = Number(summary.active_day || 0);
+        if (cards[2]) cards[2].textContent = Number(summary.deposited || 0);
+        if (cards[3]) cards[3].textContent = `${Number(summary.vip || 0)}/${Number(summary.trading || 0)}`;
+    };
+
+    const renderActivity = (items) => {
+        const box = document.getElementById("worker-activity-list");
+        if (!box) return;
+        box.innerHTML = "";
+        if (!items || !items.length) {
+            box.innerHTML = '<div class="empty">Событий пока нет.</div>';
+            return;
+        }
+        items.forEach((item) => {
+            const row = document.createElement("div");
+            row.className = "row worker-event-row";
+            row.innerHTML = `
+                <div class="worker-event-main">
+                    <div class="worker-event-top">
+                        <b>${item.title || "Событие"}</b>
+                        <span class="worker-event-time">${item.created_at || ""}</span>
+                    </div>
+                    <small>${item.first_name || "Пользователь"} · ID ${item.client_tg_id || "-"} · @${item.username || "-"}</small>
+                    <small>${item.details || "Без деталей"}</small>
+                </div>
+                ${item.amount !== null && item.amount !== undefined ? `<div class="worker-event-amount">${Number(item.amount).toFixed(2)} ${item.currency || ""}</div>` : ""}
+            `;
+            box.appendChild(row);
+        });
+    };
+
+    const renderSupport = (items) => {
+        const box = document.getElementById("worker-support-list");
+        if (!box) return;
+        box.innerHTML = "";
+        if (!items || !items.length) {
+            box.innerHTML = '<div class="empty">Открытых тикетов пока нет.</div>';
+            return;
+        }
+        items.forEach((item) => {
+            const row = document.createElement("div");
+            row.className = "row support-row";
+            const badgeClass = item.status === "closed" ? "blocked" : item.status === "in_progress" ? "favorite" : "active";
+            row.innerHTML = `
+                <div class="worker-event-main">
+                    <div class="worker-event-top">
+                        <b>#${item.id} ${item.subject || "Тикет"}</b>
+                        <span class="worker-event-time">${item.updated_at || ""}</span>
+                    </div>
+                    <small>${item.first_name || "Пользователь"} · ID ${item.client_tg_id || "-"} · @${item.username || "-"}</small>
+                    <small>${item.last_message || "Без комментария"}</small>
+                </div>
+                <div class="worker-badge ${badgeClass}">${item.status || "new"}</div>
+            `;
+            box.appendChild(row);
+        });
+    };
+
+    const pollWorkerDashboard = async () => {
+        try {
+            const resp = await fetch("/api/worker/dashboard");
+            if (!resp.ok) throw new Error("dashboard");
+            const data = await resp.json();
+            if (!data.ok) throw new Error(data.error || "dashboard");
+            renderSummary(data.summary);
+            renderActivity(data.activity);
+            renderSupport(data.tickets);
+            if (liveStatus) liveStatus.textContent = "CRM feed: online";
+        } catch (err) {
+            if (liveStatus) liveStatus.textContent = "CRM feed: reconnect";
+        }
+    };
+
     if (search) search.addEventListener("input", applyWorkerFilters);
     if (filter) filter.addEventListener("change", applyWorkerFilters);
     applyWorkerFilters();
+    setInterval(pollWorkerDashboard, 8000);
+}
+
+function bindWorkerClientPage() {
+    const activityBox = document.getElementById("worker-client-activity");
+    if (!activityBox) return;
+    const liveStatus = document.getElementById("worker-client-live-status");
+    const match = window.location.pathname.match(/\/worker\/client\/(\d+)/);
+    if (!match) return;
+    const wcId = Number(match[1]);
+
+    const renderItems = (box, items, emptyText, mapper) => {
+        if (!box) return;
+        box.innerHTML = "";
+        if (!items || !items.length) {
+            box.innerHTML = `<div class="empty">${emptyText}</div>`;
+            return;
+        }
+        items.forEach((item) => box.appendChild(mapper(item)));
+    };
+
+    const pollSnapshot = async () => {
+        try {
+            const resp = await fetch(`/api/worker/client/${wcId}/snapshot`);
+            if (!resp.ok) throw new Error("snapshot");
+            const data = await resp.json();
+            if (!data.ok) throw new Error(data.error || "snapshot");
+            renderItems(activityBox, data.activity, "Событий пока нет.", (item) => {
+                const row = document.createElement("div");
+                row.className = "row worker-event-row";
+                row.innerHTML = `
+                    <div class="worker-event-main">
+                        <div class="worker-event-top">
+                            <b>${item.title || "Событие"}</b>
+                            <span class="worker-event-time">${item.created_at || ""}</span>
+                        </div>
+                        <small>${item.details || "Без деталей"}</small>
+                        <small>Источник: ${item.actor_source || "-"} · Тип: ${item.event_type || "-"}</small>
+                    </div>
+                    ${item.amount !== null && item.amount !== undefined ? `<div class="worker-event-amount">${Number(item.amount).toFixed(2)} ${item.currency || ""}</div>` : ""}
+                `;
+                return row;
+            });
+            renderItems(document.getElementById("worker-client-support"), data.tickets, "Тикетов пока нет.", (item) => {
+                const row = document.createElement("div");
+                row.className = "row support-row";
+                row.innerHTML = `
+                    <div class="worker-event-main">
+                        <div class="worker-event-top">
+                            <b>#${item.id} ${item.subject || "Тикет"}</b>
+                            <span class="worker-event-time">${item.updated_at || ""}</span>
+                        </div>
+                        <small>${item.topic || "-"} · ${item.status || "new"}</small>
+                        <small>${item.last_message || "Без комментария"}</small>
+                    </div>
+                `;
+                return row;
+            });
+            if (liveStatus) liveStatus.textContent = "Client feed: online";
+        } catch (err) {
+            if (liveStatus) liveStatus.textContent = "Client feed: reconnect";
+        }
+    };
+
+    setInterval(pollSnapshot, 9000);
 }
 
 function renderTape(items) {
@@ -1192,6 +1349,7 @@ bindExchangeForm();
 bindDepositForm();
 bindLangSwitch();
 bindWorkerPanel();
+bindWorkerClientPage();
 bindMarketSocket();
 bindUserSocket();
 bindOpenPositionsActions();

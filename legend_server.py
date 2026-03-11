@@ -624,6 +624,194 @@ async def log_admin_user_action(
     )
 
 
+FUNNEL_STAGES = [
+    "new",
+    "web_opened",
+    "deposit_interest",
+    "support_wait",
+    "deposited",
+    "trading",
+    "withdrawal",
+    "vip",
+]
+
+
+def normalize_funnel_stage(stage: str | None) -> str:
+    value = (stage or "").strip().lower()
+    return value if value in FUNNEL_STAGES else "new"
+
+
+def parse_tags(raw: str | None) -> list[str]:
+    return [part.strip() for part in (raw or "").split(",") if part.strip()]
+
+
+def row_to_dict(row):
+    return dict(row) if row is not None else None
+
+
+async def ensure_deposit_support_ticket(
+    client_tg_id: int,
+    worker_tg_id: int | None,
+    source: str,
+    amount: float | None,
+    currency: str | None,
+    method: str | None,
+    deposit_id: int | None = None,
+):
+    existing = await bot.get_latest_open_support_ticket(client_tg_id, "deposit")
+    if existing:
+        await bot.update_support_ticket_status(
+            int(existing["id"]),
+            "new",
+            last_message=f"Пополнение {float(amount or 0):.2f} {(currency or 'USD')} через {deposit_method_label(method or '')}",
+        )
+        return int(existing["id"])
+    return await bot.create_support_ticket(
+        client_tg_id=client_tg_id,
+        worker_tg_id=worker_tg_id,
+        source=source,
+        topic="deposit",
+        subject=f"Пополнение через {deposit_method_label(method or '')}",
+        status="new",
+        last_message=f"Пополнение {float(amount or 0):.2f} {(currency or 'USD')} через {deposit_method_label(method or '')}",
+        meta={"amount": amount, "currency": currency, "method": method, "deposit_id": deposit_id},
+    )
+
+
+async def fetch_worker_clients_rows(worker_tg_id: int):
+    return await fetch_all(
+        """
+        SELECT wc.id, wc.client_tg_id, wc.min_deposit, wc.min_withdraw, wc.verified, wc.withdraw_enabled,
+               wc.trading_enabled, wc.favorite, wc.blocked, wc.crm_note, wc.tags, wc.funnel_stage, wc.last_activity_at,
+               u.first_name, u.username, u.balance, u.currency
+        FROM worker_clients wc
+        LEFT JOIN users u ON u.tg_id = wc.client_tg_id
+        WHERE wc.worker_tg_id = ?
+        ORDER BY COALESCE(wc.last_activity_at, wc.created_at) DESC, wc.id DESC
+        LIMIT 300
+        """,
+        (worker_tg_id,),
+    )
+
+
+async def fetch_worker_summary(worker_tg_id: int) -> dict:
+    row = await fetch_one(
+        """
+        SELECT
+            COUNT(*) AS total_clients,
+            SUM(CASE WHEN favorite = 1 THEN 1 ELSE 0 END) AS favorites,
+            SUM(CASE WHEN blocked = 1 THEN 1 ELSE 0 END) AS blocked,
+            SUM(CASE WHEN funnel_stage = 'deposited' THEN 1 ELSE 0 END) AS deposited,
+            SUM(CASE WHEN funnel_stage = 'trading' THEN 1 ELSE 0 END) AS trading,
+            SUM(CASE WHEN funnel_stage = 'vip' THEN 1 ELSE 0 END) AS vip,
+            SUM(CASE WHEN last_activity_at >= datetime('now', '-1 day') THEN 1 ELSE 0 END) AS active_day
+        FROM worker_clients
+        WHERE worker_tg_id = ?
+        """,
+        (worker_tg_id,),
+    )
+    return row_to_dict(row) or {
+        "total_clients": 0,
+        "favorites": 0,
+        "blocked": 0,
+        "deposited": 0,
+        "trading": 0,
+        "vip": 0,
+        "active_day": 0,
+    }
+
+
+async def fetch_worker_support_tickets(worker_tg_id: int, limit: int = 20):
+    return await fetch_all(
+        """
+        SELECT st.id, st.client_tg_id, st.source, st.topic, st.status, st.subject, st.last_message,
+               st.assigned_to, st.updated_at, u.first_name, u.username
+        FROM support_tickets st
+        LEFT JOIN users u ON u.tg_id = st.client_tg_id
+        WHERE st.worker_tg_id = ?
+        ORDER BY st.id DESC
+        LIMIT ?
+        """,
+        (worker_tg_id, limit),
+    )
+
+
+async def fetch_admin_dashboard_snapshot() -> dict:
+    metrics = await fetch_one(
+        """
+        SELECT
+            (SELECT COUNT(*) FROM users) AS users_count,
+            (SELECT COUNT(*) FROM users WHERE is_worker = 1) AS workers_count,
+            (SELECT COUNT(*) FROM deals) AS deals_count,
+            (SELECT COUNT(*) FROM withdrawals WHERE status = 'pending') AS pending_withdrawals,
+            (SELECT COUNT(*) FROM deposit_requests WHERE status = 'pending') AS pending_deposits,
+            (SELECT COUNT(*) FROM support_tickets WHERE status IN ('new', 'in_progress')) AS open_support,
+            (SELECT IFNULL(SUM(amount), 0) FROM deposit_requests WHERE status = 'approved') AS approved_deposit_sum,
+            (SELECT IFNULL(SUM(amount), 0) FROM withdrawals WHERE status = 'approved') AS approved_withdraw_sum
+        """
+    )
+    deposits = await fetch_all(
+        """
+        SELECT d.id, d.user_tg_id, d.amount, d.currency, d.method, d.status, d.created_at, d.processed_by,
+               u.first_name, u.username
+        FROM deposit_requests d
+        LEFT JOIN users u ON u.tg_id = d.user_tg_id
+        ORDER BY d.id DESC
+        LIMIT 50
+        """
+    )
+    withdrawals = await fetch_all(
+        """
+        SELECT w.id, w.user_tg_id, w.amount, w.currency, w.method, w.status, w.created_at, w.processed_by,
+               u.first_name, u.username
+        FROM withdrawals w
+        LEFT JOIN users u ON u.tg_id = w.user_tg_id
+        ORDER BY w.id DESC
+        LIMIT 50
+        """
+    )
+    support = await fetch_all(
+        """
+        SELECT st.id, st.client_tg_id, st.worker_tg_id, st.source, st.topic, st.status, st.subject,
+               st.last_message, st.assigned_to, st.updated_at, u.first_name, u.username
+        FROM support_tickets st
+        LEFT JOIN users u ON u.tg_id = st.client_tg_id
+        ORDER BY st.id DESC
+        LIMIT 40
+        """
+    )
+    audit = await fetch_all(
+        """
+        SELECT id, admin_actor, target_tg_id, action, details, amount, currency, created_at
+        FROM admin_audit_log
+        ORDER BY id DESC
+        LIMIT 50
+        """
+    )
+    worker_stats = await fetch_all(
+        """
+        SELECT u.tg_id, u.first_name, u.username,
+               COUNT(wc.id) AS clients_count,
+               SUM(CASE WHEN wc.favorite = 1 THEN 1 ELSE 0 END) AS favorites_count,
+               SUM(CASE WHEN wc.blocked = 1 THEN 1 ELSE 0 END) AS blocked_count
+        FROM users u
+        LEFT JOIN worker_clients wc ON wc.worker_tg_id = u.tg_id
+        WHERE u.is_worker = 1
+        GROUP BY u.tg_id, u.first_name, u.username
+        ORDER BY clients_count DESC, u.tg_id DESC
+        LIMIT 50
+        """
+    )
+    return {
+        "metrics": row_to_dict(metrics) or {},
+        "deposits": deposits,
+        "withdrawals": withdrawals,
+        "support": support,
+        "audit": audit,
+        "worker_stats": worker_stats,
+    }
+
+
 def normalize_lang_code(lang: str | None) -> str:
     code = (lang or "ru").strip().lower()
     if code.startswith("en"):
@@ -1295,6 +1483,11 @@ async def deposit_support_redirect(
     tg_id = await get_current_user_id(request)
     if tg_id:
         user = await fetch_one("SELECT first_name, username, currency FROM users WHERE tg_id = ?", (tg_id,))
+        worker_id = await bot.get_worker_for_client(tg_id)
+        await execute_query(
+            "UPDATE worker_clients SET funnel_stage = ?, last_activity_at = CURRENT_TIMESTAMP WHERE client_tg_id = ?",
+            ("support_wait", tg_id),
+        )
         await notify_worker_deposit_event(
             client_tg_id=tg_id,
             first_name=user["first_name"] if user else None,
@@ -1303,6 +1496,15 @@ async def deposit_support_redirect(
             currency=(user["currency"] if user and user["currency"] else "USD"),
             method=method,
             stage="support_opened",
+            deposit_id=deposit_id,
+        )
+        await ensure_deposit_support_ticket(
+            client_tg_id=tg_id,
+            worker_tg_id=worker_id,
+            source="web",
+            amount=amount,
+            currency=(user["currency"] if user and user["currency"] else "USD"),
+            method=method,
             deposit_id=deposit_id,
         )
     target = (bot.config.support_url or "").strip() or "/deposit"
@@ -1375,19 +1577,10 @@ async def worker_page(request: Request):
         return RedirectResponse(url="/profile", status_code=302)
 
     lang, labels = await get_request_lang_labels(request, tg_id)
-    rows = await fetch_all(
-        """
-        SELECT wc.id, wc.client_tg_id, wc.min_deposit, wc.min_withdraw, wc.verified, wc.withdraw_enabled,
-               wc.trading_enabled, wc.favorite, wc.blocked, u.first_name, u.username, u.balance, u.currency
-        FROM worker_clients wc
-        LEFT JOIN users u ON u.tg_id = wc.client_tg_id
-        WHERE wc.worker_tg_id = ?
-        ORDER BY wc.id DESC
-        LIMIT 200
-        """,
-        (tg_id,),
-    )
+    rows = await fetch_worker_clients_rows(tg_id)
     activity = await bot.get_worker_activity_events(tg_id, 24)
+    summary = await fetch_worker_summary(tg_id)
+    tickets = await fetch_worker_support_tickets(tg_id, 12)
     return templates.TemplateResponse(
         "worker.html",
         {
@@ -1400,6 +1593,8 @@ async def worker_page(request: Request):
             "worker_ref_link": build_worker_ref_link(tg_id),
             "clients": rows,
             "activity": activity,
+            "summary": summary,
+            "tickets": tickets,
         },
     )
 
@@ -1418,7 +1613,7 @@ async def worker_client_page(request: Request, wc_id: int):
     client = await fetch_one(
         """
         SELECT wc.id, wc.worker_tg_id, wc.client_tg_id, wc.min_deposit, wc.min_withdraw, wc.verified, wc.withdraw_enabled,
-               wc.trading_enabled, wc.favorite, wc.blocked, wc.created_at,
+               wc.trading_enabled, wc.favorite, wc.blocked, wc.crm_note, wc.tags, wc.funnel_stage, wc.last_activity_at, wc.created_at,
                u.first_name, u.username, u.language, u.currency, u.balance, u.created_at AS user_created_at
         FROM worker_clients wc
         LEFT JOIN users u ON u.tg_id = wc.client_tg_id
@@ -1456,6 +1651,16 @@ async def worker_client_page(request: Request, wc_id: int):
         """,
         (tg_id, client_tg_id),
     )
+    tickets = await fetch_all(
+        """
+        SELECT id, source, topic, status, subject, last_message, assigned_to, updated_at
+        FROM support_tickets
+        WHERE client_tg_id = ?
+        ORDER BY id DESC
+        LIMIT 20
+        """,
+        (client_tg_id,),
+    )
     return templates.TemplateResponse(
         "worker_client.html",
         {
@@ -1473,6 +1678,9 @@ async def worker_client_page(request: Request, wc_id: int):
             "withdrawals": withdrawals,
             "deals": deals,
             "activity": activity,
+            "tickets": tickets,
+            "client_tags": parse_tags(client["tags"]),
+            "funnel_stages": FUNNEL_STAGES,
         },
     )
 
@@ -1483,26 +1691,28 @@ async def api_worker_clients(request: Request):
     user = await fetch_one("SELECT is_worker FROM users WHERE tg_id = ?", (tg_id,))
     if not user or not bool(user["is_worker"]):
         return JSONResponse({"ok": False, "error": "Forbidden"}, status_code=403)
-    rows = await fetch_all(
-        """
-        SELECT wc.id, wc.client_tg_id, wc.min_deposit, wc.min_withdraw, wc.verified, wc.withdraw_enabled,
-               wc.trading_enabled, wc.favorite, wc.blocked, u.first_name, u.username, u.balance, u.currency
-        FROM worker_clients wc
-        LEFT JOIN users u ON u.tg_id = wc.client_tg_id
-        WHERE wc.worker_tg_id = ?
-        ORDER BY wc.id DESC
-        LIMIT 200
-        """,
-        (tg_id,),
-    )
+    rows = await fetch_worker_clients_rows(tg_id)
     items = [dict(r) for r in rows]
     return JSONResponse({"ok": True, "items": items})
+
+
+@app.get("/api/worker/dashboard", response_class=JSONResponse)
+async def api_worker_dashboard(request: Request):
+    tg_id = await get_current_user_id(request)
+    user = await fetch_one("SELECT is_worker FROM users WHERE tg_id = ?", (tg_id,))
+    if not user or not bool(user["is_worker"]):
+        return JSONResponse({"ok": False, "error": "Forbidden"}, status_code=403)
+    clients = [dict(r) for r in await fetch_worker_clients_rows(tg_id)]
+    activity = [dict(r) for r in await bot.get_worker_activity_events(tg_id, 24)]
+    tickets = [dict(r) for r in await fetch_worker_support_tickets(tg_id, 12)]
+    summary = await fetch_worker_summary(tg_id)
+    return JSONResponse({"ok": True, "clients": clients, "activity": activity, "tickets": tickets, "summary": summary})
 
 
 class WorkerClientUpdatePayload(BaseModel):
     wc_id: int
     action: str
-    value: float | int | None = None
+    value: float | int | str | None = None
 
 
 @app.post("/api/worker/client/update", response_class=JSONResponse)
@@ -1580,6 +1790,21 @@ async def api_worker_client_update(payload: WorkerClientUpdatePayload, request: 
         activity_title = "Пополнение баланса"
         activity_details = f"Воркер добавил баланс {val:.2f}"
         activity_amount = val
+    elif action == "set_note":
+        note = str(payload.value or "").strip()
+        await bot.update_worker_client_field(payload.wc_id, "crm_note", note)
+        activity_title = "Заметка воркера"
+        activity_details = "Обновлена заметка по рефералу"
+    elif action == "set_tags":
+        tags = ",".join(parse_tags(str(payload.value or "")))
+        await bot.update_worker_client_field(payload.wc_id, "tags", tags)
+        activity_title = "Теги реферала"
+        activity_details = f"Теги обновлены: {tags or 'очищены'}"
+    elif action == "set_funnel_stage":
+        stage = normalize_funnel_stage(str(payload.value or ""))
+        await bot.update_worker_client_field(payload.wc_id, "funnel_stage", stage)
+        activity_title = "Этап воронки"
+        activity_details = f"Этап изменён на {stage}"
     else:
         return JSONResponse({"ok": False, "error": "Unsupported action"}, status_code=400)
 
@@ -1593,7 +1818,65 @@ async def api_worker_client_update(payload: WorkerClientUpdatePayload, request: 
         meta={"action": action, "wc_id": int(payload.wc_id)},
     )
 
-    return JSONResponse({"ok": True})
+    return JSONResponse({"ok": True, "details": activity_details})
+
+
+@app.get("/api/worker/client/{wc_id}/snapshot", response_class=JSONResponse)
+async def api_worker_client_snapshot(wc_id: int, request: Request):
+    tg_id = await get_current_user_id(request)
+    user = await fetch_one("SELECT is_worker FROM users WHERE tg_id = ?", (tg_id,))
+    if not user or not bool(user["is_worker"]):
+        return JSONResponse({"ok": False, "error": "Forbidden"}, status_code=403)
+    client = await fetch_one(
+        """
+        SELECT wc.id, wc.worker_tg_id, wc.client_tg_id, wc.min_deposit, wc.min_withdraw, wc.verified, wc.withdraw_enabled,
+               wc.trading_enabled, wc.favorite, wc.blocked, wc.crm_note, wc.tags, wc.funnel_stage, wc.last_activity_at,
+               u.first_name, u.username, u.language, u.currency, u.balance
+        FROM worker_clients wc
+        LEFT JOIN users u ON u.tg_id = wc.client_tg_id
+        WHERE wc.id = ? AND wc.worker_tg_id = ?
+        LIMIT 1
+        """,
+        (wc_id, tg_id),
+    )
+    if not client:
+        return JSONResponse({"ok": False, "error": "Client not found"}, status_code=404)
+    client_tg_id = int(client["client_tg_id"])
+    stats = await bot.get_user_deal_stats(client_tg_id)
+    pending = await bot.get_user_pending_withdraw_sum(client_tg_id)
+    luck = await bot.get_luck_for_worker_client(tg_id, client_tg_id)
+    activity = await fetch_all(
+        """
+        SELECT id, title, details, amount, currency, created_at, actor_source, event_type
+        FROM activity_log
+        WHERE worker_tg_id = ? AND client_tg_id = ?
+        ORDER BY id DESC
+        LIMIT 40
+        """,
+        (tg_id, client_tg_id),
+    )
+    tickets = await fetch_all(
+        """
+        SELECT id, source, topic, status, subject, last_message, assigned_to, updated_at
+        FROM support_tickets
+        WHERE client_tg_id = ?
+        ORDER BY id DESC
+        LIMIT 20
+        """,
+        (client_tg_id,),
+    )
+    return JSONResponse(
+        {
+            "ok": True,
+            "client": dict(client),
+            "stats": stats,
+            "pending": pending,
+            "luck": luck,
+            "activity": [dict(x) for x in activity],
+            "tickets": [dict(x) for x in tickets],
+            "client_tags": parse_tags(client["tags"]),
+        }
+    )
 
 
 @app.get("/admin/login", response_class=HTMLResponse)
@@ -1626,10 +1909,6 @@ async def admin_logout(request: Request):
 async def admin_dashboard(request: Request):
     if not is_admin_session(request):
         return RedirectResponse(url="/admin/login", status_code=302)
-    users = await fetch_one("SELECT COUNT(*) AS c FROM users")
-    workers = await fetch_one("SELECT COUNT(*) AS c FROM users WHERE is_worker = 1")
-    deals = await fetch_one("SELECT COUNT(*) AS c FROM deals")
-    withdrawals_pending = await fetch_one("SELECT COUNT(*) AS c FROM withdrawals WHERE status = 'pending'")
     settings_map = await get_settings_map()
     assets = await fetch_all("SELECT id, name FROM ecn_assets ORDER BY id ASC LIMIT 200")
     users_rows = await fetch_all(
@@ -1640,18 +1919,21 @@ async def admin_dashboard(request: Request):
         LIMIT 300
         """
     )
+    snapshot = await fetch_admin_dashboard_snapshot()
+    metrics = snapshot["metrics"]
     return templates.TemplateResponse(
         "admin_dashboard.html",
         {
             "request": request,
             "title": "Legend Trading Admin",
-            "users_count": int(users["c"] if users else 0),
-            "workers_count": int(workers["c"] if workers else 0),
-            "deals_count": int(deals["c"] if deals else 0),
-            "pending_withdrawals": int(withdrawals_pending["c"] if withdrawals_pending else 0),
+            "users_count": int(metrics.get("users_count", 0) or 0),
+            "workers_count": int(metrics.get("workers_count", 0) or 0),
+            "deals_count": int(metrics.get("deals_count", 0) or 0),
+            "pending_withdrawals": int(metrics.get("pending_withdrawals", 0) or 0),
             "settings_map": settings_map,
             "assets": assets,
             "users_rows": users_rows,
+            "snapshot": snapshot,
         },
     )
 
@@ -1729,6 +2011,13 @@ async def admin_update_setting(payload: AdminSettingPayload, request: Request):
     if key not in allowed_keys:
         return JSONResponse({"ok": False, "error": "Unsupported key"}, status_code=400)
     await bot.set_setting(key, payload.value.strip())
+    await bot.create_admin_audit_event(
+        admin_actor="admin_web",
+        target_tg_id=None,
+        action=f"setting_{key}",
+        details=f"Обновлена настройка {key}",
+        meta={"key": key, "value": payload.value.strip()},
+    )
     return JSONResponse({"ok": True})
 
 
@@ -1745,6 +2034,13 @@ async def admin_add_asset(payload: AdminAssetPayload, request: Request):
         return JSONResponse({"ok": False, "error": "Asset name too short"}, status_code=400)
     await bot.add_ecn_asset(name)
     await refresh_asset_market_map()
+    await bot.create_admin_audit_event(
+        admin_actor="admin_web",
+        target_tg_id=None,
+        action="asset_add",
+        details=f"Добавлен актив {name}",
+        meta={"asset": name},
+    )
     return JSONResponse({"ok": True, "name": name})
 
 
@@ -1809,6 +2105,172 @@ async def admin_user_action(payload: AdminUserActionPayload, request: Request):
         amount=amount,
         currency=currency,
         meta={"action": action},
+    )
+    await bot.create_admin_audit_event(
+        admin_actor="admin_web",
+        target_tg_id=int(payload.tg_id),
+        action=action,
+        details=details,
+        amount=amount,
+        currency=currency,
+        meta={"action": action},
+    )
+    return JSONResponse({"ok": True, "details": details})
+
+
+class AdminProcessPayload(BaseModel):
+    entity_id: int
+    action: str
+    note: str | None = None
+
+
+@app.get("/admin/api/dashboard", response_class=JSONResponse)
+async def admin_dashboard_snapshot(request: Request):
+    if not is_admin_session(request):
+        return JSONResponse({"ok": False, "error": "Unauthorized"}, status_code=401)
+    snapshot = await fetch_admin_dashboard_snapshot()
+    return JSONResponse(
+        {
+            "ok": True,
+            "metrics": snapshot["metrics"],
+            "deposits": [dict(r) for r in snapshot["deposits"]],
+            "withdrawals": [dict(r) for r in snapshot["withdrawals"]],
+            "support": [dict(r) for r in snapshot["support"]],
+            "audit": [dict(r) for r in snapshot["audit"]],
+            "worker_stats": [dict(r) for r in snapshot["worker_stats"]],
+        }
+    )
+
+
+@app.post("/admin/api/deposit/process", response_class=JSONResponse)
+async def admin_process_deposit(payload: AdminProcessPayload, request: Request):
+    if not is_admin_session(request):
+        return JSONResponse({"ok": False, "error": "Unauthorized"}, status_code=401)
+    dep = await fetch_one("SELECT * FROM deposit_requests WHERE id = ?", (payload.entity_id,))
+    if not dep:
+        return JSONResponse({"ok": False, "error": "Deposit not found"}, status_code=404)
+    if str(dep["status"]) != "pending":
+        return JSONResponse({"ok": False, "error": "Deposit already processed"}, status_code=400)
+    action = payload.action.strip().lower()
+    if action not in {"approve", "reject"}:
+        return JSONResponse({"ok": False, "error": "Unsupported action"}, status_code=400)
+    new_status = "approved" if action == "approve" else "rejected"
+    await execute_query(
+        "UPDATE deposit_requests SET status = ?, processed_by = ? WHERE id = ?",
+        (new_status, "admin_web", payload.entity_id),
+    )
+    if new_status == "approved":
+        await bot.change_balance(int(dep["user_tg_id"]), float(dep["amount"] or 0))
+        await execute_query(
+            "UPDATE worker_clients SET funnel_stage = ?, last_activity_at = CURRENT_TIMESTAMP WHERE client_tg_id = ?",
+            ("deposited", int(dep["user_tg_id"])),
+        )
+        ticket = await bot.get_latest_open_support_ticket(int(dep["user_tg_id"]), "deposit")
+        if ticket:
+            await bot.update_support_ticket_status(int(ticket["id"]), "closed", assigned_to="admin_web", last_message="Пополнение подтверждено")
+    details = f"Заявка на пополнение #{payload.entity_id} {('подтверждена' if new_status == 'approved' else 'отклонена')}"
+    await log_admin_user_action(
+        target_tg_id=int(dep["user_tg_id"]),
+        actor_tg_id=None,
+        event_type=f"admin_deposit_{new_status}",
+        title="Пополнение",
+        details=details,
+        amount=float(dep["amount"] or 0),
+        currency=dep["currency"] or "USD",
+        meta={"deposit_id": payload.entity_id, "note": payload.note or ""},
+    )
+    await bot.create_admin_audit_event(
+        admin_actor="admin_web",
+        target_tg_id=int(dep["user_tg_id"]),
+        action=f"deposit_{new_status}",
+        details=details,
+        amount=float(dep["amount"] or 0),
+        currency=dep["currency"] or "USD",
+        meta={"deposit_id": payload.entity_id, "note": payload.note or ""},
+    )
+    return JSONResponse({"ok": True, "details": details})
+
+
+@app.post("/admin/api/withdraw/process", response_class=JSONResponse)
+async def admin_process_withdraw(payload: AdminProcessPayload, request: Request):
+    if not is_admin_session(request):
+        return JSONResponse({"ok": False, "error": "Unauthorized"}, status_code=401)
+    wd = await fetch_one("SELECT * FROM withdrawals WHERE id = ?", (payload.entity_id,))
+    if not wd:
+        return JSONResponse({"ok": False, "error": "Withdrawal not found"}, status_code=404)
+    if str(wd["status"]) != "pending":
+        return JSONResponse({"ok": False, "error": "Withdrawal already processed"}, status_code=400)
+    action = payload.action.strip().lower()
+    if action not in {"approve", "reject"}:
+        return JSONResponse({"ok": False, "error": "Unsupported action"}, status_code=400)
+    new_status = "approved" if action == "approve" else "rejected"
+    await execute_query(
+        "UPDATE withdrawals SET status = ?, processed_by = ? WHERE id = ?",
+        (new_status, "admin_web", payload.entity_id),
+    )
+    if new_status == "reject":
+        await bot.change_balance(int(wd["user_tg_id"]), float(wd["amount"] or 0))
+    else:
+        await execute_query(
+            "UPDATE worker_clients SET funnel_stage = ?, last_activity_at = CURRENT_TIMESTAMP WHERE client_tg_id = ?",
+            ("withdrawal", int(wd["user_tg_id"])),
+        )
+    details = f"Заявка на вывод #{payload.entity_id} {('подтверждена' if new_status == 'approved' else 'отклонена')}"
+    await log_admin_user_action(
+        target_tg_id=int(wd["user_tg_id"]),
+        actor_tg_id=None,
+        event_type=f"admin_withdraw_{new_status}",
+        title="Вывод",
+        details=details,
+        amount=float(wd["amount"] or 0),
+        currency=wd["currency"] or "USD",
+        meta={"withdrawal_id": payload.entity_id, "note": payload.note or ""},
+    )
+    await bot.create_admin_audit_event(
+        admin_actor="admin_web",
+        target_tg_id=int(wd["user_tg_id"]),
+        action=f"withdraw_{new_status}",
+        details=details,
+        amount=float(wd["amount"] or 0),
+        currency=wd["currency"] or "USD",
+        meta={"withdrawal_id": payload.entity_id, "note": payload.note or ""},
+    )
+    return JSONResponse({"ok": True, "details": details})
+
+
+@app.post("/admin/api/support/process", response_class=JSONResponse)
+async def admin_process_support(payload: AdminProcessPayload, request: Request):
+    if not is_admin_session(request):
+        return JSONResponse({"ok": False, "error": "Unauthorized"}, status_code=401)
+    ticket = await fetch_one("SELECT * FROM support_tickets WHERE id = ?", (payload.entity_id,))
+    if not ticket:
+        return JSONResponse({"ok": False, "error": "Support ticket not found"}, status_code=404)
+    action = payload.action.strip().lower()
+    if action == "take":
+        status = "in_progress"
+        assigned_to = "admin_web"
+        details = f"Тикет #{payload.entity_id} взят в работу"
+    elif action == "close":
+        status = "closed"
+        assigned_to = ticket["assigned_to"] or "admin_web"
+        details = f"Тикет #{payload.entity_id} закрыт"
+    else:
+        return JSONResponse({"ok": False, "error": "Unsupported action"}, status_code=400)
+    await bot.update_support_ticket_status(int(payload.entity_id), status, assigned_to=assigned_to, last_message=payload.note or ticket["last_message"] or "")
+    await log_admin_user_action(
+        target_tg_id=int(ticket["client_tg_id"]),
+        actor_tg_id=None,
+        event_type=f"admin_support_{action}",
+        title="Техподдержка",
+        details=details,
+        meta={"ticket_id": payload.entity_id, "note": payload.note or ""},
+    )
+    await bot.create_admin_audit_event(
+        admin_actor="admin_web",
+        target_tg_id=int(ticket["client_tg_id"]),
+        action=f"support_{action}",
+        details=details,
+        meta={"ticket_id": payload.entity_id, "note": payload.note or ""},
     )
     return JSONResponse({"ok": True, "details": details})
 
@@ -1909,6 +2371,10 @@ async def api_trade_open(
         amount=amount,
         currency=currency,
         meta={"asset_name": asset_name, "direction": direction, "leverage": int(leverage), "seconds": int(seconds), "trade_id": trade_id},
+    )
+    await execute_query(
+        "UPDATE worker_clients SET funnel_stage = ?, last_activity_at = CURRENT_TIMESTAMP WHERE client_tg_id = ?",
+        ("trading", tg_id),
     )
     return JSONResponse(
         {
@@ -2083,9 +2549,22 @@ async def api_deposit_request(payload: DepositRequestPayload):
         method=method,
         stage="request_created",
     )
+    worker_id = await bot.get_worker_for_client(payload.tg_id)
+    await execute_query(
+        "UPDATE worker_clients SET funnel_stage = ?, last_activity_at = CURRENT_TIMESTAMP WHERE client_tg_id = ?",
+        ("deposit_interest", payload.tg_id),
+    )
 
     if method == "card":
         support_contact = bot.support_contact_text()
+        await ensure_deposit_support_ticket(
+            client_tg_id=payload.tg_id,
+            worker_tg_id=worker_id,
+            source="web",
+            amount=payload.amount,
+            currency=currency,
+            method=method,
+        )
         return JSONResponse(
             {
                 "ok": True,
@@ -2099,9 +2578,17 @@ async def api_deposit_request(payload: DepositRequestPayload):
         )
 
     dep_id = await bot.create_deposit_request(payload.tg_id, payload.amount, currency, method)
-    worker_id = await bot.get_worker_for_client(payload.tg_id)
     worker_info_line = f"Реферал воркера: <code>{worker_id}</code>\n" if worker_id else "Реферал воркера: нет данных\n"
     method_label = deposit_method_label(method)
+    await ensure_deposit_support_ticket(
+        client_tg_id=payload.tg_id,
+        worker_tg_id=worker_id,
+        source="web",
+        amount=payload.amount,
+        currency=currency,
+        method=method,
+        deposit_id=dep_id,
+    )
     text_admin = (
         "🔔 <b>Заявка на проверку оплаты (WebApp)</b>\n\n"
         f"ID заявки: <b>{dep_id}</b>\n"

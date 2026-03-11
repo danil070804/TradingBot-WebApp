@@ -514,6 +514,62 @@ async def init_db():
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP
             )"""
     )
+    support_tickets_ddl = (
+        """CREATE TABLE IF NOT EXISTS support_tickets(
+                id BIGSERIAL PRIMARY KEY,
+                client_tg_id BIGINT,
+                worker_tg_id BIGINT,
+                source TEXT,
+                topic TEXT,
+                status TEXT DEFAULT 'new',
+                subject TEXT,
+                last_message TEXT,
+                meta_json TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )"""
+        if is_pg
+        else
+        """CREATE TABLE IF NOT EXISTS support_tickets(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                client_tg_id INTEGER,
+                worker_tg_id INTEGER,
+                source TEXT,
+                topic TEXT,
+                status TEXT DEFAULT 'new',
+                subject TEXT,
+                last_message TEXT,
+                meta_json TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )"""
+    )
+    admin_audit_log_ddl = (
+        """CREATE TABLE IF NOT EXISTS admin_audit_log(
+                id BIGSERIAL PRIMARY KEY,
+                admin_actor TEXT,
+                target_tg_id BIGINT,
+                action TEXT,
+                details TEXT,
+                amount DOUBLE PRECISION,
+                currency TEXT,
+                meta_json TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )"""
+        if is_pg
+        else
+        """CREATE TABLE IF NOT EXISTS admin_audit_log(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                admin_actor TEXT,
+                target_tg_id INTEGER,
+                action TEXT,
+                details TEXT,
+                amount REAL,
+                currency TEXT,
+                meta_json TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )"""
+    )
 
     async with aiosqlite.connect(DB_PATH) as db:
         if not is_pg:
@@ -549,6 +605,23 @@ async def init_db():
 
         await db.execute(deals_ddl)
         await db.execute(activity_log_ddl)
+        await db.execute(support_tickets_ddl)
+        await db.execute(admin_audit_log_ddl)
+
+        # Lightweight migrations for CRM/support features.
+        for sql in (
+            "ALTER TABLE worker_clients ADD COLUMN crm_note TEXT DEFAULT ''",
+            "ALTER TABLE worker_clients ADD COLUMN tags TEXT DEFAULT ''",
+            "ALTER TABLE worker_clients ADD COLUMN funnel_stage TEXT DEFAULT 'new'",
+            "ALTER TABLE worker_clients ADD COLUMN last_activity_at TEXT",
+            "ALTER TABLE deposit_requests ADD COLUMN processed_by TEXT",
+            "ALTER TABLE withdrawals ADD COLUMN processed_by TEXT",
+            "ALTER TABLE support_tickets ADD COLUMN assigned_to TEXT",
+        ):
+            try:
+                await db.execute(sql)
+            except Exception:
+                pass
 
         # Расширяем список активов ECN (insert-ignore для уже существующих)
         default_assets = [
@@ -852,6 +925,7 @@ async def log_activity_for_worker_client(
         currency=currency,
         meta=meta,
     )
+    await touch_worker_client_activity(client_tg_id)
 
 
 def deposit_method_label(method: str) -> str:
@@ -897,6 +971,101 @@ async def notify_worker_bot_deposit_event(
         await bot.send_message(worker_id, text)
     except Exception:
         pass
+
+
+async def touch_worker_client_activity(client_tg_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE worker_clients SET last_activity_at = CURRENT_TIMESTAMP WHERE client_tg_id = ?",
+            (client_tg_id,),
+        )
+        await db.commit()
+
+
+async def create_support_ticket(
+    client_tg_id: int,
+    worker_tg_id: int | None,
+    source: str,
+    topic: str,
+    subject: str,
+    status: str = "new",
+    last_message: str = "",
+    meta: dict | None = None,
+) -> int:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "INSERT INTO support_tickets(client_tg_id, worker_tg_id, source, topic, status, subject, last_message, meta_json) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                client_tg_id,
+                worker_tg_id,
+                source,
+                topic,
+                status,
+                subject,
+                last_message,
+                json.dumps(meta or {}, ensure_ascii=True),
+            ),
+        )
+        await db.commit()
+        return int(cur.lastrowid)
+
+
+async def update_support_ticket_status(ticket_id: int, status: str, assigned_to: str | None = None, last_message: str | None = None):
+    async with aiosqlite.connect(DB_PATH) as db:
+        sets = ["status = ?", "updated_at = CURRENT_TIMESTAMP"]
+        params: list = [status]
+        if assigned_to is not None:
+            sets.append("assigned_to = ?")
+            params.append(assigned_to)
+        if last_message is not None:
+            sets.append("last_message = ?")
+            params.append(last_message)
+        params.append(ticket_id)
+        await db.execute(f"UPDATE support_tickets SET {', '.join(sets)} WHERE id = ?", tuple(params))
+        await db.commit()
+
+
+async def get_latest_open_support_ticket(client_tg_id: int, topic: str | None = None) -> Optional[aiosqlite.Row]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        if topic:
+            cur = await db.execute(
+                "SELECT * FROM support_tickets WHERE client_tg_id = ? AND topic = ? AND status IN ('new', 'in_progress') ORDER BY id DESC LIMIT 1",
+                (client_tg_id, topic),
+            )
+        else:
+            cur = await db.execute(
+                "SELECT * FROM support_tickets WHERE client_tg_id = ? AND status IN ('new', 'in_progress') ORDER BY id DESC LIMIT 1",
+                (client_tg_id,),
+            )
+        return await cur.fetchone()
+
+
+async def create_admin_audit_event(
+    admin_actor: str,
+    target_tg_id: int | None,
+    action: str,
+    details: str,
+    amount: float | None = None,
+    currency: str | None = None,
+    meta: dict | None = None,
+):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "INSERT INTO admin_audit_log(admin_actor, target_tg_id, action, details, amount, currency, meta_json) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                admin_actor,
+                target_tg_id,
+                action,
+                details,
+                amount,
+                currency,
+                json.dumps(meta or {}, ensure_ascii=True),
+            ),
+        )
+        await db.commit()
 
 
 async def get_deposit_request(dep_id: int) -> Optional[aiosqlite.Row]:
@@ -1515,6 +1684,28 @@ async def menu_info(message: Message):
 async def menu_support(message: Message):
     user_row = await get_user_row(message.from_user)
     lang = normalize_lang(user_row["language"])
+    worker_id = await get_worker_for_client(message.from_user.id)
+    existing = await get_latest_open_support_ticket(message.from_user.id, "general")
+    if existing:
+        await update_support_ticket_status(int(existing["id"]), "new", last_message="Клиент открыл раздел техподдержки в Telegram-боте")
+    else:
+        await create_support_ticket(
+            client_tg_id=message.from_user.id,
+            worker_tg_id=worker_id,
+            source="bot",
+            topic="general",
+            subject="Обращение в техподдержку",
+            status="new",
+            last_message="Клиент открыл раздел техподдержки в Telegram-боте",
+        )
+    await log_activity_for_worker_client(
+        client_tg_id=message.from_user.id,
+        actor_tg_id=message.from_user.id,
+        actor_source="bot",
+        event_type="bot_support_section_opened",
+        title="Открыта техподдержка",
+        details="Реферал открыл раздел техподдержки в Telegram-боте.",
+    )
     await message.answer(
         t(lang, "menu_support_text", url=config.support_url),
         reply_markup=main_menu_keyboard(lang),
@@ -1957,6 +2148,22 @@ async def send_deposit_to_support(callback: CallbackQuery, state: FSMContext, me
         stage="support_opened",
         deposit_id=dep_id,
     )
+    await create_support_ticket(
+        client_tg_id=callback.from_user.id,
+        worker_tg_id=await get_worker_for_client(callback.from_user.id),
+        source="bot",
+        topic="deposit",
+        subject=f"Пополнение через {deposit_method_label(method)}",
+        status="new",
+        last_message=f"Клиент создал заявку на пополнение {amount:.2f} {currency}",
+        meta={"deposit_id": dep_id, "method": method, "amount": amount, "currency": currency},
+    )
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE worker_clients SET funnel_stage = 'support_wait', last_activity_at = CURRENT_TIMESTAMP WHERE client_tg_id = ?",
+            (callback.from_user.id,),
+        )
+        await db.commit()
 
     text = (
         f"{tr(lang, 'Способ оплаты', 'Payment method', 'Спосіб оплати')}: <b>{deposit_method_label(method)}</b>\n\n"
@@ -3150,6 +3357,20 @@ async def wc_chat_start(callback: CallbackQuery):
         details="Воркер открыл диалог с рефералом в Telegram-боте.",
         meta={"wc_id": wc_id},
     )
+    ticket = await get_latest_open_support_ticket(int(client_id))
+    if ticket:
+        await update_support_ticket_status(int(ticket["id"]), "in_progress", assigned_to=str(worker_id), last_message="Диалог начат в Telegram-боте")
+    else:
+        await create_support_ticket(
+            client_tg_id=int(client_id),
+            worker_tg_id=worker_id,
+            source="bot",
+            topic="general",
+            subject="Диалог с поддержкой",
+            status="in_progress",
+            last_message="Диалог начат в Telegram-боте",
+            meta={"wc_id": wc_id},
+        )
     kb = InlineKeyboardBuilder()
     kb.button(text="⏹ Завершить диалог", callback_data=f"wc_chat_stop:{client_id}")
     kb.adjust(1)
@@ -3182,6 +3403,9 @@ async def wc_chat_stop(callback: CallbackQuery):
         title="Диалог с поддержкой",
         details="Воркер завершил диалог с рефералом в Telegram-боте.",
     )
+    ticket = await get_latest_open_support_ticket(client_id)
+    if ticket:
+        await update_support_ticket_status(int(ticket["id"]), "closed", assigned_to=str(worker_id), last_message="Диалог завершён в Telegram-боте")
     await callback.message.answer("⏹ Диалог с клиентом завершён.")
     try:
         await bot.send_message(client_id, "⏹ Диалог с технической поддержкой завершён.")

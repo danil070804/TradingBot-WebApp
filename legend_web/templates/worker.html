@@ -5,12 +5,20 @@
     <h1>{{ labels.worker_title if labels else "Панель воркера" }}</h1>
     <div class="hint">{{ labels.worker_hint if labels else "Управление вашими рефералами в реальном времени" }}</div>
     <div class="hint">ID: {{ worker_id }}</div>
+    <div class="hint" id="worker-live-status">CRM feed: online</div>
     {% if worker_ref_link %}
     <div class="worker-ref-box">
         <small>Реферальная ссылка</small>
         <code>{{ worker_ref_link }}</code>
     </div>
     {% endif %}
+</section>
+
+<section class="stats-grid" id="worker-summary-grid">
+    <article class="card stat-card"><small>РЕФЕРАЛОВ</small><b>{{ summary.total_clients if summary else 0 }}</b></article>
+    <article class="card stat-card"><small>АКТИВНЫХ 24Ч</small><b>{{ summary.active_day if summary else 0 }}</b></article>
+    <article class="card stat-card"><small>С ДЕПОЗИТОМ</small><b>{{ summary.deposited if summary else 0 }}</b></article>
+    <article class="card stat-card"><small>VIP / ТРЕЙД</small><b>{{ (summary.vip if summary else 0) }}/{{ (summary.trading if summary else 0) }}</b></article>
 </section>
 
 <section class="card">
@@ -25,6 +33,8 @@
             <option value="verified">С KYC</option>
             <option value="trade_off">Торговля выкл</option>
             <option value="withdraw_off">Вывод выкл</option>
+            <option value="vip">VIP</option>
+            <option value="support">Нужна поддержка</option>
         </select>
     </div>
     <div id="worker-list" class="list">
@@ -38,6 +48,8 @@
             data-verified="{{ 1 if c.verified else 0 }}"
             data-trade-enabled="{{ 1 if c.trading_enabled else 0 }}"
             data-withdraw-enabled="{{ 1 if c.withdraw_enabled else 0 }}"
+            data-funnel-stage="{{ c.funnel_stage if c.funnel_stage else 'new' }}"
+            data-tags="{{ c.tags if c.tags else '' }}"
         >
             <div class="worker-card-main">
                 <div class="worker-head">
@@ -51,7 +63,12 @@
                 <div class="worker-meta">
                     <span>Мин. депозит: {{ "%.2f"|format((c.min_deposit or 0)) }}</span>
                     <span>Мин. вывод: {{ "%.2f"|format((c.min_withdraw or 0)) }}</span>
+                    <span>Этап: {{ c.funnel_stage if c.funnel_stage else "new" }}</span>
+                    {% if c.tags %}<span>Теги: {{ c.tags }}</span>{% endif %}
                 </div>
+                {% if c.crm_note %}
+                <div class="crm-note-preview">{{ c.crm_note }}</div>
+                {% endif %}
             </div>
             <div class="worker-actions">
                 <button class="chip worker-act {% if c.trading_enabled %}state-on{% else %}state-off{% endif %}" data-action="toggle_trade">Покупка</button>
@@ -63,6 +80,9 @@
                 <button class="chip worker-prompt" data-action="set_min_deposit" data-label="Минимальный депозит">Мин. деп</button>
                 <button class="chip worker-prompt" data-action="set_min_withdraw" data-label="Минимальный вывод">Мин. вывод</button>
                 <button class="chip worker-prompt" data-action="add_balance" data-label="Пополнение баланса">Баланс</button>
+                <button class="chip worker-text" data-action="set_funnel_stage" data-label="Этап воронки">Этап</button>
+                <button class="chip worker-text" data-action="set_tags" data-label="Теги через запятую">Теги</button>
+                <button class="chip worker-text" data-action="set_note" data-label="Заметка по рефералу">Заметка</button>
                 <a class="chip worker-open" href="/worker/client/{{ c.id }}">Карточка</a>
             </div>
         </div>
@@ -73,8 +93,31 @@
 </section>
 
 <section class="card">
+    <div class="section-title">Support center</div>
+    <div id="worker-support-list" class="list">
+        {% for item in tickets %}
+        <div class="row support-row">
+            <div class="worker-event-main">
+                <div class="worker-event-top">
+                    <b>#{{ item.id }} {{ item.subject }}</b>
+                    <span class="worker-event-time">{{ item.updated_at }}</span>
+                </div>
+                <small>{{ item.first_name if item.first_name else "Пользователь" }} · ID {{ item.client_tg_id }} · @{{ item.username if item.username else "-" }}</small>
+                <small>{{ item.last_message if item.last_message else "Без комментария" }}</small>
+            </div>
+            <div class="worker-badge {% if item.status == 'closed' %}blocked{% elif item.status == 'in_progress' %}favorite{% else %}active{% endif %}">
+                {{ item.status }}
+            </div>
+        </div>
+        {% else %}
+        <div class="empty">Открытых тикетов пока нет.</div>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="card">
     <div class="section-title">Последние события рефералов</div>
-    <div class="list">
+    <div id="worker-activity-list" class="list">
         {% for item in activity %}
         <div class="row worker-event-row">
             <div class="worker-event-main">
