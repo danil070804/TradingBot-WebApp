@@ -680,75 +680,109 @@ async def ensure_deposit_support_ticket(
 
 
 async def fetch_worker_clients_rows(worker_tg_id: int):
-    return await fetch_all(
-        """
-        SELECT wc.id, wc.client_tg_id, wc.min_deposit, wc.min_withdraw, wc.verified, wc.withdraw_enabled,
-               wc.trading_enabled, wc.favorite, wc.blocked, wc.crm_note, wc.tags, wc.funnel_stage, wc.last_activity_at,
-               u.first_name, u.username, u.balance, u.currency, cl.luck_percent
-        FROM worker_clients wc
-        LEFT JOIN users u ON u.tg_id = wc.client_tg_id
-        LEFT JOIN client_luck cl ON cl.worker_tg_id = wc.worker_tg_id AND cl.client_tg_id = wc.client_tg_id
-        WHERE wc.worker_tg_id = ?
-        ORDER BY COALESCE(wc.last_activity_at, wc.created_at) DESC, wc.id DESC
-        LIMIT 300
-        """,
-        (worker_tg_id,),
-    )
+    try:
+        return await fetch_all(
+            """
+            SELECT wc.id, wc.client_tg_id, wc.min_deposit, wc.min_withdraw, wc.verified, wc.withdraw_enabled,
+                   wc.trading_enabled, wc.favorite, wc.blocked, wc.crm_note, wc.tags, wc.funnel_stage, wc.last_activity_at,
+                   u.first_name, u.username, u.balance, u.currency, cl.luck_percent
+            FROM worker_clients wc
+            LEFT JOIN users u ON u.tg_id = wc.client_tg_id
+            LEFT JOIN client_luck cl ON cl.worker_tg_id = wc.worker_tg_id AND cl.client_tg_id = wc.client_tg_id
+            WHERE wc.worker_tg_id = ?
+            ORDER BY COALESCE(wc.last_activity_at, wc.created_at) DESC, wc.id DESC
+            LIMIT 300
+            """,
+            (worker_tg_id,),
+        )
+    except Exception:
+        return await fetch_all(
+            """
+            SELECT wc.id, wc.client_tg_id, wc.min_deposit, wc.min_withdraw, wc.verified, wc.withdraw_enabled,
+                   wc.trading_enabled, wc.favorite, wc.blocked, '' AS crm_note, '' AS tags, 'new' AS funnel_stage, wc.created_at AS last_activity_at,
+                   u.first_name, u.username, u.balance, u.currency, 0 AS luck_percent
+            FROM worker_clients wc
+            LEFT JOIN users u ON u.tg_id = wc.client_tg_id
+            WHERE wc.worker_tg_id = ?
+            ORDER BY wc.id DESC
+            LIMIT 300
+            """,
+            (worker_tg_id,),
+        )
 
 
 async def fetch_worker_summary(worker_tg_id: int) -> dict:
     active_cutoff = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
-    row = await fetch_one(
-        """
-        SELECT
-            COUNT(*) AS total_clients,
-            COALESCE(SUM(CASE WHEN favorite = 1 THEN 1 ELSE 0 END), 0) AS favorites,
-            COALESCE(SUM(CASE WHEN blocked = 1 THEN 1 ELSE 0 END), 0) AS blocked,
-            COALESCE(SUM(CASE WHEN funnel_stage = 'deposited' THEN 1 ELSE 0 END), 0) AS deposited,
-            COALESCE(SUM(CASE WHEN funnel_stage = 'trading' THEN 1 ELSE 0 END), 0) AS trading,
-            COALESCE(SUM(CASE WHEN funnel_stage = 'vip' THEN 1 ELSE 0 END), 0) AS vip,
-            COALESCE(SUM(CASE WHEN last_activity_at IS NOT NULL AND last_activity_at >= ? THEN 1 ELSE 0 END), 0) AS active_day
-        FROM worker_clients
-        WHERE worker_tg_id = ?
-        """,
-        (active_cutoff, worker_tg_id),
-    )
-    return row_to_dict(row) or {
-        "total_clients": 0,
-        "favorites": 0,
-        "blocked": 0,
-        "deposited": 0,
-        "trading": 0,
-        "vip": 0,
-        "active_day": 0,
-    }
+    try:
+        row = await fetch_one(
+            """
+            SELECT
+                COUNT(*) AS total_clients,
+                COALESCE(SUM(CASE WHEN favorite = 1 THEN 1 ELSE 0 END), 0) AS favorites,
+                COALESCE(SUM(CASE WHEN blocked = 1 THEN 1 ELSE 0 END), 0) AS blocked,
+                COALESCE(SUM(CASE WHEN funnel_stage = 'deposited' THEN 1 ELSE 0 END), 0) AS deposited,
+                COALESCE(SUM(CASE WHEN funnel_stage = 'trading' THEN 1 ELSE 0 END), 0) AS trading,
+                COALESCE(SUM(CASE WHEN funnel_stage = 'vip' THEN 1 ELSE 0 END), 0) AS vip,
+                COALESCE(SUM(CASE WHEN last_activity_at IS NOT NULL AND last_activity_at >= ? THEN 1 ELSE 0 END), 0) AS active_day
+            FROM worker_clients
+            WHERE worker_tg_id = ?
+            """,
+            (active_cutoff, worker_tg_id),
+        )
+        return row_to_dict(row) or {
+            "total_clients": 0,
+            "favorites": 0,
+            "blocked": 0,
+            "deposited": 0,
+            "trading": 0,
+            "vip": 0,
+            "active_day": 0,
+        }
+    except Exception:
+        fallback = await fetch_one("SELECT COUNT(*) AS total_clients FROM worker_clients WHERE worker_tg_id = ?", (worker_tg_id,))
+        total = int(fallback["total_clients"] if fallback else 0)
+        return {
+            "total_clients": total,
+            "favorites": 0,
+            "blocked": 0,
+            "deposited": 0,
+            "trading": 0,
+            "vip": 0,
+            "active_day": 0,
+        }
 
 
 async def fetch_worker_support_tickets(worker_tg_id: int, limit: int = 20):
-    return await fetch_all(
-        """
-        SELECT st.id, st.client_tg_id, st.source, st.topic, st.status, st.subject, st.last_message,
-               st.assigned_to, st.updated_at, u.first_name, u.username
-        FROM support_tickets st
-        LEFT JOIN users u ON u.tg_id = st.client_tg_id
-        WHERE st.worker_tg_id = ?
-        ORDER BY st.id DESC
-        LIMIT ?
-        """,
-        (worker_tg_id, limit),
-    )
+    try:
+        return await fetch_all(
+            """
+            SELECT st.id, st.client_tg_id, st.source, st.topic, st.status, st.subject, st.last_message,
+                   st.assigned_to, st.updated_at, u.first_name, u.username
+            FROM support_tickets st
+            LEFT JOIN users u ON u.tg_id = st.client_tg_id
+            WHERE st.worker_tg_id = ?
+            ORDER BY st.id DESC
+            LIMIT ?
+            """,
+            (worker_tg_id, limit),
+        )
+    except Exception:
+        return []
 
 
 async def fetch_worker_choices():
-    return await fetch_all(
-        """
-        SELECT tg_id, first_name, username
-        FROM users
-        WHERE is_worker = 1
-        ORDER BY tg_id DESC
-        LIMIT 100
-        """
-    )
+    try:
+        return await fetch_all(
+            """
+            SELECT tg_id, first_name, username
+            FROM users
+            WHERE is_worker = 1
+            ORDER BY tg_id DESC
+            LIMIT 100
+            """
+        )
+    except Exception:
+        return []
 
 
 async def fetch_admin_dashboard_snapshot() -> dict:
@@ -1664,11 +1698,26 @@ async def worker_page(request: Request):
         return RedirectResponse(url="/profile", status_code=302)
 
     lang, labels = await get_request_lang_labels(request, tg_id)
-    rows = await fetch_worker_clients_rows(tg_id)
-    activity = await bot.get_worker_activity_events(tg_id, 24)
-    summary = await fetch_worker_summary(tg_id)
-    tickets = await fetch_worker_support_tickets(tg_id, 12)
-    worker_choices = await fetch_worker_choices()
+    try:
+        rows = await fetch_worker_clients_rows(tg_id)
+    except Exception:
+        rows = []
+    try:
+        activity = await bot.get_worker_activity_events(tg_id, 24)
+    except Exception:
+        activity = []
+    try:
+        summary = await fetch_worker_summary(tg_id)
+    except Exception:
+        summary = {"total_clients": 0, "favorites": 0, "blocked": 0, "deposited": 0, "trading": 0, "vip": 0, "active_day": 0}
+    try:
+        tickets = await fetch_worker_support_tickets(tg_id, 12)
+    except Exception:
+        tickets = []
+    try:
+        worker_choices = await fetch_worker_choices()
+    except Exception:
+        worker_choices = []
     return templates.TemplateResponse(
         "worker.html",
         {
@@ -1699,19 +1748,33 @@ async def worker_client_page(request: Request, wc_id: int):
         return RedirectResponse(url="/profile", status_code=302)
 
     lang, labels = await get_request_lang_labels(request, tg_id)
-    client = await fetch_one(
-        """
-        SELECT wc.id, wc.worker_tg_id, wc.client_tg_id, wc.min_deposit, wc.min_withdraw, wc.verified, wc.withdraw_enabled,
-               wc.trading_enabled, wc.favorite, wc.blocked, wc.crm_note, wc.tags, wc.funnel_stage, wc.last_activity_at, wc.created_at,
-               u.first_name, u.username, u.language, u.currency, u.balance, u.created_at AS user_created_at, cl.luck_percent
-        FROM worker_clients wc
-        LEFT JOIN users u ON u.tg_id = wc.client_tg_id
-        LEFT JOIN client_luck cl ON cl.worker_tg_id = wc.worker_tg_id AND cl.client_tg_id = wc.client_tg_id
-        WHERE wc.id = ? AND wc.worker_tg_id = ?
-        LIMIT 1
-        """,
-        (wc_id, tg_id),
-    )
+    try:
+        client = await fetch_one(
+            """
+            SELECT wc.id, wc.worker_tg_id, wc.client_tg_id, wc.min_deposit, wc.min_withdraw, wc.verified, wc.withdraw_enabled,
+                   wc.trading_enabled, wc.favorite, wc.blocked, wc.crm_note, wc.tags, wc.funnel_stage, wc.last_activity_at, wc.created_at,
+                   u.first_name, u.username, u.language, u.currency, u.balance, u.created_at AS user_created_at, cl.luck_percent
+            FROM worker_clients wc
+            LEFT JOIN users u ON u.tg_id = wc.client_tg_id
+            LEFT JOIN client_luck cl ON cl.worker_tg_id = wc.worker_tg_id AND cl.client_tg_id = wc.client_tg_id
+            WHERE wc.id = ? AND wc.worker_tg_id = ?
+            LIMIT 1
+            """,
+            (wc_id, tg_id),
+        )
+    except Exception:
+        client = await fetch_one(
+            """
+            SELECT wc.id, wc.worker_tg_id, wc.client_tg_id, wc.min_deposit, wc.min_withdraw, wc.verified, wc.withdraw_enabled,
+                   wc.trading_enabled, wc.favorite, wc.blocked, '' AS crm_note, '' AS tags, 'new' AS funnel_stage, wc.created_at AS last_activity_at, wc.created_at,
+                   u.first_name, u.username, u.language, u.currency, u.balance, u.created_at AS user_created_at, 0 AS luck_percent
+            FROM worker_clients wc
+            LEFT JOIN users u ON u.tg_id = wc.client_tg_id
+            WHERE wc.id = ? AND wc.worker_tg_id = ?
+            LIMIT 1
+            """,
+            (wc_id, tg_id),
+        )
     if not client:
         return RedirectResponse(url="/worker", status_code=302)
 
