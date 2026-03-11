@@ -72,6 +72,7 @@
                 <div class="worker-meta">
                     <span>Мин. депозит: {{ "%.2f"|format((c.min_deposit or 0)) }}</span>
                     <span>Мин. вывод: {{ "%.2f"|format((c.min_withdraw or 0)) }}</span>
+                    <span>Удача: {{ "%.2f"|format((c.luck_percent or 0)) }}%</span>
                     <span>Этап: {{ c.funnel_stage if c.funnel_stage else "new" }}</span>
                     {% if c.tags %}<span>Теги: {{ c.tags }}</span>{% endif %}
                 </div>

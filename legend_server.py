@@ -684,9 +684,10 @@ async def fetch_worker_clients_rows(worker_tg_id: int):
         """
         SELECT wc.id, wc.client_tg_id, wc.min_deposit, wc.min_withdraw, wc.verified, wc.withdraw_enabled,
                wc.trading_enabled, wc.favorite, wc.blocked, wc.crm_note, wc.tags, wc.funnel_stage, wc.last_activity_at,
-               u.first_name, u.username, u.balance, u.currency
+               u.first_name, u.username, u.balance, u.currency, cl.luck_percent
         FROM worker_clients wc
         LEFT JOIN users u ON u.tg_id = wc.client_tg_id
+        LEFT JOIN client_luck cl ON cl.worker_tg_id = wc.worker_tg_id AND cl.client_tg_id = wc.client_tg_id
         WHERE wc.worker_tg_id = ?
         ORDER BY COALESCE(wc.last_activity_at, wc.created_at) DESC, wc.id DESC
         LIMIT 300
@@ -841,9 +842,10 @@ async def build_worker_client_snapshot_payload(worker_tg_id: int, wc_id: int) ->
         """
         SELECT wc.id, wc.worker_tg_id, wc.client_tg_id, wc.min_deposit, wc.min_withdraw, wc.verified, wc.withdraw_enabled,
                wc.trading_enabled, wc.favorite, wc.blocked, wc.crm_note, wc.tags, wc.funnel_stage, wc.last_activity_at,
-               u.first_name, u.username, u.language, u.currency, u.balance
+               u.first_name, u.username, u.language, u.currency, u.balance, cl.luck_percent
         FROM worker_clients wc
         LEFT JOIN users u ON u.tg_id = wc.client_tg_id
+        LEFT JOIN client_luck cl ON cl.worker_tg_id = wc.worker_tg_id AND cl.client_tg_id = wc.client_tg_id
         WHERE wc.id = ? AND wc.worker_tg_id = ?
         LIMIT 1
         """,
@@ -1701,9 +1703,10 @@ async def worker_client_page(request: Request, wc_id: int):
         """
         SELECT wc.id, wc.worker_tg_id, wc.client_tg_id, wc.min_deposit, wc.min_withdraw, wc.verified, wc.withdraw_enabled,
                wc.trading_enabled, wc.favorite, wc.blocked, wc.crm_note, wc.tags, wc.funnel_stage, wc.last_activity_at, wc.created_at,
-               u.first_name, u.username, u.language, u.currency, u.balance, u.created_at AS user_created_at
+               u.first_name, u.username, u.language, u.currency, u.balance, u.created_at AS user_created_at, cl.luck_percent
         FROM worker_clients wc
         LEFT JOIN users u ON u.tg_id = wc.client_tg_id
+        LEFT JOIN client_luck cl ON cl.worker_tg_id = wc.worker_tg_id AND cl.client_tg_id = wc.client_tg_id
         WHERE wc.id = ? AND wc.worker_tg_id = ?
         LIMIT 1
         """,

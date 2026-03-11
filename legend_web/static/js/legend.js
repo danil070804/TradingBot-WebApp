@@ -1206,6 +1206,7 @@ function bindWorkerPanel() {
                     <div class="worker-meta">
                         <span>Мин. депозит: ${Number(c.min_deposit || 0).toFixed(2)}</span>
                         <span>Мин. вывод: ${Number(c.min_withdraw || 0).toFixed(2)}</span>
+                        <span>Удача: ${Number(c.luck_percent || 0).toFixed(2)}%</span>
                         <span>Этап: ${c.funnel_stage || "new"}</span>
                         ${c.tags ? `<span>Теги: ${c.tags}</span>` : ""}
                     </div>
@@ -1413,6 +1414,8 @@ function bindWorkerClientPage() {
                 `;
                 return row;
             });
+            const luckBox = document.getElementById("worker-client-luck");
+            if (luckBox) luckBox.textContent = `${Number(data.luck || 0).toFixed(2)}%`;
             if (liveStatus) liveStatus.textContent = "Client feed: online";
         } catch (err) {
             if (liveStatus) liveStatus.textContent = "Client feed: reconnect";
@@ -1468,6 +1471,8 @@ function bindWorkerClientPage() {
                 `;
                 return row;
             });
+            const luckBox = document.getElementById("worker-client-luck");
+            if (luckBox) luckBox.textContent = `${Number(data.luck || 0).toFixed(2)}%`;
             if (liveStatus) liveStatus.textContent = "Client feed: live";
         } catch (_) {}
     });
