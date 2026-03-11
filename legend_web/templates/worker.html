@@ -24,6 +24,18 @@
     <article class="card stat-card"><small>VIP / ТРЕЙД</small><b>{{ (summary.vip if summary else 0) }}/{{ (summary.trading if summary else 0) }}</b></article>
 </section>
 
+<section class="card worker-stage-panel">
+    <div class="section-title">Воронка реферала</div>
+    <div class="funnel-track">
+        <span class="funnel-step active">new</span>
+        <span class="funnel-step active">web</span>
+        <span class="funnel-step active">deposit</span>
+        <span class="funnel-step">support</span>
+        <span class="funnel-step">trade</span>
+        <span class="funnel-step">vip</span>
+    </div>
+</section>
+
 <section class="card">
     <div class="section-title">{{ labels.worker_title if labels else "Панель воркера" }}</div>
     <p class="deposit-lead">Управляйте клиентами, лимитами и статусами из одного окна. Карточка клиента открывается нажатием по самому блоку реферала.</p>
@@ -74,7 +86,7 @@
                 <div class="worker-meta">
                     <span>Мин. депозит: {{ "%.2f"|format((c.min_deposit or 0)) }}</span>
                     <span>Мин. вывод: {{ "%.2f"|format((c.min_withdraw or 0)) }}</span>
-                    <span>Удача: {{ "%.2f"|format((c.luck_percent or 0)) }}%</span>
+                    <span class="luck-badge {% if (c.luck_percent or 0) >= 75 %}high{% elif (c.luck_percent or 0) >= 40 %}mid{% else %}low{% endif %}">Удача: {{ "%.2f"|format((c.luck_percent or 0)) }}%</span>
                     <span>Этап: {{ c.funnel_stage if c.funnel_stage else "new" }}</span>
                     {% if c.tags %}<span>Теги: {{ c.tags }}</span>{% endif %}
                 </div>

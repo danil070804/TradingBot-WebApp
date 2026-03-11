@@ -31,8 +31,17 @@
     </article>
     <article class="card stat-card">
         <small>УДАЧА</small>
-        <b id="worker-client-luck">{{ "%.2f"|format(luck or 0) }}%</b>
+        <b id="worker-client-luck" class="luck-value {% if (luck or 0) >= 75 %}high{% elif (luck or 0) >= 40 %}mid{% else %}low{% endif %}">{{ "%.2f"|format(luck or 0) }}%</b>
     </article>
+</section>
+
+<section class="card worker-stage-panel">
+    <div class="section-title">Путь клиента</div>
+    <div class="funnel-track">
+        {% for stage in funnel_stages %}
+        <span class="funnel-step {% if stage == client.funnel_stage %}current{% endif %}">{{ stage }}</span>
+        {% endfor %}
+    </div>
 </section>
 
 <section class="card">

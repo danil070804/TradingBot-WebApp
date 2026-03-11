@@ -17,6 +17,16 @@
             <div id="admin-live-meta" data-scope="admin"></div>
         </section>
 
+        <section class="card admin-command-deck">
+            <div class="section-title">Command Deck</div>
+            <div class="worker-meta">
+                <span>Users: {{ users_count }}</span>
+                <span>Workers: {{ workers_count }}</span>
+                <span>Deals: {{ deals_count }}</span>
+                <span>Pending WD: {{ pending_withdrawals }}</span>
+            </div>
+        </section>
+
         <section class="metrics">
             <article class="card metric"><h3>Users</h3><p>{{ users_count }}</p></article>
             <article class="card metric"><h3>Workers</h3><p>{{ workers_count }}</p></article>
