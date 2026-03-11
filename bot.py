@@ -290,6 +290,10 @@ class AdminPaymentStates(StatesGroup):
     waiting_asset_name = State()
 
 
+class AdminMediaStates(StatesGroup):
+    waiting_photo = State()
+
+
 class WorkerServiceStates(StatesGroup):
     waiting_min_dep = State()
     waiting_min_wd = State()
@@ -853,6 +857,40 @@ async def get_global_min_trade_usdt() -> float:
 
 async def get_global_min_deposit_usdt() -> float:
     return max(0.0, await get_setting_float("global_min_deposit_usdt", DEFAULT_MIN_DEPOSIT_USDT))
+
+
+async def get_section_photo_file_id(section_key: str) -> str:
+    meta = BOT_SECTION_MEDIA.get(section_key)
+    if not meta:
+        return ""
+    return await get_setting_value(meta["setting"], "")
+
+
+async def send_section_message(target: Message, section_key: str, text: str, reply_markup=None):
+    photo_id = await get_section_photo_file_id(section_key)
+    if photo_id:
+        with contextlib.suppress(Exception):
+            return await target.answer_photo(photo=photo_id, caption=text, reply_markup=reply_markup)
+    return await target.answer(text, reply_markup=reply_markup)
+
+
+def bot_section_media_keyboard():
+    kb = InlineKeyboardBuilder()
+    for section_key, meta in BOT_SECTION_MEDIA.items():
+        kb.button(text=f"🖼 {meta['title']}", callback_data=f"admin_media:{section_key}")
+    kb.button(text="⬅️ Админ-панель", callback_data="open_admin_panel")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def bot_section_media_actions_keyboard(section_key: str, has_photo: bool):
+    kb = InlineKeyboardBuilder()
+    kb.button(text="📤 Загрузить фото", callback_data=f"admin_media_set:{section_key}")
+    if has_photo:
+        kb.button(text="🗑 Удалить фото", callback_data=f"admin_media_delete:{section_key}")
+    kb.button(text="⬅️ К разделам", callback_data="admin_media")
+    kb.adjust(1)
+    return kb.as_markup()
 
 
 async def get_effective_min_trade_amount(client_tg_id: int, currency: str | None) -> float:
@@ -1919,6 +1957,12 @@ CURRENCIES = [
 DEFAULT_MIN_TRADE_USDT = 10.0
 DEFAULT_MIN_DEPOSIT_USDT = 10.0
 LEGACY_DEFAULT_MIN_TRADE_AMOUNT = 100.0
+BOT_SECTION_MEDIA = {
+    "portfolio": {"setting": "bot_photo_portfolio", "title": "Портфель"},
+    "open_ecn": {"setting": "bot_photo_open_ecn", "title": "Открыть ECN"},
+    "support": {"setting": "bot_photo_support", "title": "Тех. поддержка"},
+    "info": {"setting": "bot_photo_info", "title": "Инфо"},
+}
 CURRENCY_PER_USDT = {
     "USD": 1.0,
     "USDT": 1.0,
@@ -2189,6 +2233,7 @@ def admin_keyboard():
     kb.button(text="📊Статистика", callback_data="admin_stats")
     kb.button(text="👷Добавить воркера", callback_data="admin_add_worker")
     kb.button(text="📜Воркеры и рефералы", callback_data="admin_workers")
+    kb.button(text="🖼 Фото разделов", callback_data="admin_media")
     kb.button(text="💳Платёжные реквизиты", callback_data="admin_payments")
     kb.button(text="🪙Активы ECN", callback_data="admin_assets")
     kb.button(text="⬅️В профиль", callback_data="open_profile")
@@ -2410,7 +2455,7 @@ async def menu_info(message: Message):
     user_row = await get_user_row(message.from_user)
     lang = normalize_lang(user_row["language"])
     text = t(lang, "menu_info_text")
-    await message.answer(text, reply_markup=main_menu_keyboard(lang))
+    await send_section_message(message, "info", text, reply_markup=main_menu_keyboard(lang))
 
 
 @dp.message(F.text.in_({"🌐 Тех. Поддержка", "🌐 Support", "🌐 Тех. Підтримка"}))
@@ -2439,7 +2484,9 @@ async def menu_support(message: Message):
         title="Открыта техподдержка",
         details="Реферал открыл раздел техподдержки в Telegram-боте.",
     )
-    await message.answer(
+    await send_section_message(
+        message,
+        "support",
         t(lang, "menu_support_text", url=config.support_url),
         reply_markup=main_menu_keyboard(lang),
     )
@@ -2464,14 +2511,16 @@ async def start_ecn_flow(msg, state: FSMContext):
     currency = user_row["currency"] or "USD"
 
     if balance <= 0:
-        await message.answer(
+        await send_section_message(
+            message,
+            "open_ecn",
             tr(lang, f"⚠️ На вашем балансе 0 {currency}. Пополните баланс, чтобы открыть сделку.", f"⚠️ Your balance is 0 {currency}. Top up balance to open a deal.", f"⚠️ На вашому балансі 0 {currency}. Поповніть баланс, щоб відкрити угоду.")
         )
         return
 
     assets = await get_ecn_assets()
     if not assets:
-        await message.answer(tr(lang, "❗ Список активов ECN пока пуст. Обратитесь к администратору.", "❗ ECN assets list is empty. Contact admin.", "❗ Список активів ECN порожній. Зверніться до адміністратора."))
+        await send_section_message(message, "open_ecn", tr(lang, "❗ Список активов ECN пока пуст. Обратитесь к администратору.", "❗ ECN assets list is empty. Contact admin.", "❗ Список активів ECN порожній. Зверніться до адміністратора."))
         return
 
     text = tr(
@@ -2481,7 +2530,7 @@ async def start_ecn_flow(msg, state: FSMContext):
         "Оберіть актив для угоди. Список розбитий на сторінки, щоб не перевантажувати чат.",
     )
 
-    await message.answer(text, reply_markup=ecn_assets_page_keyboard(assets, page=0))
+    await send_section_message(message, "open_ecn", text, reply_markup=ecn_assets_page_keyboard(assets, page=0))
     await state.clear()
 
 
@@ -2897,7 +2946,7 @@ async def send_profile(callback_or_msg):
         t(lang, "profile_pending_value", pending=pending_withdraw, currency=currency),
     ]
     text = "\n".join(text_lines)
-    await msg.answer(text, reply_markup=profile_keyboard(is_admin, is_worker, lang))
+    await send_section_message(msg, "portfolio", text, reply_markup=profile_keyboard(is_admin, is_worker, lang))
 
 # ---------- DEPOSIT ----------
 
@@ -3933,6 +3982,73 @@ async def on_admin_stats(callback: CallbackQuery):
     await callback.answer()
 
 
+@dp.callback_query(F.data == "admin_media")
+async def on_admin_media(callback: CallbackQuery):
+    if not is_admin_id(callback.from_user.id):
+        await callback.answer("⛔ Нет доступа.")
+        return
+    lines = ["🖼 <b>Фото для разделов бота</b>", ""]
+    for section_key, meta in BOT_SECTION_MEDIA.items():
+        current = await get_section_photo_file_id(section_key)
+        status = "установлено" if current else "не задано"
+        lines.append(f"• {meta['title']}: <b>{status}</b>")
+    lines.append("")
+    lines.append("Выберите раздел, чтобы загрузить новое фото или удалить текущее.")
+    await callback.message.answer("\n".join(lines), reply_markup=bot_section_media_keyboard())
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("admin_media:"))
+async def on_admin_media_section(callback: CallbackQuery):
+    if not is_admin_id(callback.from_user.id):
+        await callback.answer("⛔ Нет доступа.")
+        return
+    section_key = callback.data.split(":", 1)[1]
+    meta = BOT_SECTION_MEDIA.get(section_key)
+    if not meta:
+        await callback.answer("Раздел не найден.")
+        return
+    current = await get_section_photo_file_id(section_key)
+    text = (
+        f"🖼 <b>{meta['title']}</b>\n\n"
+        f"Текущее состояние: <b>{'фото установлено' if current else 'фото не задано'}</b>\n\n"
+        "Можно загрузить новое изображение или удалить текущее."
+    )
+    await callback.message.answer(text, reply_markup=bot_section_media_actions_keyboard(section_key, bool(current)))
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("admin_media_set:"))
+async def on_admin_media_set(callback: CallbackQuery, state: FSMContext):
+    if not is_admin_id(callback.from_user.id):
+        await callback.answer("⛔ Нет доступа.")
+        return
+    section_key = callback.data.split(":", 1)[1]
+    meta = BOT_SECTION_MEDIA.get(section_key)
+    if not meta:
+        await callback.answer("Раздел не найден.")
+        return
+    await state.update_data(section_media_key=section_key)
+    await state.set_state(AdminMediaStates.waiting_photo)
+    await callback.message.answer(f"📤 Отправьте фото для раздела <b>{meta['title']}</b> одним сообщением.")
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("admin_media_delete:"))
+async def on_admin_media_delete(callback: CallbackQuery):
+    if not is_admin_id(callback.from_user.id):
+        await callback.answer("⛔ Нет доступа.")
+        return
+    section_key = callback.data.split(":", 1)[1]
+    meta = BOT_SECTION_MEDIA.get(section_key)
+    if not meta:
+        await callback.answer("Раздел не найден.")
+        return
+    await set_setting(meta["setting"], "")
+    await callback.message.answer(f"🗑 Фото для раздела <b>{meta['title']}</b> удалено.")
+    await callback.answer()
+
+
 @dp.callback_query(F.data == "admin_add_worker")
 async def on_admin_add_worker(callback: CallbackQuery, state: FSMContext):
     if not is_admin_id(callback.from_user.id):
@@ -3957,6 +4073,30 @@ async def admin_set_worker(message: Message, state: FSMContext):
     await set_worker_flag(user_id, True)
     await message.answer(f"✅ Пользователь <code>{user_id}</code> назначен воркером.")
     await state.clear()
+
+
+@dp.message(AdminMediaStates.waiting_photo, F.photo)
+async def admin_save_section_photo(message: Message, state: FSMContext):
+    if not is_admin_id(message.from_user.id):
+        await message.answer("⛔ Нет доступа.")
+        await state.clear()
+        return
+    data = await state.get_data()
+    section_key = data.get("section_media_key")
+    meta = BOT_SECTION_MEDIA.get(section_key or "")
+    if not meta:
+        await message.answer("❗ Раздел для фото не найден. Попробуйте снова.")
+        await state.clear()
+        return
+    photo = message.photo[-1]
+    await set_setting(meta["setting"], photo.file_id)
+    await message.answer(f"✅ Фото для раздела <b>{meta['title']}</b> сохранено.")
+    await state.clear()
+
+
+@dp.message(AdminMediaStates.waiting_photo)
+async def admin_save_section_photo_invalid(message: Message, state: FSMContext):
+    await message.answer("❗ Пожалуйста, отправьте именно фотографию одним сообщением.")
 
 @dp.callback_query(F.data == "admin_workers")
 async def on_admin_workers(callback: CallbackQuery):

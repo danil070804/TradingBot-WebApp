@@ -2,9 +2,11 @@
 {% block title %}Главная | Legend Trading{% endblock %}
 {% block content %}
 <section class="card hero">
+    <input type="hidden" name="tg_id" value="{{ tg_id }}">
     <h1>{{ labels.home_balance if labels else "Общий баланс" }}</h1>
     <div class="balance">{{ "%.2f"|format((user.balance if user else 0) or 0) }} {{ (user.currency if user else "USD") or "USD" }}</div>
     <div class="hint">ID: {{ tg_id }}</div>
+    <div class="hint">Открытые сделки: <span id="live-open-trades">0</span></div>
 </section>
 
 <section class="quick-actions">
@@ -45,6 +47,13 @@
             <em class="{{ 'pos' if m.day_change >= 0 else 'neg' }}">{{ "%+.2f"|format(m.day_change) }}%</em>
         </div>
         {% endfor %}
+    </div>
+</section>
+
+<section class="card">
+    <div class="section-title">{{ labels.trade_open_positions if labels else "Открытые позиции" }}</div>
+    <div class="list" id="open-positions-list">
+        <div class="empty">{{ labels.js_loading if labels else "Загрузка..." }}</div>
     </div>
 </section>
 
