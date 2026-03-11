@@ -244,13 +244,14 @@ function bindDepositForm() {
                 return;
             }
             if (data.requires_support) {
-                const button = data.support_url
-                    ? `<div class="result-action"><a class="qa-btn" href="${data.support_url}" target="_blank">${L("js_support_btn", "Open Support")}</a></div>`
+                const supportEntryUrl = data.support_entry_url || "";
+                const button = supportEntryUrl
+                    ? `<div class="result-action"><a class="qa-btn" href="${supportEntryUrl}">${L("js_support_btn", "Open Support")}</a></div>`
                     : "";
                 result.innerHTML = `<span class="pos">${data.message || L("js_card_support_msg", "For bank card payment, contact support.")}</span>${button}`;
-                if (data.redirect_to_support && data.support_url) {
+                if (data.redirect_to_support && supportEntryUrl) {
                     window.setTimeout(() => {
-                        window.location.href = data.support_url;
+                        window.location.href = supportEntryUrl;
                     }, 900);
                 }
                 return;

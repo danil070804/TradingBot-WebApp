@@ -8,7 +8,7 @@ import hashlib
 import time
 import secrets
 from collections import deque
-from urllib.parse import parse_qsl
+from urllib.parse import parse_qsl, urlencode
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -489,6 +489,62 @@ async def get_current_user_id(request: Request) -> int:
     if from_session:
         return int(from_session)
     return await get_or_pick_user_id()
+
+
+def deposit_method_label(method: str) -> str:
+    return {
+        "crypto": "Crypto bot",
+        "trc20": "TRC20 USDT",
+        "card": "Банковская карта",
+    }.get((method or "").strip().lower(), method or "Неизвестно")
+
+
+async def notify_worker_deposit_event(
+    client_tg_id: int,
+    first_name: str | None,
+    username: str | None,
+    amount: float | None,
+    currency: str | None,
+    method: str | None,
+    stage: str,
+    deposit_id: int | None = None,
+):
+    worker_id = await bot.get_worker_for_client(client_tg_id)
+    if not worker_id:
+        return
+    stage_text = {
+        "request_created": "создал заявку на пополнение",
+        "support_opened": "перешёл в техподдержку по пополнению",
+    }.get(stage, stage)
+    amount_text = f"{float(amount):.2f} {(currency or 'USD')}" if amount is not None else "не указана"
+    name = (first_name or "").strip() or "Пользователь"
+    username_line = f"@{username}" if username else "без username"
+    deposit_line = f"\nЗаявка: <b>#{deposit_id}</b>" if deposit_id else ""
+    text = (
+        "🔔 <b>Действие реферала по пополнению</b>\n\n"
+        f"Реферал: <b>{name}</b>\n"
+        f"User ID: <code>{client_tg_id}</code>\n"
+        f"Username: {username_line}\n"
+        f"Сумма: <b>{amount_text}</b>\n"
+        f"Метод: <b>{deposit_method_label(method or 'Не указан')}</b>\n"
+        f"Статус: <b>{stage_text}</b>"
+        f"{deposit_line}"
+    )
+    try:
+        await bot.bot.send_message(worker_id, text)
+    except Exception:
+        pass
+
+
+def build_support_redirect_url(amount: float | None = None, method: str | None = None, deposit_id: int | None = None) -> str:
+    params: dict[str, str] = {}
+    if amount is not None:
+        params["amount"] = f"{float(amount):.2f}"
+    if method:
+        params["method"] = method
+    if deposit_id is not None:
+        params["deposit_id"] = str(int(deposit_id))
+    return f"/deposit/support?{urlencode(params)}" if params else "/deposit/support"
 
 
 def normalize_lang_code(lang: str | None) -> str:
@@ -1144,11 +1200,36 @@ async def deposit_page(request: Request):
             "card_pay_url": bot.config.card_pay_url,
             "card_requisites": bot.config.card_requisites,
             "support_url": bot.config.support_url,
+            "support_entry_url": build_support_redirect_url(),
             "support_contact": bot.support_contact_text(),
             "lang": lang,
             "labels": labels,
         },
     )
+
+
+@app.get("/deposit/support")
+async def deposit_support_redirect(
+    request: Request,
+    amount: float | None = None,
+    method: str | None = None,
+    deposit_id: int | None = None,
+):
+    tg_id = await get_current_user_id(request)
+    if tg_id:
+        user = await fetch_one("SELECT first_name, username, currency FROM users WHERE tg_id = ?", (tg_id,))
+        await notify_worker_deposit_event(
+            client_tg_id=tg_id,
+            first_name=user["first_name"] if user else None,
+            username=user["username"] if user else None,
+            amount=amount,
+            currency=(user["currency"] if user and user["currency"] else "USD"),
+            method=method,
+            stage="support_opened",
+            deposit_id=deposit_id,
+        )
+    target = (bot.config.support_url or "").strip() or "/deposit"
+    return RedirectResponse(url=target, status_code=302)
 
 
 @app.get("/deals", response_class=HTMLResponse)
@@ -1645,6 +1726,16 @@ async def api_deposit_request(payload: DepositRequestPayload):
     if method not in {"crypto", "trc20", "card"}:
         return JSONResponse({"ok": False, "error": "Неподдерживаемый метод"}, status_code=400)
 
+    await notify_worker_deposit_event(
+        client_tg_id=payload.tg_id,
+        first_name=user["first_name"],
+        username=user["username"],
+        amount=payload.amount,
+        currency=currency,
+        method=method,
+        stage="request_created",
+    )
+
     if method == "card":
         support_contact = bot.support_contact_text()
         return JSONResponse(
@@ -1653,6 +1744,7 @@ async def api_deposit_request(payload: DepositRequestPayload):
                 "requires_support": True,
                 "redirect_to_support": True,
                 "support_url": bot.config.support_url,
+                "support_entry_url": build_support_redirect_url(payload.amount, method),
                 "support_contact": support_contact,
                 "message": f"Для оплаты картой свяжитесь с поддержкой: {support_contact}",
             }
@@ -1661,7 +1753,7 @@ async def api_deposit_request(payload: DepositRequestPayload):
     dep_id = await bot.create_deposit_request(payload.tg_id, payload.amount, currency, method)
     worker_id = await bot.get_worker_for_client(payload.tg_id)
     worker_info_line = f"Реферал воркера: <code>{worker_id}</code>\n" if worker_id else "Реферал воркера: нет данных\n"
-    method_label = {"crypto": "Crypto bot", "trc20": "TRC20 USDT", "card": "Банковская карта"}[method]
+    method_label = deposit_method_label(method)
     text_admin = (
         "🔔 <b>Заявка на проверку оплаты (WebApp)</b>\n\n"
         f"ID заявки: <b>{dep_id}</b>\n"
@@ -1682,7 +1774,7 @@ async def api_deposit_request(payload: DepositRequestPayload):
             pass
 
     support_contact = bot.support_contact_text()
-    method_label = {"crypto": "Crypto bot", "trc20": "TRC20 USDT", "card": "Банковская карта"}[method]
+    method_label = deposit_method_label(method)
     return JSONResponse(
         {
             "ok": True,
@@ -1690,6 +1782,7 @@ async def api_deposit_request(payload: DepositRequestPayload):
             "requires_support": True,
             "redirect_to_support": True,
             "support_url": bot.config.support_url,
+            "support_entry_url": build_support_redirect_url(payload.amount, method, dep_id),
             "support_contact": support_contact,
             "message": f"Заявка #{dep_id} создана. Для пополнения через {method_label} перейдите в поддержку: {support_contact}",
         }

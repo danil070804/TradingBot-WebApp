@@ -30,7 +30,7 @@
             <small>Менеджер отправит реквизиты или ссылку на оплату после выбора способа.</small>
         </div>
         <small>{{ support_contact }}</small>
-        {% if support_url %}<a class="qa-btn" href="{{ support_url }}" target="_blank">{{ labels.js_support_btn if labels else "Перейти в поддержку" }}</a>{% endif %}
+        {% if support_url %}<a class="qa-btn" href="{{ support_entry_url }}">{{ labels.js_support_btn if labels else "Перейти в поддержку" }}</a>{% endif %}
     </div>
     <div id="deposit-result" class="result-box"></div>
 </section>
