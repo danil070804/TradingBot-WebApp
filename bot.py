@@ -2627,7 +2627,7 @@ async def menu_portfolio(message: Message):
     await send_profile(message)
 
 
-@dp.message(F.text.in_({"ℹ️ Инфо", "ℹ️ Info", "ℹ️ Інфо"}))
+@dp.message(F.text.in_({"ℹ️ О сервисе", "ℹ️ Инфо", "ℹ️ Info", "ℹ️ Інфо"}))
 async def menu_info(message: Message):
     user_row = await get_user_row(message.from_user)
     lang = normalize_lang(user_row["language"])
@@ -2669,7 +2669,7 @@ async def menu_support(message: Message):
     )
 
 
-@dp.message(F.text.in_({"📈 Открыть ECN", "📈 Open ECN", "📈 Відкрити ECN"}))
+@dp.message(F.text.in_({"📈 Открыть сделку", "📈 Открыть ECN", "📈 Open ECN", "📈 Відкрити ECN"}))
 async def menu_open_ecn(message: Message, state: FSMContext):
     await start_ecn_flow(message, state)
 
