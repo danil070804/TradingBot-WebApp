@@ -954,6 +954,15 @@ def admin_prompt_keyboard(back_callback: str):
     return kb.as_markup()
 
 
+def profile_back_keyboard(lang: str = "ru", extra_cancel: tuple[str, str] | None = None):
+    kb = InlineKeyboardBuilder()
+    if extra_cancel:
+        kb.button(text=extra_cancel[0], callback_data=extra_cancel[1])
+    kb.button(text=t(lang, "settings_btn_back"), callback_data="open_profile")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
 async def get_effective_min_trade_amount(client_tg_id: int, currency: str | None) -> float:
     global_min = convert_usdt_to_currency(await get_global_min_trade_usdt(), currency)
     trade_settings = await get_client_trade_settings(client_tg_id)
@@ -2991,7 +3000,8 @@ async def run_demo_deal(
 # ---------- PROFILE ----------
 
 @dp.callback_query(F.data == "open_profile")
-async def on_open_profile(callback: CallbackQuery):
+async def on_open_profile(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
     await send_profile(callback)
 
 
@@ -3039,10 +3049,14 @@ async def send_profile(callback_or_msg):
 
 @dp.callback_query(F.data == "deposit")
 async def on_deposit(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
     user_row = await get_user_row(callback.from_user)
     lang = normalize_lang(user_row["language"])
     currency = user_row["currency"] or "USD"
-    await callback.message.answer(t(lang, "deposit_enter_amount", currency=currency))
+    await callback.message.answer(
+        t(lang, "deposit_enter_amount", currency=currency),
+        reply_markup=profile_back_keyboard(lang, (t(lang, "deposit_cancel"), "cancel_deposit")),
+    )
     await state.set_state(DepositStates.waiting_amount)
     await callback.answer()
 
@@ -3059,7 +3073,10 @@ async def deposit_amount_entered(message: Message, state: FSMContext):
         if amount <= 0:
             raise ValueError
     except ValueError:
-        await message.answer(t(lang, "deposit_invalid_amount"))
+        await message.answer(
+            t(lang, "deposit_invalid_amount"),
+            reply_markup=profile_back_keyboard(lang, (t(lang, "deposit_cancel"), "cancel_deposit")),
+        )
         return
     if amount < effective_min_deposit:
         await message.answer(
@@ -3068,7 +3085,8 @@ async def deposit_amount_entered(message: Message, state: FSMContext):
                 f"⚠️ Минимальное пополнение: {effective_min_deposit:.2f} {currency} (эквивалент {global_min_deposit_usdt:.2f} USDT).",
                 f"⚠️ Minimum deposit: {effective_min_deposit:.2f} {currency} ({global_min_deposit_usdt:.2f} USDT equivalent).",
                 f"⚠️ Мінімальне поповнення: {effective_min_deposit:.2f} {currency} (еквівалент {global_min_deposit_usdt:.2f} USDT).",
-            )
+            ),
+            reply_markup=profile_back_keyboard(lang, (t(lang, "deposit_cancel"), "cancel_deposit")),
         )
         return
     await state.update_data(deposit_amount=amount)
@@ -3079,12 +3097,13 @@ async def deposit_amount_entered(message: Message, state: FSMContext):
     )
 
 
+@dp.callback_query(DepositStates.waiting_amount, F.data == "cancel_deposit")
 @dp.callback_query(DepositStates.waiting_method, F.data == "cancel_deposit")
 async def on_cancel_deposit(callback: CallbackQuery, state: FSMContext):
     user_row = await get_user_row(callback.from_user)
     lang = normalize_lang(user_row["language"])
     await state.clear()
-    await callback.message.answer(t(lang, "deposit_cancelled"))
+    await callback.message.answer(t(lang, "deposit_cancelled"), reply_markup=profile_back_keyboard(lang))
     await callback.answer()
 
 
@@ -3227,11 +3246,13 @@ async def on_check_payment_card(callback: CallbackQuery, state: FSMContext):
 
 @dp.callback_query(F.data == "withdraw")
 async def on_withdraw(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
     user_row = await get_user_row(callback.from_user)
     lang = normalize_lang(user_row["language"])
     currency = user_row["currency"] or "USD"
     await callback.message.answer(
-        tr(lang, f"📤 На какую сумму вы хотите вывести средства? Введите сумму в {currency}.", f"📤 How much do you want to withdraw? Enter amount in {currency}.", f"📤 На яку суму ви хочете вивести кошти? Вкажіть суму в {currency}.")
+        tr(lang, f"📤 На какую сумму вы хотите вывести средства? Введите сумму в {currency}.", f"📤 How much do you want to withdraw? Enter amount in {currency}.", f"📤 На яку суму ви хочете вивести кошти? Вкажіть суму в {currency}."),
+        reply_markup=profile_back_keyboard(lang, ("❌ Отмена", "wd_cancel")),
     )
     await state.set_state(WithdrawStates.waiting_amount)
     await callback.answer()
@@ -3248,10 +3269,16 @@ async def withdraw_amount_entered(message: Message, state: FSMContext):
         if amount <= 0:
             raise ValueError
     except ValueError:
-        await message.answer(tr(lang, "❗ Введите корректную положительную сумму.", "❗ Enter a valid positive amount.", "❗ Введіть коректну додатну суму."))
+        await message.answer(
+            tr(lang, "❗ Введите корректную положительную сумму.", "❗ Enter a valid positive amount.", "❗ Введіть коректну додатну суму."),
+            reply_markup=profile_back_keyboard(lang, ("❌ Отмена", "wd_cancel")),
+        )
         return
     if amount > balance:
-        await message.answer(tr(lang, f"❗ Недостаточно средств. Доступно: {balance:.2f} {currency}.", f"❗ Not enough funds. Available: {balance:.2f} {currency}.", f"❗ Недостатньо коштів. Доступно: {balance:.2f} {currency}."))
+        await message.answer(
+            tr(lang, f"❗ Недостаточно средств. Доступно: {balance:.2f} {currency}.", f"❗ Not enough funds. Available: {balance:.2f} {currency}.", f"❗ Недостатньо коштів. Доступно: {balance:.2f} {currency}."),
+            reply_markup=profile_back_keyboard(lang, ("❌ Отмена", "wd_cancel")),
+        )
         await state.clear()
         return
     await state.update_data(withdraw_amount=amount)
@@ -3263,22 +3290,28 @@ async def withdraw_amount_entered(message: Message, state: FSMContext):
 
 @dp.callback_query(F.data == "wd_cancel")
 async def on_withdraw_cancel(callback: CallbackQuery, state: FSMContext):
+    user_row = await get_user_row(callback.from_user)
+    lang = normalize_lang(user_row["language"])
     await state.clear()
-    await callback.message.answer("❌ Заявка на вывод отменена.")
+    await callback.message.answer("❌ Заявка на вывод отменена.", reply_markup=profile_back_keyboard(lang))
     await callback.answer()
 
 
 @dp.callback_query(F.data == "wd_card")
 async def on_withdraw_card(callback: CallbackQuery, state: FSMContext):
+    user_row = await get_user_row(callback.from_user)
+    lang = normalize_lang(user_row["language"])
     await state.set_state(WithdrawStates.waiting_card)
-    await callback.message.answer("💳 Укажите номер карты для вывода средств:")
+    await callback.message.answer("💳 Укажите номер карты для вывода средств:", reply_markup=profile_back_keyboard(lang, ("❌ Отмена", "wd_cancel")))
     await callback.answer()
 
 
 @dp.callback_query(F.data == "wd_trc20")
 async def on_withdraw_trc20(callback: CallbackQuery, state: FSMContext):
+    user_row = await get_user_row(callback.from_user)
+    lang = normalize_lang(user_row["language"])
     await state.set_state(WithdrawStates.waiting_wallet)
-    await callback.message.answer("👛 Укажите адрес кошелька TRC20 USDT:")
+    await callback.message.answer("👛 Укажите адрес кошелька TRC20 USDT:", reply_markup=profile_back_keyboard(lang, ("❌ Отмена", "wd_cancel")))
     await callback.answer()
 
 @dp.message(WithdrawStates.waiting_card)
@@ -3523,7 +3556,8 @@ async def reject_deposit(callback: CallbackQuery):
 # ---------- VERIFICATION & SETTINGS ----------
 
 @dp.callback_query(F.data == "verify")
-async def on_verify(callback: CallbackQuery):
+async def on_verify(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
     text = (
         "🔐 <b>Верификация ещё не пройдена</b>\n\n"
         "Чтобы пройти проверку, откройте поддержку, сообщите свой ID и следуйте инструкциям менеджера."
@@ -3533,7 +3567,8 @@ async def on_verify(callback: CallbackQuery):
 
 
 @dp.callback_query(F.data == "settings")
-async def on_settings(callback: CallbackQuery):
+async def on_settings(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
     user_row = await get_user_row(callback.from_user)
     lang = normalize_lang(user_row["language"])
     cur = user_row["currency"] or "не выбрана"
@@ -3559,12 +3594,13 @@ async def on_settings_currency(callback: CallbackQuery):
 
 
 @dp.callback_query(F.data == "my_deals")
-async def on_my_deals(callback: CallbackQuery):
+async def on_my_deals(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
     user_row = await get_user_row(callback.from_user)
     lang = normalize_lang(user_row["language"])
     rows = await get_user_deals(callback.from_user.id, limit=10)
     if not rows:
-        await callback.message.answer(t(lang, "my_deals_empty"))
+        await callback.message.answer(t(lang, "my_deals_empty"), reply_markup=profile_back_keyboard(lang))
         await callback.answer()
         return
 
@@ -3579,17 +3615,18 @@ async def on_my_deals(callback: CallbackQuery):
             f"• PnL: {row['profit']:+.2f} {row['currency']}"
         )
 
-    await callback.message.answer("\n".join(lines))
+    await callback.message.answer("\n".join(lines), reply_markup=profile_back_keyboard(lang))
     await callback.answer()
 
 # ---------- WORKER PANEL ----------
 
 @dp.callback_query(F.data == "open_worker_panel")
-async def open_worker_panel_cb(callback: CallbackQuery):
+async def open_worker_panel_cb(callback: CallbackQuery, state: FSMContext):
     user_row = await get_user_row(callback.from_user)
     if not bool(user_row["is_worker"]):
         await callback.answer("⛔ Воркер-панель доступна только воркерам.")
         return
+    await state.clear()
     await send_worker_panel(callback.message, callback.from_user)
     await callback.answer()
 
