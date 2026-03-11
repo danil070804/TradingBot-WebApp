@@ -1722,6 +1722,36 @@ def ecn_assets_keyboard(rows):
     return kb.as_markup()
 
 
+ECN_ASSETS_PER_PAGE = 10
+
+
+def ecn_assets_page_keyboard(rows, page: int = 0):
+    total = len(rows)
+    total_pages = max(1, (total + ECN_ASSETS_PER_PAGE - 1) // ECN_ASSETS_PER_PAGE)
+    safe_page = max(0, min(page, total_pages - 1))
+    start = safe_page * ECN_ASSETS_PER_PAGE
+    end = start + ECN_ASSETS_PER_PAGE
+
+    kb = InlineKeyboardBuilder()
+    for row in rows[start:end]:
+        kb.button(
+            text=row["name"],
+            callback_data=f"ecn_asset:{row['id']}",
+        )
+
+    if total_pages > 1:
+        prev_page = safe_page - 1 if safe_page > 0 else total_pages - 1
+        next_page = safe_page + 1 if safe_page < total_pages - 1 else 0
+        kb.button(text="‹", callback_data=f"ecn_assets_page:{prev_page}")
+        kb.button(text=f"{safe_page + 1}/{total_pages}", callback_data="ecn_assets_page:stay")
+        kb.button(text="›", callback_data=f"ecn_assets_page:{next_page}")
+        kb.adjust(2, 2, 2, 2, 2, 3)
+    else:
+        kb.adjust(2, 2, 2, 2, 2)
+
+    return kb.as_markup()
+
+
 def ecn_direction_keyboard(asset_id: int, lang: str = "ru"):
     kb = InlineKeyboardBuilder()
     kb.button(text=tr(lang, "📈 Повышение", "📈 Up", "📈 Вгору"), callback_data=f"ecn_dir:up:{asset_id}")
@@ -1815,13 +1845,43 @@ async def start_ecn_flow(msg, state: FSMContext):
         await message.answer(tr(lang, "❗ Список активов ECN пока пуст. Обратитесь к администратору.", "❗ ECN assets list is empty. Contact admin.", "❗ Список активів ECN порожній. Зверніться до адміністратора."))
         return
 
-    text_lines = [tr(lang, "Самые востребованные активы:", "Top assets:", "Топ активи:")]
-    for row in assets:
-        text_lines.append(f"└ {row['name']}")
-    text = "\n".join(text_lines)
+    text = tr(
+        lang,
+        "Выберите актив для сделки. Список разбит на страницы, чтобы не раздувать чат.",
+        "Choose an asset for the trade. The list is split into pages to keep the chat compact.",
+        "Оберіть актив для угоди. Список розбитий на сторінки, щоб не перевантажувати чат.",
+    )
 
-    await message.answer(text, reply_markup=ecn_assets_keyboard(assets))
+    await message.answer(text, reply_markup=ecn_assets_page_keyboard(assets, page=0))
     await state.clear()
+
+
+@dp.callback_query(F.data.startswith("ecn_assets_page:"))
+async def ecn_assets_page(callback: CallbackQuery):
+    page_token = callback.data.split(":", 1)[1]
+    if page_token == "stay":
+        await callback.answer()
+        return
+
+    assets = await get_ecn_assets()
+    user_row = await get_user_row(callback.from_user)
+    lang = normalize_lang(user_row["language"])
+
+    if not assets:
+        await callback.answer(
+            tr(lang, "Список активов пуст.", "Assets list is empty.", "Список активів порожній."),
+            show_alert=True,
+        )
+        return
+
+    try:
+        page = int(page_token)
+    except ValueError:
+        await callback.answer()
+        return
+
+    await callback.message.edit_reply_markup(reply_markup=ecn_assets_page_keyboard(assets, page=page))
+    await callback.answer()
 
 
 @dp.callback_query(F.data.startswith("ecn_asset:"))
