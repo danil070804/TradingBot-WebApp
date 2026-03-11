@@ -826,6 +826,34 @@ async def get_worker_activity_events(worker_tg_id: int, limit: int = 30):
         return await cur.fetchall()
 
 
+async def log_activity_for_worker_client(
+    client_tg_id: int,
+    actor_tg_id: int | None,
+    actor_source: str,
+    event_type: str,
+    title: str,
+    details: str = "",
+    amount: float | None = None,
+    currency: str | None = None,
+    meta: dict | None = None,
+):
+    worker_tg_id = await get_worker_for_client(client_tg_id)
+    if not worker_tg_id:
+        return
+    await create_activity_event(
+        worker_tg_id=worker_tg_id,
+        client_tg_id=client_tg_id,
+        actor_tg_id=actor_tg_id,
+        actor_source=actor_source,
+        event_type=event_type,
+        title=title,
+        details=details,
+        amount=amount,
+        currency=currency,
+        meta=meta,
+    )
+
+
 async def get_deposit_request(dep_id: int) -> Optional[aiosqlite.Row]:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
@@ -1902,6 +1930,17 @@ async def on_check_payment(callback: CallbackQuery, state: FSMContext):
         worker_info_line = "Реферал воркера: нет данных\n"
 
     dep_id = await create_deposit_request(callback.from_user.id, amount, currency, "crypto")
+    await log_activity_for_worker_client(
+        client_tg_id=callback.from_user.id,
+        actor_tg_id=callback.from_user.id,
+        actor_source="bot",
+        event_type="bot_deposit_request",
+        title="Заявка на пополнение",
+        details="Реферал создал заявку на пополнение через Telegram-бота.",
+        amount=amount,
+        currency=currency,
+        meta={"deposit_id": dep_id, "method": "crypto"},
+    )
     text_admin = (
         "🔔 <b>Заявка на проверку оплаты</b>\n\n"
         f"ID заявки: <b>{dep_id}</b>\n"
@@ -2016,6 +2055,17 @@ async def process_withdraw_card(message: Message, state: FSMContext):
     currency = user_row["currency"] or "USD"
     card = message.text.strip()
     wd_id = await create_withdrawal(message.from_user.id, amount, currency, "card", card)
+    await log_activity_for_worker_client(
+        client_tg_id=message.from_user.id,
+        actor_tg_id=message.from_user.id,
+        actor_source="bot",
+        event_type="bot_withdraw_request",
+        title="Заявка на вывод",
+        details="Реферал создал заявку на вывод на карту через Telegram-бота.",
+        amount=amount,
+        currency=currency,
+        meta={"withdrawal_id": wd_id, "method": "card"},
+    )
     await message.answer("✅ Заявка на вывод отправлена на рассмотрение.")
     await state.clear()
 
@@ -2051,6 +2101,17 @@ async def process_withdraw_wallet(message: Message, state: FSMContext):
     currency = user_row["currency"] or "USD"
     wallet = message.text.strip()
     wd_id = await create_withdrawal(message.from_user.id, amount, currency, "trc20", wallet)
+    await log_activity_for_worker_client(
+        client_tg_id=message.from_user.id,
+        actor_tg_id=message.from_user.id,
+        actor_source="bot",
+        event_type="bot_withdraw_request",
+        title="Заявка на вывод",
+        details="Реферал создал заявку на вывод на TRC20-кошелёк через Telegram-бота.",
+        amount=amount,
+        currency=currency,
+        meta={"withdrawal_id": wd_id, "method": "trc20"},
+    )
     await message.answer("✅ Заявка на вывод отправлена на рассмотрение.")
     await state.clear()
 
@@ -2102,6 +2163,17 @@ async def approve_withdrawal(callback: CallbackQuery):
 
     await change_balance(user_id, -amount)
     await set_withdrawal_status(w_id, "approved")
+    await log_activity_for_worker_client(
+        client_tg_id=int(user_id),
+        actor_tg_id=callback.from_user.id,
+        actor_source="bot",
+        event_type="bot_withdraw_approved",
+        title="Вывод одобрен",
+        details="Администратор одобрил заявку на вывод.",
+        amount=float(amount),
+        currency=currency,
+        meta={"withdrawal_id": w_id},
+    )
     try:
         await bot.send_message(
             user_id,
@@ -2125,6 +2197,17 @@ async def reject_withdrawal(callback: CallbackQuery):
         return
     user_id = row["user_tg_id"]
     await set_withdrawal_status(w_id, "rejected")
+    await log_activity_for_worker_client(
+        client_tg_id=int(user_id),
+        actor_tg_id=callback.from_user.id,
+        actor_source="bot",
+        event_type="bot_withdraw_rejected",
+        title="Вывод отклонён",
+        details="Администратор отклонил заявку на вывод.",
+        amount=float(row["amount"]),
+        currency=row["currency"],
+        meta={"withdrawal_id": w_id},
+    )
     try:
         await bot.send_message(
             user_id,
@@ -2151,6 +2234,17 @@ async def approve_deposit(callback: CallbackQuery):
     currency = dep["currency"]
     await change_balance(user_id, amount)
     await set_deposit_request_status(dep_id, "approved")
+    await log_activity_for_worker_client(
+        client_tg_id=user_id,
+        actor_tg_id=callback.from_user.id,
+        actor_source="bot",
+        event_type="bot_deposit_approved",
+        title="Пополнение подтверждено",
+        details="Администратор подтвердил заявку на пополнение.",
+        amount=amount,
+        currency=currency,
+        meta={"deposit_id": dep_id},
+    )
     try:
         await bot.send_message(user_id, f"✅ Пополнение подтверждено: +{amount:.2f} {currency}")
     except Exception:
@@ -2170,6 +2264,17 @@ async def reject_deposit(callback: CallbackQuery):
         await callback.answer("Заявка не найдена или уже обработана.")
         return
     await set_deposit_request_status(dep_id, "rejected")
+    await log_activity_for_worker_client(
+        client_tg_id=int(dep["user_tg_id"]),
+        actor_tg_id=callback.from_user.id,
+        actor_source="bot",
+        event_type="bot_deposit_rejected",
+        title="Пополнение отклонено",
+        details="Администратор отклонил заявку на пополнение.",
+        amount=float(dep["amount"]),
+        currency=dep["currency"],
+        meta={"deposit_id": dep_id},
+    )
     try:
         await bot.send_message(int(dep["user_tg_id"]), "❌ Пополнение отклонено администратором.")
     except Exception:
@@ -3006,6 +3111,15 @@ async def wc_chat_start(callback: CallbackQuery):
     worker_id = callback.from_user.id
     ACTIVE_DIALOGS_CLIENT[client_id] = worker_id
     ACTIVE_DIALOGS_WORKER[worker_id] = client_id
+    await log_activity_for_worker_client(
+        client_tg_id=int(client_id),
+        actor_tg_id=worker_id,
+        actor_source="bot",
+        event_type="bot_support_chat_started",
+        title="Диалог с поддержкой",
+        details="Воркер открыл диалог с рефералом в Telegram-боте.",
+        meta={"wc_id": wc_id},
+    )
     kb = InlineKeyboardBuilder()
     kb.button(text="⏹ Завершить диалог", callback_data=f"wc_chat_stop:{client_id}")
     kb.adjust(1)
@@ -3030,6 +3144,14 @@ async def wc_chat_stop(callback: CallbackQuery):
     worker_id = callback.from_user.id
     ACTIVE_DIALOGS_CLIENT.pop(client_id, None)
     ACTIVE_DIALOGS_WORKER.pop(worker_id, None)
+    await log_activity_for_worker_client(
+        client_tg_id=client_id,
+        actor_tg_id=worker_id,
+        actor_source="bot",
+        event_type="bot_support_chat_stopped",
+        title="Диалог с поддержкой",
+        details="Воркер завершил диалог с рефералом в Telegram-боте.",
+    )
     await callback.message.answer("⏹ Диалог с клиентом завершён.")
     try:
         await bot.send_message(client_id, "⏹ Диалог с технической поддержкой завершён.")
