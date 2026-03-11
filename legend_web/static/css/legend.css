@@ -741,6 +741,17 @@ select, input {
     flex: 1;
 }
 
+.worker-card-link {
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+    transition: transform .18s ease, box-shadow .18s ease;
+}
+
+.worker-card-link:hover {
+    transform: translateY(-1px);
+}
+
 .worker-head {
     display: flex;
     align-items: center;
@@ -935,6 +946,10 @@ select, input {
 .admin-queue-row .worker-actions {
     width: min(180px, 100%);
     grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.worker-client-actions {
+    width: 100%;
 }
 
 .position-row .chip {

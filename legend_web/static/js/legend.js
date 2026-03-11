@@ -1196,7 +1196,7 @@ function bindWorkerPanel() {
             row.dataset.funnelStage = c.funnel_stage || "new";
             row.dataset.tags = c.tags || "";
             row.innerHTML = `
-                <div class="worker-card-main">
+                <a class="worker-card-link worker-card-main" href="/worker/client/${c.id}">
                     <div class="worker-head">
                         <b>#${c.id} ${c.first_name || "Пользователь"}</b>
                         <span class="worker-badge ${c.blocked ? "blocked" : c.favorite ? "favorite" : "active"}">${c.blocked ? "Заблокирован" : c.favorite ? "Избранный" : "Активный"}</span>
@@ -1211,7 +1211,7 @@ function bindWorkerPanel() {
                         ${c.tags ? `<span>Теги: ${c.tags}</span>` : ""}
                     </div>
                     ${c.crm_note ? `<div class="crm-note-preview">${c.crm_note}</div>` : ""}
-                </div>
+                </a>
                 <div class="worker-actions">
                     <button class="chip worker-act ${c.trading_enabled ? "state-on" : "state-off"}" data-action="toggle_trade">Покупка</button>
                     <button class="chip worker-act ${c.withdraw_enabled ? "state-on" : "state-off"}" data-action="toggle_withdraw">Вывод</button>
@@ -1366,6 +1366,53 @@ function bindWorkerClientPage() {
     const wcId = Number(liveMeta ? liveMeta.dataset.wcId : 0);
     const workerId = Number(liveMeta ? liveMeta.dataset.workerId : 0);
     if (!wcId || !workerId) return;
+    const controls = document.getElementById("worker-client-controls");
+    const resultBox = document.getElementById("worker-client-control-result");
+
+    const doClientUpdate = async (action, value = null) => {
+        const resp = await fetch("/api/worker/client/update", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ wc_id: wcId, action, value }),
+        });
+        const data = await resp.json();
+        if (resultBox) {
+            resultBox.innerHTML = resp.ok && data.ok
+                ? `<span class="pos">${data.details || "Сохранено"}</span>`
+                : `<span class="neg">${data.error || "Ошибка"}</span>`;
+        }
+        if (!resp.ok || !data.ok) return false;
+        await pollSnapshot();
+        return true;
+    };
+
+    const bindClientControls = () => {
+        if (!controls) return;
+        controls.querySelectorAll(".worker-client-toggle").forEach((btn) => {
+            btn.onclick = async () => {
+                await doClientUpdate(btn.dataset.action);
+            };
+        });
+        controls.querySelectorAll(".worker-client-prompt").forEach((btn) => {
+            btn.onclick = async () => {
+                const raw = prompt(`${btn.dataset.label || "Значение"}:`);
+                if (raw === null) return;
+                const value = Number(raw);
+                if (Number.isNaN(value)) {
+                    if (resultBox) resultBox.innerHTML = '<span class="neg">Введите корректное число</span>';
+                    return;
+                }
+                await doClientUpdate(btn.dataset.action, value);
+            };
+        });
+        controls.querySelectorAll(".worker-client-text").forEach((btn) => {
+            btn.onclick = async () => {
+                const value = prompt(`${btn.dataset.label || "Значение"}:`);
+                if (value === null) return;
+                await doClientUpdate(btn.dataset.action, value);
+            };
+        });
+    };
 
     const renderItems = (box, items, emptyText, mapper) => {
         if (!box) return;
@@ -1484,6 +1531,7 @@ function bindWorkerClientPage() {
         if (liveStatus) liveStatus.textContent = "Client feed: reconnect";
         startFallback();
     });
+    bindClientControls();
 }
 
 function renderTape(items) {

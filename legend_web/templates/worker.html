@@ -60,7 +60,7 @@
             data-funnel-stage="{{ c.funnel_stage if c.funnel_stage else 'new' }}"
             data-tags="{{ c.tags if c.tags else '' }}"
         >
-            <div class="worker-card-main">
+            <a class="worker-card-link worker-card-main" href="/worker/client/{{ c.id }}">
                 <div class="worker-head">
                     <b>#{{ c.id }} {{ c.first_name if c.first_name else "Пользователь" }}</b>
                     <span class="worker-badge {% if c.blocked %}blocked{% elif c.favorite %}favorite{% else %}active{% endif %}">
@@ -79,7 +79,7 @@
                 {% if c.crm_note %}
                 <div class="crm-note-preview">{{ c.crm_note }}</div>
                 {% endif %}
-            </div>
+            </a>
             <div class="worker-actions">
                 <button class="chip worker-act {% if c.trading_enabled %}state-on{% else %}state-off{% endif %}" data-action="toggle_trade">Покупка</button>
                 <button class="chip worker-act {% if c.withdraw_enabled %}state-on{% else %}state-off{% endif %}" data-action="toggle_withdraw">Вывод</button>

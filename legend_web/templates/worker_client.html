@@ -76,6 +76,25 @@
 </section>
 
 <section class="card">
+    <div class="section-title">Управление рефералом</div>
+    <div id="worker-client-controls" class="worker-actions worker-client-actions" data-wc-id="{{ client.id }}">
+        <button class="chip worker-client-toggle {% if client.trading_enabled %}state-on{% else %}state-off{% endif %}" data-action="toggle_trade">Покупка</button>
+        <button class="chip worker-client-toggle {% if client.withdraw_enabled %}state-on{% else %}state-off{% endif %}" data-action="toggle_withdraw">Вывод</button>
+        <button class="chip worker-client-toggle {% if client.verified %}state-on{% else %}state-off{% endif %}" data-action="toggle_verified">Вериф</button>
+        <button class="chip worker-client-toggle {% if client.favorite %}state-fav{% else %}state-off{% endif %}" data-action="toggle_favorite">Избранное</button>
+        <button class="chip worker-client-toggle {% if client.blocked %}state-block{% else %}state-on{% endif %}" data-action="toggle_block">{{ "Разблок" if client.blocked else "Блок" }}</button>
+        <button class="chip worker-client-prompt" data-action="set_luck" data-label="Удача 0-100">Удача</button>
+        <button class="chip worker-client-prompt" data-action="set_min_deposit" data-label="Минимальный депозит">Мин. деп</button>
+        <button class="chip worker-client-prompt" data-action="set_min_withdraw" data-label="Минимальный вывод">Мин. вывод</button>
+        <button class="chip worker-client-prompt" data-action="add_balance" data-label="Пополнение баланса">Баланс</button>
+        <button class="chip worker-client-text" data-action="set_funnel_stage" data-label="Этап воронки">Этап</button>
+        <button class="chip worker-client-text" data-action="set_tags" data-label="Теги через запятую">Теги</button>
+        <button class="chip worker-client-text" data-action="set_note" data-label="Заметка по рефералу">Заметка</button>
+    </div>
+    <div id="worker-client-control-result" class="result-box"></div>
+</section>
+
+<section class="card">
     <div class="section-title">История событий</div>
     <div id="worker-client-activity" class="list">
         {% for item in activity %}
