@@ -7,6 +7,7 @@ import hmac
 import hashlib
 import time
 import secrets
+from datetime import datetime, timedelta, timezone
 from collections import deque
 from urllib.parse import parse_qsl, urlencode
 from contextlib import asynccontextmanager
@@ -695,20 +696,21 @@ async def fetch_worker_clients_rows(worker_tg_id: int):
 
 
 async def fetch_worker_summary(worker_tg_id: int) -> dict:
+    active_cutoff = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S")
     row = await fetch_one(
         """
         SELECT
             COUNT(*) AS total_clients,
-            SUM(CASE WHEN favorite = 1 THEN 1 ELSE 0 END) AS favorites,
-            SUM(CASE WHEN blocked = 1 THEN 1 ELSE 0 END) AS blocked,
-            SUM(CASE WHEN funnel_stage = 'deposited' THEN 1 ELSE 0 END) AS deposited,
-            SUM(CASE WHEN funnel_stage = 'trading' THEN 1 ELSE 0 END) AS trading,
-            SUM(CASE WHEN funnel_stage = 'vip' THEN 1 ELSE 0 END) AS vip,
-            SUM(CASE WHEN last_activity_at >= datetime('now', '-1 day') THEN 1 ELSE 0 END) AS active_day
+            COALESCE(SUM(CASE WHEN favorite = 1 THEN 1 ELSE 0 END), 0) AS favorites,
+            COALESCE(SUM(CASE WHEN blocked = 1 THEN 1 ELSE 0 END), 0) AS blocked,
+            COALESCE(SUM(CASE WHEN funnel_stage = 'deposited' THEN 1 ELSE 0 END), 0) AS deposited,
+            COALESCE(SUM(CASE WHEN funnel_stage = 'trading' THEN 1 ELSE 0 END), 0) AS trading,
+            COALESCE(SUM(CASE WHEN funnel_stage = 'vip' THEN 1 ELSE 0 END), 0) AS vip,
+            COALESCE(SUM(CASE WHEN last_activity_at IS NOT NULL AND last_activity_at >= ? THEN 1 ELSE 0 END), 0) AS active_day
         FROM worker_clients
         WHERE worker_tg_id = ?
         """,
-        (worker_tg_id,),
+        (active_cutoff, worker_tg_id),
     )
     return row_to_dict(row) or {
         "total_clients": 0,
@@ -758,8 +760,8 @@ async def fetch_admin_dashboard_snapshot() -> dict:
             (SELECT COUNT(*) FROM withdrawals WHERE status = 'pending') AS pending_withdrawals,
             (SELECT COUNT(*) FROM deposit_requests WHERE status = 'pending') AS pending_deposits,
             (SELECT COUNT(*) FROM support_tickets WHERE status IN ('new', 'in_progress')) AS open_support,
-            (SELECT IFNULL(SUM(amount), 0) FROM deposit_requests WHERE status = 'approved') AS approved_deposit_sum,
-            (SELECT IFNULL(SUM(amount), 0) FROM withdrawals WHERE status = 'approved') AS approved_withdraw_sum
+            (SELECT COALESCE(SUM(amount), 0) FROM deposit_requests WHERE status = 'approved') AS approved_deposit_sum,
+            (SELECT COALESCE(SUM(amount), 0) FROM withdrawals WHERE status = 'approved') AS approved_withdraw_sum
         """
     )
     deposits = await fetch_all(
@@ -2669,7 +2671,7 @@ async def api_deposit_request(payload: DepositRequestPayload):
 async def api_overview():
     users = await fetch_one("SELECT COUNT(*) AS c FROM users")
     deals = await fetch_one("SELECT COUNT(*) AS c FROM deals")
-    pnl = await fetch_one("SELECT IFNULL(SUM(profit), 0) AS s FROM deals")
+    pnl = await fetch_one("SELECT COALESCE(SUM(profit), 0) AS s FROM deals")
     pending = await fetch_one("SELECT COUNT(*) AS c FROM withdrawals WHERE status = 'pending'")
     return JSONResponse(
         {
