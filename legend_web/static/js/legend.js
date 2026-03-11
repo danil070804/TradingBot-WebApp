@@ -1077,7 +1077,19 @@ function bindWorkerPanel() {
     if (!wrap) return;
     const search = document.getElementById("worker-search");
     const filter = document.getElementById("worker-filter");
+    const transferTarget = document.getElementById("worker-transfer-target");
     const liveStatus = document.getElementById("worker-live-status");
+
+    const patchRowState = (row, action, value) => {
+        if (!row) return;
+        if (action === "toggle_trade") row.dataset.tradeEnabled = row.dataset.tradeEnabled === "1" ? "0" : "1";
+        if (action === "toggle_withdraw") row.dataset.withdrawEnabled = row.dataset.withdrawEnabled === "1" ? "0" : "1";
+        if (action === "toggle_verified") row.dataset.verified = row.dataset.verified === "1" ? "0" : "1";
+        if (action === "toggle_favorite") row.dataset.favorite = row.dataset.favorite === "1" ? "0" : "1";
+        if (action === "toggle_block") row.dataset.blocked = row.dataset.blocked === "1" ? "0" : "1";
+        if (action === "set_funnel_stage") row.dataset.funnelStage = String(value || "");
+        if (action === "set_tags") row.dataset.tags = String(value || "");
+    };
 
     const applyWorkerFilters = () => {
         const q = (search ? search.value : "").trim().toLowerCase();
@@ -1108,7 +1120,8 @@ function bindWorkerPanel() {
             alert(data.error || "Не удалось обновить данные");
             return false;
         }
-        location.reload();
+        patchRowState(wrap.querySelector(`.worker-row[data-wc-id="${wcId}"]`), action, value);
+        await pollWorkerDashboard();
         return true;
     };
 
@@ -1144,6 +1157,19 @@ function bindWorkerPanel() {
             const val = prompt(`${label}:`);
             if (val === null) return;
             await doUpdate(row.dataset.wcId, btn.dataset.action, val);
+        });
+    });
+
+    wrap.querySelectorAll(".worker-transfer").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+            const row = btn.closest(".worker-row");
+            if (!row) return;
+            const target = transferTarget ? transferTarget.value : "";
+            if (!target) {
+                alert("Сначала выбери воркера в верхнем списке");
+                return;
+            }
+            await doUpdate(row.dataset.wcId, "transfer_worker", Number(target));
         });
     });
 

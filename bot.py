@@ -1026,6 +1026,32 @@ async def update_support_ticket_status(ticket_id: int, status: str, assigned_to:
         await db.commit()
 
 
+async def transfer_worker_client_record(wc_id: int, new_worker_tg_id: int) -> bool:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute("SELECT id, client_tg_id, worker_tg_id FROM worker_clients WHERE id = ?", (wc_id,))
+        row = await cur.fetchone()
+        if not row:
+            return False
+        existing = await db.execute(
+            "SELECT id FROM worker_clients WHERE worker_tg_id = ? AND client_tg_id = ? AND id != ?",
+            (new_worker_tg_id, row["client_tg_id"], wc_id),
+        )
+        dupe = await existing.fetchone()
+        if dupe:
+            return False
+        await db.execute(
+            "UPDATE worker_clients SET worker_tg_id = ?, last_activity_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (new_worker_tg_id, wc_id),
+        )
+        await db.execute(
+            "UPDATE support_tickets SET worker_tg_id = ? WHERE client_tg_id = ?",
+            (new_worker_tg_id, row["client_tg_id"]),
+        )
+        await db.commit()
+        return True
+
+
 async def get_latest_open_support_ticket(client_tg_id: int, topic: str | None = None) -> Optional[aiosqlite.Row]:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row

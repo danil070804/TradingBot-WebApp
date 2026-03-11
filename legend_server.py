@@ -736,6 +736,18 @@ async def fetch_worker_support_tickets(worker_tg_id: int, limit: int = 20):
     )
 
 
+async def fetch_worker_choices():
+    return await fetch_all(
+        """
+        SELECT tg_id, first_name, username
+        FROM users
+        WHERE is_worker = 1
+        ORDER BY tg_id DESC
+        LIMIT 100
+        """
+    )
+
+
 async def fetch_admin_dashboard_snapshot() -> dict:
     metrics = await fetch_one(
         """
@@ -1581,6 +1593,7 @@ async def worker_page(request: Request):
     activity = await bot.get_worker_activity_events(tg_id, 24)
     summary = await fetch_worker_summary(tg_id)
     tickets = await fetch_worker_support_tickets(tg_id, 12)
+    worker_choices = await fetch_worker_choices()
     return templates.TemplateResponse(
         "worker.html",
         {
@@ -1595,6 +1608,7 @@ async def worker_page(request: Request):
             "activity": activity,
             "summary": summary,
             "tickets": tickets,
+            "worker_choices": worker_choices,
         },
     )
 
@@ -1805,6 +1819,16 @@ async def api_worker_client_update(payload: WorkerClientUpdatePayload, request: 
         await bot.update_worker_client_field(payload.wc_id, "funnel_stage", stage)
         activity_title = "Этап воронки"
         activity_details = f"Этап изменён на {stage}"
+    elif action == "transfer_worker":
+        new_worker_id = int(float(payload.value or 0))
+        target_worker = await fetch_one("SELECT tg_id, is_worker FROM users WHERE tg_id = ?", (new_worker_id,))
+        if not target_worker or not bool(target_worker["is_worker"]):
+            return JSONResponse({"ok": False, "error": "Новый воркер не найден"}, status_code=404)
+        moved = await bot.transfer_worker_client_record(payload.wc_id, new_worker_id)
+        if not moved:
+            return JSONResponse({"ok": False, "error": "Не удалось передать реферала"}, status_code=400)
+        activity_title = "Передача реферала"
+        activity_details = f"Реферал передан воркеру {new_worker_id}"
     else:
         return JSONResponse({"ok": False, "error": "Unsupported action"}, status_code=400)
 
@@ -2250,6 +2274,14 @@ async def admin_process_support(payload: AdminProcessPayload, request: Request):
         status = "in_progress"
         assigned_to = "admin_web"
         details = f"Тикет #{payload.entity_id} взят в работу"
+    elif action == "hold":
+        status = "on_hold"
+        assigned_to = ticket["assigned_to"] or "admin_web"
+        details = f"Тикет #{payload.entity_id} поставлен на паузу"
+    elif action == "escalate":
+        status = "escalated"
+        assigned_to = "admin_web"
+        details = f"Тикет #{payload.entity_id} эскалирован"
     elif action == "close":
         status = "closed"
         assigned_to = ticket["assigned_to"] or "admin_web"

@@ -30,7 +30,17 @@
             <article class="card metric"><h3>Approved WD</h3><p>{{ "%.2f"|format((snapshot.metrics.approved_withdraw_sum if snapshot.metrics else 0) or 0) }}</p></article>
         </section>
 
-        <section class="card">
+        <section class="card admin-tabs-shell">
+            <div class="admin-tabs">
+                <button class="admin-tab active" type="button" data-tab="admin-users">Пользователи</button>
+                <button class="admin-tab" type="button" data-tab="admin-finance">Финансы</button>
+                <button class="admin-tab" type="button" data-tab="admin-support">Support</button>
+                <button class="admin-tab" type="button" data-tab="admin-workers">Воркеры</button>
+                <button class="admin-tab" type="button" data-tab="admin-system">Система</button>
+            </div>
+        </section>
+
+        <section class="card admin-tab-panel" data-panel="admin-system">
             <div class="section-title">Системные реквизиты</div>
             <div class="form-grid">
                 <label>Crypto Bot URL<input id="s-crypto_bot_url" value="{{ settings_map.crypto_bot_url }}"></label>
@@ -44,7 +54,7 @@
             <div id="settings-result" class="result-box"></div>
         </section>
 
-        <section class="card">
+        <section class="card admin-tab-panel" data-panel="admin-system">
             <div class="section-title">Активы ECN</div>
             <div class="form-grid">
                 <label>Добавить актив<input id="new-asset-name" placeholder="Например, BNB"></label>
@@ -58,7 +68,7 @@
             </div>
         </section>
 
-        <section class="card">
+        <section class="card admin-tab-panel active" data-panel="admin-users">
             <div class="section-title">Пользователи</div>
             <div class="worker-toolbar">
                 <input id="admin-user-search" type="search" placeholder="Поиск по tg_id, username, имени">
@@ -100,7 +110,7 @@
             </div>
         </section>
 
-        <section class="card">
+        <section class="card admin-tab-panel" data-panel="admin-finance">
             <div class="section-title">Пополнения</div>
             <div id="admin-deposit-result" class="result-box"></div>
             <div id="admin-deposit-list" class="list">
@@ -125,7 +135,7 @@
             </div>
         </section>
 
-        <section class="card">
+        <section class="card admin-tab-panel" data-panel="admin-finance">
             <div class="section-title">Выводы</div>
             <div id="admin-withdraw-result" class="result-box"></div>
             <div id="admin-withdraw-list" class="list">
@@ -150,7 +160,7 @@
             </div>
         </section>
 
-        <section class="card">
+        <section class="card admin-tab-panel" data-panel="admin-support">
             <div class="section-title">Support center</div>
             <div id="admin-support-result" class="result-box"></div>
             <div id="admin-support-list" class="list">
@@ -166,7 +176,9 @@
                     </div>
                     <div class="worker-actions">
                         <button class="chip admin-support-act" data-id="{{ s.id }}" data-action="take">Взять</button>
-                        <button class="chip admin-support-act state-fav" data-id="{{ s.id }}" data-action="close">Закрыть</button>
+                        <button class="chip admin-support-act state-off" data-id="{{ s.id }}" data-action="hold">Пауза</button>
+                        <button class="chip admin-support-act state-fav" data-id="{{ s.id }}" data-action="escalate">Эскал.</button>
+                        <button class="chip admin-support-act state-block" data-id="{{ s.id }}" data-action="close">Закрыть</button>
                     </div>
                 </div>
                 {% else %}
@@ -175,7 +187,7 @@
             </div>
         </section>
 
-        <section class="card">
+        <section class="card admin-tab-panel" data-panel="admin-workers">
             <div class="section-title">Воркеры</div>
             <div id="admin-worker-stats" class="list">
                 {% for w in snapshot.worker_stats %}
@@ -192,7 +204,7 @@
             </div>
         </section>
 
-        <section class="card">
+        <section class="card admin-tab-panel" data-panel="admin-support">
             <div class="section-title">Audit log</div>
             <div id="admin-audit-list" class="list">
                 {% for a in snapshot.audit %}
@@ -255,7 +267,8 @@ async function addAsset() {
     });
     if (r.ok) {
         document.getElementById("asset-result").innerHTML = '<span class="pos">Актив добавлен</span>';
-        setTimeout(() => location.reload(), 450);
+        document.getElementById("new-asset-name").value = "";
+        refreshAdminDashboard();
         return;
     }
     document.getElementById("asset-result").innerHTML = '<span class="neg">Не удалось добавить актив</span>';
@@ -278,7 +291,7 @@ async function adminUserAction(tgId, action, value = null) {
         ? `<span class="pos">${data.details || "Сохранено"}</span>`
         : `<span class="neg">${data.error || "Ошибка"}</span>`;
     if (r.ok && data.ok) {
-        setTimeout(() => location.reload(), 500);
+        refreshAdminDashboard();
     }
 }
 
@@ -339,8 +352,21 @@ async function processAdminEntity(url, entityId, action, resultId) {
             : `<span class="neg">${data.error || "Ошибка"}</span>`;
     }
     if (r.ok && data.ok) {
-        setTimeout(() => location.reload(), 450);
+        refreshAdminDashboard();
     }
+}
+
+function bindAdminTabs() {
+    const tabs = document.querySelectorAll(".admin-tab");
+    const panels = document.querySelectorAll(".admin-tab-panel");
+    tabs.forEach((tab) => {
+        tab.onclick = () => {
+            tabs.forEach((x) => x.classList.toggle("active", x === tab));
+            panels.forEach((panel) => {
+                panel.classList.toggle("active", panel.dataset.panel === tab.dataset.tab);
+            });
+        };
+    });
 }
 
 function wireAdminActionButtons() {
@@ -422,7 +448,9 @@ async function refreshAdminDashboard() {
                 </div>
                 <div class="worker-actions">
                     <button class="chip admin-support-act" data-id="${s.id}" data-action="take">Взять</button>
-                    <button class="chip admin-support-act state-fav" data-id="${s.id}" data-action="close">Закрыть</button>
+                    <button class="chip admin-support-act state-off" data-id="${s.id}" data-action="hold">Пауза</button>
+                    <button class="chip admin-support-act state-fav" data-id="${s.id}" data-action="escalate">Эскал.</button>
+                    <button class="chip admin-support-act state-block" data-id="${s.id}" data-action="close">Закрыть</button>
                 </div>
             </div>`);
         renderSimpleList("admin-worker-stats", data.worker_stats, '<div class="empty">Воркеров пока нет.</div>', (w) => `
@@ -452,6 +480,7 @@ async function refreshAdminDashboard() {
 }
 
 wireAdminActionButtons();
+bindAdminTabs();
 setInterval(refreshAdminDashboard, 8000);
 </script>
 </body>

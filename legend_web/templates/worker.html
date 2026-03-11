@@ -36,6 +36,14 @@
             <option value="vip">VIP</option>
             <option value="support">Нужна поддержка</option>
         </select>
+        <select id="worker-transfer-target">
+            <option value="">Передать воркеру</option>
+            {% for w in worker_choices %}
+            {% if w.tg_id != worker_id %}
+            <option value="{{ w.tg_id }}">{{ w.first_name if w.first_name else "Воркер" }} · {{ w.tg_id }}</option>
+            {% endif %}
+            {% endfor %}
+        </select>
     </div>
     <div id="worker-list" class="list">
         {% for c in clients %}
@@ -83,6 +91,7 @@
                 <button class="chip worker-text" data-action="set_funnel_stage" data-label="Этап воронки">Этап</button>
                 <button class="chip worker-text" data-action="set_tags" data-label="Теги через запятую">Теги</button>
                 <button class="chip worker-text" data-action="set_note" data-label="Заметка по рефералу">Заметка</button>
+                <button class="chip worker-transfer">Передать</button>
                 <a class="chip worker-open" href="/worker/client/{{ c.id }}">Карточка</a>
             </div>
         </div>
@@ -105,7 +114,7 @@
                 <small>{{ item.first_name if item.first_name else "Пользователь" }} · ID {{ item.client_tg_id }} · @{{ item.username if item.username else "-" }}</small>
                 <small>{{ item.last_message if item.last_message else "Без комментария" }}</small>
             </div>
-            <div class="worker-badge {% if item.status == 'closed' %}blocked{% elif item.status == 'in_progress' %}favorite{% else %}active{% endif %}">
+            <div class="worker-badge {% if item.status == 'closed' %}blocked{% elif item.status in ['in_progress', 'escalated'] %}favorite{% elif item.status == 'on_hold' %}state-hold{% else %}active{% endif %}">
                 {{ item.status }}
             </div>
         </div>
