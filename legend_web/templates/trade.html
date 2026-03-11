@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Торговля | Legend Trading{% endblock %}
 {% block content %}
+<script>
+    window.LEGEND_INITIAL_OPEN_POSITIONS = {{ (initial_open_positions or []) | tojson }};
+    window.LEGEND_INITIAL_TRADE_STATUS = {{ initial_trade_status | tojson if initial_trade_status else 'null' }};
+</script>
 <section class="card hero">
     <h1>{{ labels.trade_title if labels else "Futures Terminal" }}</h1>
     <div class="hint">{{ labels.trade_balance if labels else "Баланс" }}: <span id="live-balance">{{ "%.2f"|format((user.balance if user else 0) or 0) }}</span> <span id="live-currency">{{ (user.currency if user else "USD") or "USD" }}</span></div>

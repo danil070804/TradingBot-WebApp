@@ -1547,6 +1547,38 @@ async def trade(request: Request):
     raw_assets = await fetch_all("SELECT id, name FROM ecn_assets ORDER BY id ASC")
     assets = [{"id": a["id"], "name": a["name"], "ticker": ticker_from_asset_name(a["name"])} for a in raw_assets]
     user = await get_nav_user(tg_id)
+    initial_open_positions = []
+    initial_trade_status = None
+    if tg_id:
+        await settle_user_open_trades(int(tg_id))
+        now = time.time()
+        open_trades = await bot.get_open_trades_for_user(int(tg_id))
+        for tr in open_trades:
+            initial_open_positions.append(
+                {
+                    "trade_id": str(tr["trade_id"]),
+                    "asset_name": str(tr["asset_name"] or ""),
+                    "direction": str(tr["direction"] or "up"),
+                    "amount": float(tr["amount"] or 0),
+                    "remaining": max(0, int(float(tr["close_ts"] or 0) - now)),
+                }
+            )
+        initial_open_positions.sort(key=lambda x: x["remaining"])
+        if initial_open_positions:
+            first_trade = await bot.get_active_trade(str(initial_open_positions[0]["trade_id"]))
+            if first_trade:
+                initial_trade_status = {
+                    "ok": True,
+                    "trade_id": str(first_trade["trade_id"]),
+                    "status": str(first_trade["status"] or "open"),
+                    "remaining": max(0, int(float(first_trade["close_ts"] or 0) - time.time())),
+                    "start_price": float(first_trade["start_price"] or 0),
+                    "asset_name": str(first_trade["asset_name"] or ""),
+                    "direction": str(first_trade["direction"] or "up"),
+                    "amount": float(first_trade["amount"] or 0),
+                    "currency": str(first_trade["currency"] or "USD"),
+                    "seconds": int(first_trade["seconds"] or 0),
+                }
     return templates.TemplateResponse(
         "trade.html",
         {
@@ -1558,6 +1590,8 @@ async def trade(request: Request):
             "user": user,
             "lang": lang,
             "labels": labels,
+            "initial_open_positions": initial_open_positions,
+            "initial_trade_status": initial_trade_status,
         },
     )
 
@@ -2641,6 +2675,11 @@ async def api_trade_status(trade_id: str, tg_id: int):
         "status": trade["status"],
         "remaining": remaining,
         "start_price": float(trade["start_price"] or 0),
+        "asset_name": str(trade["asset_name"] or ""),
+        "direction": str(trade["direction"] or "up"),
+        "amount": float(trade["amount"] or 0),
+        "currency": str(trade["currency"] or "USD"),
+        "seconds": int(trade["seconds"] or 0),
     }
     if trade["status"] == "closed":
         payload.update(

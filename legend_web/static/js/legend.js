@@ -1,6 +1,9 @@
 const LEGEND_LABELS = window.LEGEND_LABELS || {};
 const L = (key, fallback) => LEGEND_LABELS[key] || fallback;
 let MARKET_SOCKET_RUNTIME = null;
+let LIVE_TRADE_PANEL_ID = null;
+const INITIAL_OPEN_POSITIONS = Array.isArray(window.LEGEND_INITIAL_OPEN_POSITIONS) ? window.LEGEND_INITIAL_OPEN_POSITIONS : [];
+const INITIAL_TRADE_STATUS = window.LEGEND_INITIAL_TRADE_STATUS || null;
 
 function applyRuntimeProfile() {
     const body = document.body;
@@ -17,6 +20,51 @@ function reasonLabel(reason) {
     if (reason === "sl") return L("js_reason_sl", "Stop Loss");
     if (reason === "manual") return L("js_reason_manual", "Manual close");
     return L("js_reason_time", "By timer");
+}
+
+function updateTradePanelFromStatus(status) {
+    const timer = document.getElementById("trade-timer");
+    const progress = document.getElementById("trade-progress");
+    const result = document.getElementById("trade-result");
+    if (!timer || !result) return;
+
+    const remaining = Math.max(0, Number(status.remaining || 0));
+    const total = Math.max(1, Number(status.seconds || 1));
+    timer.textContent = `${L("js_trade_waiting", "Time left")}: ${remaining}s`;
+    if (progress) {
+        const done = Math.min(100, Math.max(0, ((total - remaining) / total) * 100));
+        progress.style.width = `${done}%`;
+    }
+
+    if (status.status === "closed") {
+        const cls = status.is_win ? "pos" : "neg";
+        const reason = reasonLabel(status.close_reason);
+        result.innerHTML =
+            `${L("js_trade_done", "Deal completed")}: <span class="${cls}">${status.profit > 0 ? "+" : ""}${status.profit}</span><br>` +
+            `Reason: ${reason}<br>` +
+            `${L("js_trade_balance", "New balance")}: ${status.balance}<br>` +
+            `${L("js_trade_rate", "Rate")}: ${status.start_price} -> ${status.end_price}`;
+        LIVE_TRADE_PANEL_ID = null;
+        return;
+    }
+
+    const side = status.direction === "up" ? L("trade_long", "LONG") : L("trade_short", "SHORT");
+    result.innerHTML =
+        `<span class="pos">${L("js_trade_started", "Trade opened, countdown started")}</span><br>` +
+        `${status.asset_name} ${side} · ${Number(status.amount || 0).toFixed(2)} ${status.currency || "USD"}`;
+}
+
+async function syncTradePanel(tradeId, tgId) {
+    if (!tradeId || !tgId) return;
+    LIVE_TRADE_PANEL_ID = tradeId;
+    try {
+        const statusResp = await fetch(`/api/trade/status?trade_id=${encodeURIComponent(tradeId)}&tg_id=${tgId}`);
+        const status = await statusResp.json();
+        if (!statusResp.ok || !status.ok) return;
+        updateTradePanelFromStatus(status);
+    } catch (_) {
+        // no-op
+    }
 }
 
 function bindDirectionButtons() {
@@ -916,6 +964,9 @@ function bindUserSocket() {
         if (balanceRaw) balanceRaw.value = Number(data.balance || 0).toFixed(4);
         if (positionsWrap && Array.isArray(data.open_positions)) {
             renderOpenPositions(data.open_positions, tgId);
+            if (data.open_positions.length) {
+                syncTradePanel(data.open_positions[0].trade_id, tgId);
+            }
         }
     });
 }
@@ -925,6 +976,13 @@ function renderOpenPositions(items, tgId) {
     if (!wrap) return;
     if (!items.length) {
         wrap.innerHTML = `<div class="empty">No open positions.</div>`;
+        const timer = document.getElementById("trade-timer");
+        const progress = document.getElementById("trade-progress");
+        const result = document.getElementById("trade-result");
+        if (timer) timer.textContent = "--";
+        if (progress) progress.style.width = "0%";
+        if (result) result.innerHTML = "";
+        LIVE_TRADE_PANEL_ID = null;
         return;
     }
     wrap.innerHTML = items
@@ -973,6 +1031,22 @@ function bindOpenPositionsActions() {
     });
 }
 
+function hydrateInitialTradeState() {
+    const tg = document.querySelector('input[name="tg_id"]');
+    const positionsWrap = document.getElementById("open-positions-list");
+    const openEl = document.getElementById("live-open-trades");
+    if (tg && positionsWrap && INITIAL_OPEN_POSITIONS.length) {
+        renderOpenPositions(INITIAL_OPEN_POSITIONS, Number(tg.value || 0));
+    }
+    if (openEl && INITIAL_OPEN_POSITIONS.length) {
+        openEl.textContent = String(INITIAL_OPEN_POSITIONS.length);
+    }
+    if (INITIAL_TRADE_STATUS && INITIAL_TRADE_STATUS.ok) {
+        LIVE_TRADE_PANEL_ID = INITIAL_TRADE_STATUS.trade_id || null;
+        updateTradePanelFromStatus(INITIAL_TRADE_STATUS);
+    }
+}
+
 async function refreshOpenPositions() {
     const wrap = document.getElementById("open-positions-list");
     const tg = document.querySelector('input[name="tg_id"]');
@@ -984,6 +1058,9 @@ async function refreshOpenPositions() {
         const data = await resp.json();
         if (!resp.ok || !data.ok) return;
         renderOpenPositions(data.items || [], tgId);
+        if (Array.isArray(data.items) && data.items.length) {
+            syncTradePanel(data.items[0].trade_id, tgId);
+        }
     } catch (_) {
         // no-op
     }
@@ -1653,6 +1730,7 @@ bindMarketSocket();
 bindUserSocket();
 bindOpenPositionsActions();
 bindMarketMiniCharts();
+hydrateInitialTradeState();
 
 const tapeWrap = document.getElementById("market-tape-list");
 if (tapeWrap) {
