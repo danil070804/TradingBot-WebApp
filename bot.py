@@ -939,6 +939,21 @@ def bot_section_media_actions_keyboard(section_key: str, has_photo: bool):
     return kb.as_markup()
 
 
+def admin_back_keyboard(callback_data: str = "open_admin_panel", label: str = "⬅️ Назад"):
+    kb = InlineKeyboardBuilder()
+    kb.button(text=label, callback_data=callback_data)
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def admin_prompt_keyboard(back_callback: str):
+    kb = InlineKeyboardBuilder()
+    kb.button(text="⬅️ Назад", callback_data=back_callback)
+    kb.button(text="✖️ Отмена", callback_data="open_admin_panel")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
 async def get_effective_min_trade_amount(client_tg_id: int, currency: str | None) -> float:
     global_min = convert_usdt_to_currency(await get_global_min_trade_usdt(), currency)
     trade_settings = await get_client_trade_settings(client_tg_id)
@@ -4025,10 +4040,11 @@ async def ws_min_wd_set(message: Message, state: FSMContext):
 # ---------- ADMIN PANEL ----------
 
 @dp.callback_query(F.data == "open_admin_panel")
-async def open_admin_panel_cb(callback: CallbackQuery):
+async def open_admin_panel_cb(callback: CallbackQuery, state: FSMContext):
     if not is_admin_id(callback.from_user.id):
         await callback.answer("⛔ Нет доступа.")
         return
+    await state.clear()
     await send_admin_panel(callback.message)
     await callback.answer()
 
@@ -4042,23 +4058,29 @@ async def admin_cmd(message: Message):
 
 
 async def send_admin_panel(msg: Message):
-    await msg.answer("🛠 <b>Админ-панель</b>\n\nВыберите действие из списка ниже:", reply_markup=admin_keyboard())
+    await msg.answer(
+        "🛠 <b>Админ-панель</b>\n\n"
+        "Управляйте системой, контентом бота, реквизитами и командой из одного центра.",
+        reply_markup=admin_keyboard(),
+    )
 
 @dp.callback_query(F.data == "admin_stats")
-async def on_admin_stats(callback: CallbackQuery):
+async def on_admin_stats(callback: CallbackQuery, state: FSMContext):
     if not is_admin_id(callback.from_user.id):
         await callback.answer("⛔ Нет доступа.")
         return
+    await state.clear()
     text = await get_admin_stats_text()
-    await callback.message.answer(text)
+    await callback.message.answer(text, reply_markup=admin_back_keyboard("open_admin_panel", "⬅️ К админке"))
     await callback.answer()
 
 
 @dp.callback_query(F.data == "admin_media")
-async def on_admin_media(callback: CallbackQuery):
+async def on_admin_media(callback: CallbackQuery, state: FSMContext):
     if not is_admin_id(callback.from_user.id):
         await callback.answer("⛔ Нет доступа.")
         return
+    await state.clear()
     lines = ["🖼 <b>Фото для разделов бота</b>", ""]
     for section_key, meta in BOT_SECTION_MEDIA.items():
         current = await get_section_photo_file_id(section_key)
@@ -4071,10 +4093,11 @@ async def on_admin_media(callback: CallbackQuery):
 
 
 @dp.callback_query(F.data.startswith("admin_media:"))
-async def on_admin_media_section(callback: CallbackQuery):
+async def on_admin_media_section(callback: CallbackQuery, state: FSMContext):
     if not is_admin_id(callback.from_user.id):
         await callback.answer("⛔ Нет доступа.")
         return
+    await state.clear()
     section_key = callback.data.split(":", 1)[1]
     meta = BOT_SECTION_MEDIA.get(section_key)
     if not meta:
@@ -4102,7 +4125,11 @@ async def on_admin_media_set(callback: CallbackQuery, state: FSMContext):
         return
     await state.update_data(section_media_key=section_key)
     await state.set_state(AdminMediaStates.waiting_photo)
-    await callback.message.answer(f"📤 Отправьте фото для раздела <b>{meta['title']}</b> одним сообщением.")
+    await callback.message.answer(
+        f"📤 Отправьте фото для раздела <b>{meta['title']}</b> одним сообщением.\n\n"
+        "PNG, JPG и Telegram-фото подойдут. Новое изображение сразу заменит текущее.",
+        reply_markup=admin_prompt_keyboard(f"admin_media:{section_key}"),
+    )
     await callback.answer()
 
 
@@ -4117,7 +4144,10 @@ async def on_admin_media_delete(callback: CallbackQuery):
         await callback.answer("Раздел не найден.")
         return
     await set_setting(meta["setting"], "")
-    await callback.message.answer(f"🗑 Фото для раздела <b>{meta['title']}</b> удалено.")
+    await callback.message.answer(
+        f"🗑 Фото для раздела <b>{meta['title']}</b> удалено.",
+        reply_markup=admin_back_keyboard(f"admin_media:{section_key}", "⬅️ К разделу"),
+    )
     await callback.answer()
 
 
@@ -4126,7 +4156,10 @@ async def on_admin_add_worker(callback: CallbackQuery, state: FSMContext):
     if not is_admin_id(callback.from_user.id):
         await callback.answer("⛔ Нет доступа.")
         return
-    await callback.message.answer("👷 Отправьте Telegram ID пользователя, которому нужно выдать роль воркера.")
+    await callback.message.answer(
+        "👷 Отправьте Telegram ID пользователя, которому нужно выдать роль воркера.",
+        reply_markup=admin_prompt_keyboard("open_admin_panel"),
+    )
     await state.set_state(AdminStates.waiting_worker_id)
     await callback.answer()
 
@@ -4140,10 +4173,13 @@ async def admin_set_worker(message: Message, state: FSMContext):
     try:
         user_id = int(message.text.strip())
     except ValueError:
-        await message.answer("❗ Введите корректный числовой Telegram ID.")
+        await message.answer("❗ Введите корректный числовой Telegram ID.", reply_markup=admin_prompt_keyboard("open_admin_panel"))
         return
     await set_worker_flag(user_id, True)
-    await message.answer(f"✅ Пользователь <code>{user_id}</code> назначен воркером.")
+    await message.answer(
+        f"✅ Пользователь <code>{user_id}</code> назначен воркером.",
+        reply_markup=admin_back_keyboard("open_admin_panel", "⬅️ К админке"),
+    )
     await state.clear()
 
 
@@ -4162,13 +4198,22 @@ async def admin_save_section_photo(message: Message, state: FSMContext):
         return
     photo = message.photo[-1]
     await set_setting(meta["setting"], photo.file_id)
-    await message.answer(f"✅ Фото для раздела <b>{meta['title']}</b> сохранено.")
+    await message.answer(
+        f"✅ Фото для раздела <b>{meta['title']}</b> сохранено.",
+        reply_markup=admin_back_keyboard(f"admin_media:{section_key}", "⬅️ К разделу"),
+    )
     await state.clear()
 
 
 @dp.message(AdminMediaStates.waiting_photo)
 async def admin_save_section_photo_invalid(message: Message, state: FSMContext):
-    await message.answer("❗ Пожалуйста, отправьте именно фотографию одним сообщением.")
+    data = await state.get_data()
+    section_key = data.get("section_media_key") or "admin_media"
+    back_target = f"admin_media:{section_key}" if section_key in BOT_SECTION_MEDIA else "admin_media"
+    await message.answer(
+        "❗ Пожалуйста, отправьте именно фотографию одним сообщением.",
+        reply_markup=admin_prompt_keyboard(back_target),
+    )
 
 @dp.callback_query(F.data == "admin_workers")
 async def on_admin_workers(callback: CallbackQuery):
@@ -4214,10 +4259,11 @@ async def on_admin_worker_details(callback: CallbackQuery):
     await callback.answer()
 
 @dp.callback_query(F.data == "admin_payments")
-async def on_admin_payments(callback: CallbackQuery):
+async def on_admin_payments(callback: CallbackQuery, state: FSMContext):
     if not is_admin_id(callback.from_user.id):
         await callback.answer("⛔ Нет доступа.")
         return
+    await state.clear()
     crypto_url = config.crypto_bot_url or "не задана"
     trc20 = config.trc20_address or "не задан"
     card_url = config.card_pay_url or "не задана"
@@ -4258,7 +4304,7 @@ async def on_admin_set_crypto(callback: CallbackQuery, state: FSMContext):
     if not is_admin_id(callback.from_user.id):
         await callback.answer("⛔ Нет доступа.")
         return
-    await callback.message.answer("🔗 Отправьте новый URL для Crypto Bot:")
+    await callback.message.answer("🔗 Отправьте новый URL для Crypto Bot:", reply_markup=admin_prompt_keyboard("admin_payments"))
     await state.set_state(AdminPaymentStates.waiting_crypto_url)
     await callback.answer()
 
@@ -4268,7 +4314,7 @@ async def on_admin_set_trc20(callback: CallbackQuery, state: FSMContext):
     if not is_admin_id(callback.from_user.id):
         await callback.answer("⛔ Нет доступа.")
         return
-    await callback.message.answer("👛 Отправьте новый адрес кошелька TRC20 USDT:")
+    await callback.message.answer("👛 Отправьте новый адрес кошелька TRC20 USDT:", reply_markup=admin_prompt_keyboard("admin_payments"))
     await state.set_state(AdminPaymentStates.waiting_trc20)
     await callback.answer()
 
@@ -4278,7 +4324,7 @@ async def on_admin_set_card_url(callback: CallbackQuery, state: FSMContext):
     if not is_admin_id(callback.from_user.id):
         await callback.answer("⛔ Нет доступа.")
         return
-    await callback.message.answer("💳 Отправьте новый URL для оплаты банковской картой:")
+    await callback.message.answer("💳 Отправьте новый URL для оплаты банковской картой:", reply_markup=admin_prompt_keyboard("admin_payments"))
     await state.set_state(AdminPaymentStates.waiting_card_url)
     await callback.answer()
 
@@ -4288,7 +4334,7 @@ async def on_admin_set_card_req(callback: CallbackQuery, state: FSMContext):
     if not is_admin_id(callback.from_user.id):
         await callback.answer("⛔ Нет доступа.")
         return
-    await callback.message.answer("🏦 Отправьте актуальные реквизиты карты одним сообщением:")
+    await callback.message.answer("🏦 Отправьте актуальные реквизиты карты одним сообщением:", reply_markup=admin_prompt_keyboard("admin_payments"))
     await state.set_state(AdminPaymentStates.waiting_card_requisites)
     await callback.answer()
 
@@ -4298,7 +4344,7 @@ async def on_admin_set_support(callback: CallbackQuery, state: FSMContext):
     if not is_admin_id(callback.from_user.id):
         await callback.answer("⛔ Нет доступа.")
         return
-    await callback.message.answer("🛟 Отправьте новый URL технической поддержки:")
+    await callback.message.answer("🛟 Отправьте новый URL технической поддержки:", reply_markup=admin_prompt_keyboard("admin_payments"))
     await state.set_state(AdminPaymentStates.waiting_support_url)
     await callback.answer()
 
@@ -4308,7 +4354,7 @@ async def on_admin_set_webapp(callback: CallbackQuery, state: FSMContext):
     if not is_admin_id(callback.from_user.id):
         await callback.answer("⛔ Нет доступа.")
         return
-    await callback.message.answer("🌐 Отправьте новый URL WebApp:")
+    await callback.message.answer("🌐 Отправьте новый URL WebApp:", reply_markup=admin_prompt_keyboard("admin_payments"))
     await state.set_state(AdminPaymentStates.waiting_webapp_url)
     await callback.answer()
 
@@ -4318,7 +4364,7 @@ async def on_admin_set_global_min_dep(callback: CallbackQuery, state: FSMContext
     if not is_admin_id(callback.from_user.id):
         await callback.answer("⛔ Нет доступа.")
         return
-    await callback.message.answer("📥 Отправьте новую глобальную минималку пополнения в USDT:")
+    await callback.message.answer("📥 Отправьте новую глобальную минималку пополнения в USDT:", reply_markup=admin_prompt_keyboard("admin_payments"))
     await state.set_state(AdminPaymentStates.waiting_global_min_deposit_usdt)
     await callback.answer()
 
@@ -4328,7 +4374,7 @@ async def on_admin_set_global_min_trade(callback: CallbackQuery, state: FSMConte
     if not is_admin_id(callback.from_user.id):
         await callback.answer("⛔ Нет доступа.")
         return
-    await callback.message.answer("📈 Отправьте новую глобальную минималку сделки в USDT:")
+    await callback.message.answer("📈 Отправьте новую глобальную минималку сделки в USDT:", reply_markup=admin_prompt_keyboard("admin_payments"))
     await state.set_state(AdminPaymentStates.waiting_global_min_trade_usdt)
     await callback.answer()
 
@@ -4338,6 +4384,7 @@ async def on_admin_assets(callback: CallbackQuery, state: FSMContext):
     if not is_admin_id(callback.from_user.id):
         await callback.answer("⛔ Нет доступа.")
         return
+    await state.clear()
     rows = await get_ecn_assets()
     preview = ", ".join([r["name"] for r in rows[:20]])
     text = (
@@ -4347,7 +4394,7 @@ async def on_admin_assets(callback: CallbackQuery, state: FSMContext):
         "Отправьте название нового актива одним сообщением."
     )
     await state.set_state(AdminPaymentStates.waiting_asset_name)
-    await callback.message.answer(text)
+    await callback.message.answer(text, reply_markup=admin_prompt_keyboard("open_admin_panel"))
     await callback.answer()
 
 @dp.message(AdminPaymentStates.waiting_crypto_url)
@@ -4358,12 +4405,13 @@ async def admin_save_crypto_url(message: Message, state: FSMContext):
         return
     new_url = message.text.strip()
     if not (new_url.startswith("http://") or new_url.startswith("https://")):
-        await message.answer("❗ Похоже, это не ссылка. Отправьте корректный URL.")
+        await message.answer("❗ Похоже, это не ссылка. Отправьте корректный URL.", reply_markup=admin_prompt_keyboard("admin_payments"))
         return
     await set_setting("crypto_bot_url", new_url)
     await message.answer(
         "✅ Ссылка на Crypto bot обновлена.\n"
-        f"Текущее значение:\n<code>{new_url}</code>"
+        f"Текущее значение:\n<code>{new_url}</code>",
+        reply_markup=admin_back_keyboard("admin_payments", "⬅️ К реквизитам"),
     )
     await state.clear()
 
@@ -4376,12 +4424,13 @@ async def admin_save_trc20(message: Message, state: FSMContext):
         return
     new_addr = message.text.strip()
     if len(new_addr) < 10:
-        await message.answer("❗ Слишком короткий адрес. Отправьте корректный TRC20-адрес.")
+        await message.answer("❗ Слишком короткий адрес. Отправьте корректный TRC20-адрес.", reply_markup=admin_prompt_keyboard("admin_payments"))
         return
     await set_setting("trc20_address", new_addr)
     await message.answer(
         "✅ Адрес TRC20 USDT обновлён.\n"
-        f"Текущее значение:\n<code>{new_addr}</code>"
+        f"Текущее значение:\n<code>{new_addr}</code>",
+        reply_markup=admin_back_keyboard("admin_payments", "⬅️ К реквизитам"),
     )
     await state.clear()
 
@@ -4394,10 +4443,13 @@ async def admin_save_card_url(message: Message, state: FSMContext):
         return
     new_url = message.text.strip()
     if not (new_url.startswith("http://") or new_url.startswith("https://")):
-        await message.answer("❗ Отправьте корректный URL.")
+        await message.answer("❗ Отправьте корректный URL.", reply_markup=admin_prompt_keyboard("admin_payments"))
         return
     await set_setting("card_pay_url", new_url)
-    await message.answer(f"✅ URL оплаты картой обновлён.\n<code>{new_url}</code>")
+    await message.answer(
+        f"✅ URL оплаты картой обновлён.\n<code>{new_url}</code>",
+        reply_markup=admin_back_keyboard("admin_payments", "⬅️ К реквизитам"),
+    )
     await state.clear()
 
 
@@ -4409,10 +4461,10 @@ async def admin_save_card_requisites(message: Message, state: FSMContext):
         return
     value = message.text.strip()
     if len(value) < 8:
-        await message.answer("❗ Реквизиты выглядят слишком короткими. Проверьте и отправьте ещё раз.")
+        await message.answer("❗ Реквизиты выглядят слишком короткими. Проверьте и отправьте ещё раз.", reply_markup=admin_prompt_keyboard("admin_payments"))
         return
     await set_setting("card_requisites", value)
-    await message.answer("✅ Реквизиты карты обновлены.")
+    await message.answer("✅ Реквизиты карты обновлены.", reply_markup=admin_back_keyboard("admin_payments", "⬅️ К реквизитам"))
     await state.clear()
 
 
@@ -4424,12 +4476,15 @@ async def admin_save_support_url(message: Message, state: FSMContext):
         return
     new_url = message.text.strip()
     if not (new_url.startswith("http://") or new_url.startswith("https://") or new_url.startswith("t.me/")):
-        await message.answer("❗ Отправьте корректную ссылку поддержки.")
+        await message.answer("❗ Отправьте корректную ссылку поддержки.", reply_markup=admin_prompt_keyboard("admin_payments"))
         return
     if new_url.startswith("t.me/"):
         new_url = f"https://{new_url}"
     await set_setting("support_url", new_url)
-    await message.answer(f"✅ Ссылка поддержки обновлена.\n<code>{new_url}</code>")
+    await message.answer(
+        f"✅ Ссылка поддержки обновлена.\n<code>{new_url}</code>",
+        reply_markup=admin_back_keyboard("admin_payments", "⬅️ К реквизитам"),
+    )
     await state.clear()
 
 
@@ -4441,10 +4496,13 @@ async def admin_save_webapp_url(message: Message, state: FSMContext):
         return
     new_url = message.text.strip().rstrip("/")
     if not (new_url.startswith("http://") or new_url.startswith("https://")):
-        await message.answer("❗ Отправьте корректный URL WebApp.")
+        await message.answer("❗ Отправьте корректный URL WebApp.", reply_markup=admin_prompt_keyboard("admin_payments"))
         return
     await set_setting("webapp_url", new_url)
-    await message.answer(f"✅ WebApp URL обновлён.\n<code>{new_url}</code>")
+    await message.answer(
+        f"✅ WebApp URL обновлён.\n<code>{new_url}</code>",
+        reply_markup=admin_back_keyboard("admin_payments", "⬅️ К реквизитам"),
+    )
     await state.clear()
 
 
@@ -4459,10 +4517,13 @@ async def admin_save_global_min_deposit_usdt(message: Message, state: FSMContext
         if value < 0:
             raise ValueError
     except ValueError:
-        await message.answer("❗ Отправьте неотрицательное число в USDT.")
+        await message.answer("❗ Отправьте неотрицательное число в USDT.", reply_markup=admin_prompt_keyboard("admin_payments"))
         return
     await set_setting("global_min_deposit_usdt", f"{value:.2f}")
-    await message.answer(f"✅ Глобальная минималка пополнения обновлена: <b>{value:.2f} USDT</b>")
+    await message.answer(
+        f"✅ Глобальная минималка пополнения обновлена: <b>{value:.2f} USDT</b>",
+        reply_markup=admin_back_keyboard("admin_payments", "⬅️ К реквизитам"),
+    )
     await state.clear()
 
 
@@ -4477,10 +4538,13 @@ async def admin_save_global_min_trade_usdt(message: Message, state: FSMContext):
         if value < 0:
             raise ValueError
     except ValueError:
-        await message.answer("❗ Отправьте неотрицательное число в USDT.")
+        await message.answer("❗ Отправьте неотрицательное число в USDT.", reply_markup=admin_prompt_keyboard("admin_payments"))
         return
     await set_setting("global_min_trade_usdt", f"{value:.2f}")
-    await message.answer(f"✅ Глобальная минималка сделки обновлена: <b>{value:.2f} USDT</b>")
+    await message.answer(
+        f"✅ Глобальная минималка сделки обновлена: <b>{value:.2f} USDT</b>",
+        reply_markup=admin_back_keyboard("admin_payments", "⬅️ К реквизитам"),
+    )
     await state.clear()
 
 
@@ -4492,10 +4556,13 @@ async def admin_add_asset_from_text(message: Message, state: FSMContext):
         return
     name = message.text.strip()
     if len(name) < 2:
-        await message.answer("❗ Слишком короткое название актива.")
+        await message.answer("❗ Слишком короткое название актива.", reply_markup=admin_prompt_keyboard("open_admin_panel"))
         return
     await add_ecn_asset(name)
-    await message.answer(f"✅ Актив добавлен в список ECN или уже существовал ранее: <b>{name}</b>")
+    await message.answer(
+        f"✅ Актив добавлен в список ECN или уже существовал ранее: <b>{name}</b>",
+        reply_markup=admin_back_keyboard("admin_assets", "⬅️ К активам"),
+    )
     await state.clear()
 
 # ---------- WORKER ↔ CLIENT DIALOG ----------
