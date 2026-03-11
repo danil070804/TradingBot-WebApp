@@ -873,7 +873,7 @@ async def get_worker_client_row(client_tg_id: int, worker_tg_id: int | None = No
                 SELECT *
                 FROM worker_clients
                 WHERE client_tg_id = ?
-                ORDER BY COALESCE(last_activity_at, created_at) DESC, id DESC
+                ORDER BY (last_activity_at IS NOT NULL) DESC, last_activity_at DESC, created_at DESC, id DESC
                 LIMIT 1
                 """,
                 (client_tg_id,),
@@ -884,7 +884,7 @@ async def get_worker_client_row(client_tg_id: int, worker_tg_id: int | None = No
                 SELECT *
                 FROM worker_clients
                 WHERE client_tg_id = ? AND worker_tg_id = ?
-                ORDER BY COALESCE(last_activity_at, created_at) DESC, id DESC
+                ORDER BY (last_activity_at IS NOT NULL) DESC, last_activity_at DESC, created_at DESC, id DESC
                 LIMIT 1
                 """,
                 (client_tg_id, worker_tg_id),

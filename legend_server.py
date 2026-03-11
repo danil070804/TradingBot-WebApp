@@ -710,7 +710,7 @@ async def fetch_worker_clients_rows(worker_tg_id: int):
             LEFT JOIN users u ON u.tg_id = wc.client_tg_id
             LEFT JOIN client_luck cl ON cl.worker_tg_id = wc.worker_tg_id AND cl.client_tg_id = wc.client_tg_id
             WHERE wc.worker_tg_id = ?
-            ORDER BY COALESCE(wc.last_activity_at, wc.created_at) DESC, wc.id DESC
+            ORDER BY (wc.last_activity_at IS NOT NULL) DESC, wc.last_activity_at DESC, wc.created_at DESC, wc.id DESC
             LIMIT 300
             """,
             (worker_tg_id,),
