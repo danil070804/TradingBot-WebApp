@@ -410,6 +410,7 @@ class WorkerClientStates(StatesGroup):
     waiting_balance_amount = State()
     waiting_min_dep = State()
     waiting_min_wd = State()
+    waiting_min_trade = State()
     waiting_transfer_worker = State()
 
 
@@ -2592,36 +2593,37 @@ def worker_sheeps_keyboard(wc_rows):
     kb = InlineKeyboardBuilder()
     for row in wc_rows[:10]:
         label_name = row["first_name"] or "без имени"
-        btn_text = f"/n{row['id']} — {label_name}"
+        btn_text = f"👤 /n{row['id']} • {label_name}"
         kb.button(text=btn_text, callback_data=f"wc_profile:{row['id']}")
-    kb.button(text="День", callback_data="sheep_period:day")
-    kb.button(text="Неделя", callback_data="sheep_period:week")
-    kb.button(text="Месяц", callback_data="sheep_period:month")
-    kb.button(text="• Всё время •", callback_data="sheep_period:all")
+    kb.button(text="🕓 День", callback_data="sheep_period:day")
+    kb.button(text="📆 Неделя", callback_data="sheep_period:week")
+    kb.button(text="🗓 Месяц", callback_data="sheep_period:month")
+    kb.button(text="∞ Всё время", callback_data="sheep_period:all")
     kb.button(text="⭐ Избранные", callback_data="sheep_fav")
     kb.button(text="🔍 Поиск по ID", callback_data="sheep_search")
-    kb.button(text="⬅ Назад", callback_data="open_worker_panel")
-    kb.adjust(1)
+    kb.button(text="⬅️ К панели", callback_data="open_worker_panel")
+    kb.adjust(1, 1, 2, 2, 1)
     return kb.as_markup()
 
 
-def worker_client_profile_keyboard(wc_id: int, flags: dict, balance: float, currency: str, min_dep: float, min_wd: float):
+def worker_client_profile_keyboard(wc_id: int, flags: dict, balance: float, currency: str, min_dep: float, min_wd: float, min_trade: float):
     kb = InlineKeyboardBuilder()
-    kb.button(text="💰 Баланс", callback_data=f"wc_adj_balance:{wc_id}")
+    kb.button(text=f"💰 Баланс · {balance:.2f} {currency}", callback_data=f"wc_adj_balance:{wc_id}")
     kb.button(text="☘️ Удача", callback_data=f"wc_luck:{wc_id}")
-    kb.button(text="📥 Мин. депозит", callback_data=f"wc_min_dep:{wc_id}")
-    kb.button(text="📤 Мин. вывод", callback_data=f"wc_min_wd:{wc_id}")
-    kb.button(text=("✅ Вериф" if not flags["verified"] else "❌ Вериф"), callback_data=f"wc_toggle_verif:{wc_id}")
-    kb.button(text=("✅ Вывод" if not flags["withdraw_enabled"] else "❌ Вывод"), callback_data=f"wc_toggle_withdraw:{wc_id}")
-    kb.button(text=("✅ Покупка" if not flags["trading_enabled"] else "❌ Покупка"), callback_data=f"wc_toggle_trade:{wc_id}")
-    kb.button(text=("⭐ В избранное" if not flags["favorite"] else "⭐ Убрать из избранного"), callback_data=f"wc_toggle_fav:{wc_id}")
-    kb.button(text="📤 Передать лохматого", callback_data=f"wc_transfer:{wc_id}")
+    kb.button(text=f"📥 Мин. депозит · {float(min_dep):.2f}", callback_data=f"wc_min_dep:{wc_id}")
+    kb.button(text=f"📤 Мин. вывод · {float(min_wd):.2f}", callback_data=f"wc_min_wd:{wc_id}")
+    kb.button(text=f"📈 Мин. сделка · {float(min_trade):.2f}", callback_data=f"wc_min_trade:{wc_id}")
+    kb.button(text=("🛂 Вериф: OFF" if not flags["verified"] else "🛂 Вериф: ON"), callback_data=f"wc_toggle_verif:{wc_id}")
+    kb.button(text=("💸 Вывод: OFF" if not flags["withdraw_enabled"] else "💸 Вывод: ON"), callback_data=f"wc_toggle_withdraw:{wc_id}")
+    kb.button(text=("📊 Торговля: OFF" if not flags["trading_enabled"] else "📊 Торговля: ON"), callback_data=f"wc_toggle_trade:{wc_id}")
+    kb.button(text=("⭐ В избранное" if not flags["favorite"] else "✨ Убрать из избранного"), callback_data=f"wc_toggle_fav:{wc_id}")
+    kb.button(text="🔁 Передать реферала", callback_data=f"wc_transfer:{wc_id}")
     kb.button(
         text=("🔒 Заблокировать" if not flags["blocked"] else "🔓 Разблокировать"),
         callback_data=f"wc_toggle_block:{wc_id}",
     )
     kb.button(text="💬 Начать диалог", callback_data=f"wc_chat_start:{wc_id}")
-    kb.button(text="⬅ Назад", callback_data="worker_sheeps")
+    kb.button(text="⬅️ К базе рефералов", callback_data="worker_sheeps")
     kb.adjust(2, 2, 2, 2, 2, 1, 1)
     return kb.as_markup()
 
@@ -3938,10 +3940,14 @@ async def worker_sheeps(callback: CallbackQuery):
     rows = await get_worker_clients_list(callback.from_user.id)
     text = "🐑 <b>База рефералов</b>\n\n"
     if not rows:
-        text += "Список пока пуст."
+        text += "╰ Пока здесь нет закреплённых клиентов."
     else:
         first = rows[0]
-        text += f"Последняя активная карточка: /n{first['id']} (ID <code>{first['client_tg_id']}</code>)"
+        text += (
+            "╭ <b>Быстрый доступ</b>\n"
+            f"├ Последняя активная карточка: <code>/n{first['id']}</code>\n"
+            f"╰ Telegram ID клиента: <code>{first['client_tg_id']}</code>"
+        )
     await callback.message.answer(text, reply_markup=worker_sheeps_keyboard(rows))
     await callback.answer()
 
@@ -3956,17 +3962,24 @@ async def sheep_fav(callback: CallbackQuery):
     rows = await get_worker_clients_list(callback.from_user.id, favorites_only=True)
     text = "⭐ <b>Избранные рефералы</b>\n\n"
     if not rows:
-        text += "Список избранного пока пуст."
+        text += "╰ Список избранного пока пуст."
     else:
         first = rows[0]
-        text += f"Первая карточка: /n{first['id']} (ID <code>{first['client_tg_id']}</code>)"
+        text += (
+            "╭ <b>Быстрый доступ</b>\n"
+            f"├ Первая карточка: <code>/n{first['id']}</code>\n"
+            f"╰ Telegram ID клиента: <code>{first['client_tg_id']}</code>"
+        )
     await callback.message.answer(text, reply_markup=worker_sheeps_keyboard(rows))
     await callback.answer()
 
 
 @dp.callback_query(F.data == "sheep_search")
 async def sheep_search(callback: CallbackQuery):
-    await callback.message.answer("🔍 Поиск по ID пока в разработке. Пока можно открыть карточку командой вида <code>/n123</code>.")
+    await callback.message.answer(
+        "🔍 <b>Поиск по ID</b>\n\n"
+        "Введите команду в формате <code>/n123</code>, где <code>123</code> — ID карточки реферала."
+    )
     await callback.answer()
 
 @dp.message(F.text.startswith("/n"))
@@ -4028,30 +4041,31 @@ async def open_worker_client_profile(msg: Message, wc_id: int):
     auto_reject_text = "ВКЛ" if auto_reject_trades else "ВЫКЛ"
 
     text = (
-        f"📄 <b>Карточка реферала</b> /n{wc_id}\n\n"
-        f"👤 <b>{profile_name}</b>\n"
+        f"📄 <b>Карточка реферала</b> <code>/n{wc_id}</code>\n\n"
+        f"╭ <b>Профиль клиента</b>\n"
+        f"├ Имя: <b>{profile_name}</b>\n"
         f"├ ID: <code>{row['client_tg_id']}</code>\n"
         f"├ Username: {username}\n"
         f"├ Язык: {lang}\n"
-        f"└ Последняя активность: {activity_text}\n\n"
-        f"💰 <b>Финансы и лимиты</b>\n"
-        f"├ Баланс: {balance:.2f} {currency}\n"
-        f"├ Мин. депозит: {float(min_dep):.2f} {currency}\n"
-        f"├ Мин. вывод: {float(min_wd):.2f} {currency}\n"
-        f"├ Мин. сделка: {float(min_trade):.2f} {currency}\n"
-        f"├ Коэффициент: {float(trade_coefficient):.2f}\n"
-        f"└ Удача: {luck_text}\n\n"
-        f"⚙️ <b>Статусы</b>\n"
-        f"├ Торговля: {status_trade}\n"
-        f"├ Вывод: {status_withdraw}\n"
-        f"├ Верификация: {status_verify}\n"
-        f"├ Авто-отклонение: {auto_reject_text}\n"
-        f"├ Избранное: {status_favorite}\n"
-        f"└ Блок: {status_block}"
+        f"╰ Последняя активность: {activity_text}\n\n"
+        f"╭ <b>Финансы и торговые лимиты</b>\n"
+        f"├ Баланс: <b>{balance:.2f} {currency}</b>\n"
+        f"├ Мин. депозит: <b>{float(min_dep):.2f} {currency}</b>\n"
+        f"├ Мин. вывод: <b>{float(min_wd):.2f} {currency}</b>\n"
+        f"├ Мин. сделка: <b>{float(min_trade):.2f} {currency}</b>\n"
+        f"├ Коэффициент: <b>{float(trade_coefficient):.2f}</b>\n"
+        f"╰ Удача: <b>{luck_text}</b>\n\n"
+        f"╭ <b>Статусы</b>\n"
+        f"├ Торговля: <b>{status_trade}</b>\n"
+        f"├ Вывод: <b>{status_withdraw}</b>\n"
+        f"├ Верификация: <b>{status_verify}</b>\n"
+        f"├ Авто-отклонение: <b>{auto_reject_text}</b>\n"
+        f"├ Избранное: <b>{status_favorite}</b>\n"
+        f"╰ Блокировка: <b>{status_block}</b>"
     )
     await msg.answer(
         text,
-        reply_markup=worker_client_profile_keyboard(wc_id, flags, balance, currency, min_dep, min_wd),
+        reply_markup=worker_client_profile_keyboard(wc_id, flags, balance, currency, min_dep, min_wd, min_trade),
     )
 
 
@@ -4191,6 +4205,59 @@ async def wc_min_wd_set(message: Message, state: FSMContext):
         return
     await update_worker_client_field(wc_id, "min_withdraw", value)
     await message.answer(f"✅ Минимальный вывод для клиента обновлён: <b>{value:.2f}</b>")
+    await state.clear()
+
+
+@dp.callback_query(F.data.startswith("wc_min_trade:"))
+async def wc_min_trade_cb(callback: CallbackQuery, state: FSMContext):
+    wc_id = int(callback.data.split(":", 1)[1])
+    row = await get_worker_client_by_id(wc_id)
+    if not row:
+        await callback.message.answer("❗ Карточка реферала не найдена.")
+        await callback.answer()
+        return
+    currency = row["currency"] or "USD"
+    global_min_trade_usdt = await get_global_min_trade_usdt()
+    effective_global_min = convert_usdt_to_currency(global_min_trade_usdt, currency)
+    await state.update_data(wc_id=wc_id)
+    await state.set_state(WorkerClientStates.waiting_min_trade)
+    await callback.message.answer(
+        "📈 <b>Минимальная сделка клиента</b>\n\n"
+        f"Текущая валюта счёта: <b>{currency}</b>\n"
+        f"Глобальная база: <b>{global_min_trade_usdt:.2f} USDT</b>\n"
+        f"Эквивалент в валюте клиента: <b>{effective_global_min:.2f} {currency}</b>\n\n"
+        f"Отправьте новое значение минимальной сделки в <b>{currency}</b>."
+    )
+    await callback.answer()
+
+
+@dp.message(WorkerClientStates.waiting_min_trade)
+async def wc_min_trade_set(message: Message, state: FSMContext):
+    data = await state.get_data()
+    wc_id = data.get("wc_id")
+    row = await get_worker_client_by_id(wc_id)
+    if not row:
+        await message.answer("❗ Карточка реферала не найдена.")
+        await state.clear()
+        return
+    currency = row["currency"] or "USD"
+    try:
+        value = float(message.text.replace(",", "."))
+        if value < 0:
+            raise ValueError
+    except ValueError:
+        await message.answer("❗ Введите неотрицательное число.")
+        return
+    await update_worker_client_field(wc_id, "min_trade_amount", value)
+    global_min_trade_usdt = await get_global_min_trade_usdt()
+    value_in_usdt = convert_currency_to_usdt(value, currency)
+    await message.answer(
+        "✅ <b>Минимальная сделка обновлена</b>\n\n"
+        f"├ Клиент: <code>/n{wc_id}</code>\n"
+        f"├ Новое значение: <b>{value:.2f} {currency}</b>\n"
+        f"├ Эквивалент: <b>{value_in_usdt:.2f} USDT</b>\n"
+        f"╰ Глобальная база системы: <b>{global_min_trade_usdt:.2f} USDT</b>"
+    )
     await state.clear()
 
 @dp.callback_query(F.data.startswith("wc_toggle_verif:"))
