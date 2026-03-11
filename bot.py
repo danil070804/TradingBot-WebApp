@@ -56,11 +56,27 @@ dp = Dispatcher()
 ACTIVE_DIALOGS_CLIENT: dict[int, int] = {}
 # worker_id -> client_id
 ACTIVE_DIALOGS_WORKER: dict[int, int] = {}
+ACTIVE_DEAL_TASKS: set[asyncio.Task] = set()
 
 
 class DepositStates(StatesGroup):
     waiting_amount = State()
     waiting_method = State()
+
+
+def spawn_background_task(coro):
+    task = asyncio.create_task(coro)
+    ACTIVE_DEAL_TASKS.add(task)
+
+    def _finalize(done_task: asyncio.Task):
+        ACTIVE_DEAL_TASKS.discard(done_task)
+        try:
+            done_task.result()
+        except Exception as exc:
+            print(f"[deal-task] {exc}")
+
+    task.add_done_callback(_finalize)
+    return task
 
 
 I18N = {
@@ -686,6 +702,29 @@ async def get_user_row(tg_user) -> aiosqlite.Row:
         await db.commit()
 
         cur = await db.execute("SELECT * FROM users WHERE tg_id = ?", (tg_user.id,))
+        return await cur.fetchone()
+
+
+async def get_user_by_tg_id(tg_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute("SELECT * FROM users WHERE tg_id = ?", (tg_id,))
+        return await cur.fetchone()
+
+
+async def get_client_trade_settings(client_tg_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            """
+            SELECT min_trade_amount, auto_reject_trades, trading_enabled, blocked
+            FROM worker_clients
+            WHERE client_tg_id = ?
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (client_tg_id,),
+        )
         return await cur.fetchone()
 
 
@@ -1897,11 +1936,47 @@ async def ecn_choose_time(callback: CallbackQuery, state: FSMContext):
     lang = normalize_lang(user_row["language"])
     currency = user_row["currency"] or "USD"
     balance = user_row["balance"] or 0.0
+    trade_settings = await get_client_trade_settings(callback.from_user.id)
 
     if not amount or amount <= 0:
         await callback.answer(tr(lang, "Сумма сделки не определена. Начните заново.", "Deal amount is not set. Start again.", "Суму угоди не визначено. Почніть заново."), show_alert=True)
         await state.clear()
         return
+
+    if trade_settings:
+        if bool(trade_settings["blocked"]):
+            await callback.answer(
+                tr(lang, "Аккаунт заблокирован для торговли.", "Trading is blocked for this account.", "Акаунт заблокований для торгівлі."),
+                show_alert=True,
+            )
+            await state.clear()
+            return
+        if not bool(trade_settings["trading_enabled"]):
+            await callback.answer(
+                tr(lang, "Торговля для аккаунта отключена.", "Trading is disabled for this account.", "Торгівлю для акаунта вимкнено."),
+                show_alert=True,
+            )
+            await state.clear()
+            return
+        if bool(trade_settings["auto_reject_trades"]):
+            await callback.answer(
+                tr(lang, "Сделки для аккаунта временно отклоняются.", "Trades are temporarily rejected for this account.", "Угоди для акаунта тимчасово відхиляються."),
+                show_alert=True,
+            )
+            await state.clear()
+            return
+        min_trade_amount = float(trade_settings["min_trade_amount"] or 100.0)
+        if amount < min_trade_amount:
+            await callback.answer(
+                tr(
+                    lang,
+                    f"Минимальная сумма сделки: {min_trade_amount:.2f} {currency}.",
+                    f"Minimum trade amount: {min_trade_amount:.2f} {currency}.",
+                    f"Мінімальна сума угоди: {min_trade_amount:.2f} {currency}.",
+                ),
+                show_alert=True,
+            )
+            return
 
     if amount > balance:
         await callback.answer(tr(lang, "Недостаточно средств для открытия сделки.", "Insufficient funds to open deal.", "Недостатньо коштів для відкриття угоди."), show_alert=True)
@@ -1925,7 +2000,7 @@ async def ecn_choose_time(callback: CallbackQuery, state: FSMContext):
     msg = await callback.message.answer(text)
     await callback.answer()
 
-    asyncio.create_task(
+    spawn_background_task(
         run_demo_deal(
             user_tg_id=callback.from_user.id,
             chat_id=msg.chat.id,
