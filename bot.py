@@ -41,6 +41,8 @@ class Config:
     webapp_url: str
     card_pay_url: str
     card_requisites: str
+    news_url: str
+    user_agreement_url: str
 
 
 config = Config(
@@ -53,6 +55,8 @@ config = Config(
     webapp_url=(os.getenv("WEBAPP_URL") or os.getenv("WEBHOOK_BASE_URL") or "").rstrip("/"),
     card_pay_url=os.getenv("CARD_PAY_URL", ""),
     card_requisites=os.getenv("CARD_REQUISITES", ""),
+    news_url=os.getenv("NEWS_URL", "https://www.youtube.com/channel/UCVj_rwnR1p-7Da15L8MwRNQ"),
+    user_agreement_url=os.getenv("USER_AGREEMENT_URL", "https://telegra.ph/Polzovatelskoe-soglashenie-03-27-13"),
 )
 
 bot = Bot(token=config.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
@@ -269,6 +273,17 @@ def support_contact_text() -> str:
     return raw
 
 
+def build_menu_info_text(lang: str) -> str:
+    news_url = (config.news_url or "").strip() or "—"
+    user_agreement_url = (config.user_agreement_url or "").strip() or "—"
+    return tr(
+        lang,
+        f"ℹ️ Информация\n\n📣 Новости: {news_url}\n📄 Пользовательское соглашение: {user_agreement_url}",
+        f"ℹ️ Information\n\n📣 News: {news_url}\n📄 User agreement: {user_agreement_url}",
+        f"ℹ️ Інформація\n\n📣 Новини: {news_url}\n📄 Угода користувача: {user_agreement_url}",
+    )
+
+
 class WithdrawStates(StatesGroup):
     waiting_amount = State()
     waiting_card = State()
@@ -285,6 +300,8 @@ class AdminPaymentStates(StatesGroup):
     waiting_card_url = State()
     waiting_card_requisites = State()
     waiting_support_url = State()
+    waiting_news_url = State()
+    waiting_user_agreement_url = State()
     waiting_webapp_url = State()
     waiting_global_min_deposit_usdt = State()
     waiting_global_min_trade_usdt = State()
@@ -814,12 +831,16 @@ async def init_db():
                 config.card_requisites = row["value"]
             elif row["key"] == "support_url":
                 config.support_url = row["value"]
+            elif row["key"] == "news_url":
+                config.news_url = row["value"]
+            elif row["key"] == "user_agreement_url":
+                config.user_agreement_url = row["value"]
             elif row["key"] == "webapp_url":
                 config.webapp_url = row["value"]
 
         cur = await db.execute(
-            "SELECT key FROM settings WHERE key IN (?, ?)",
-            ("global_min_trade_usdt", "global_min_deposit_usdt"),
+            "SELECT key FROM settings WHERE key IN (?, ?, ?, ?)",
+            ("global_min_trade_usdt", "global_min_deposit_usdt", "news_url", "user_agreement_url"),
         )
         existing_setting_rows = await cur.fetchall()
         existing_settings = {row["key"] for row in existing_setting_rows}
@@ -827,6 +848,8 @@ async def init_db():
         for key, default_value in (
             ("global_min_trade_usdt", str(DEFAULT_MIN_TRADE_USDT)),
             ("global_min_deposit_usdt", str(DEFAULT_MIN_DEPOSIT_USDT)),
+            ("news_url", config.news_url),
+            ("user_agreement_url", config.user_agreement_url),
         ):
             if key not in existing_settings:
                 await db.execute(
@@ -1996,6 +2019,10 @@ async def set_setting(key: str, value: str):
         config.card_requisites = value
     elif key == "support_url":
         config.support_url = value
+    elif key == "news_url":
+        config.news_url = value
+    elif key == "user_agreement_url":
+        config.user_agreement_url = value
     elif key == "webapp_url":
         config.webapp_url = value
 
@@ -2662,7 +2689,7 @@ async def menu_portfolio(message: Message):
 async def menu_info(message: Message):
     user_row = await get_user_row(message.from_user)
     lang = normalize_lang(user_row["language"])
-    text = t(lang, "menu_info_text")
+    text = build_menu_info_text(lang)
     await send_section_message(message, "info", text, reply_markup=main_menu_keyboard(lang))
 
 
@@ -4448,6 +4475,8 @@ async def on_admin_payments(callback: CallbackQuery, state: FSMContext):
     card_url = config.card_pay_url or "не задана"
     card_req = config.card_requisites or "не заданы"
     support_url = config.support_url or "не задана"
+    news_url = config.news_url or "не задана"
+    user_agreement_url = config.user_agreement_url or "не задана"
     webapp_url = config.webapp_url or "не задана"
     global_min_deposit_usdt = await get_global_min_deposit_usdt()
     global_min_trade_usdt = await get_global_min_trade_usdt()
@@ -4458,6 +4487,8 @@ async def on_admin_payments(callback: CallbackQuery, state: FSMContext):
         f"💳 Card Pay URL:\n<code>{card_url}</code>\n\n"
         f"🏦 Card requisites:\n<code>{card_req}</code>\n\n"
         f"🛟 Support URL:\n<code>{support_url}</code>\n\n"
+        f"📣 News URL:\n<code>{news_url}</code>\n\n"
+        f"📄 User agreement URL:\n<code>{user_agreement_url}</code>\n\n"
         f"🌐 WebApp URL:\n<code>{webapp_url}</code>\n\n"
         f"📥 Глобальный мин. депозит:\n<code>{global_min_deposit_usdt:.2f} USDT</code>\n\n"
         f"📈 Глобальная мин. сделка:\n<code>{global_min_trade_usdt:.2f} USDT</code>\n\n"
@@ -4469,6 +4500,8 @@ async def on_admin_payments(callback: CallbackQuery, state: FSMContext):
     kb.button(text="✏️Изменить ссылку оплаты картой", callback_data="admin_set_card_url")
     kb.button(text="✏️Изменить реквизиты карты", callback_data="admin_set_card_req")
     kb.button(text="✏️Изменить ссылку поддержки", callback_data="admin_set_support")
+    kb.button(text="✏️Изменить ссылку новостей", callback_data="admin_set_news")
+    kb.button(text="✏️Изменить ссылку соглашения", callback_data="admin_set_user_agreement")
     kb.button(text="✏️Изменить WebApp URL", callback_data="admin_set_webapp")
     kb.button(text="✏️Изменить мин. депозит USDT", callback_data="admin_set_global_min_dep")
     kb.button(text="✏️Изменить мин. сделку USDT", callback_data="admin_set_global_min_trade")
@@ -4525,6 +4558,26 @@ async def on_admin_set_support(callback: CallbackQuery, state: FSMContext):
         return
     await callback.message.answer("🛟 Отправьте новый URL технической поддержки:", reply_markup=admin_prompt_keyboard("admin_payments"))
     await state.set_state(AdminPaymentStates.waiting_support_url)
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "admin_set_news")
+async def on_admin_set_news(callback: CallbackQuery, state: FSMContext):
+    if not is_admin_id(callback.from_user.id):
+        await callback.answer("⛔ Нет доступа.")
+        return
+    await callback.message.answer("📣 Отправьте новый URL для блока новостей в разделе «О сервисе»:", reply_markup=admin_prompt_keyboard("admin_payments"))
+    await state.set_state(AdminPaymentStates.waiting_news_url)
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "admin_set_user_agreement")
+async def on_admin_set_user_agreement(callback: CallbackQuery, state: FSMContext):
+    if not is_admin_id(callback.from_user.id):
+        await callback.answer("⛔ Нет доступа.")
+        return
+    await callback.message.answer("📄 Отправьте новый URL пользовательского соглашения:", reply_markup=admin_prompt_keyboard("admin_payments"))
+    await state.set_state(AdminPaymentStates.waiting_user_agreement_url)
     await callback.answer()
 
 
@@ -4662,6 +4715,42 @@ async def admin_save_support_url(message: Message, state: FSMContext):
     await set_setting("support_url", new_url)
     await message.answer(
         f"✅ Ссылка поддержки обновлена.\n<code>{new_url}</code>",
+        reply_markup=admin_back_keyboard("admin_payments", "⬅️ К реквизитам"),
+    )
+    await state.clear()
+
+
+@dp.message(AdminPaymentStates.waiting_news_url)
+async def admin_save_news_url(message: Message, state: FSMContext):
+    if not is_admin_id(message.from_user.id):
+        await message.answer("⛔ Нет доступа.")
+        await state.clear()
+        return
+    new_url = message.text.strip()
+    if not (new_url.startswith("http://") or new_url.startswith("https://")):
+        await message.answer("❗ Отправьте корректную ссылку на новости.", reply_markup=admin_prompt_keyboard("admin_payments"))
+        return
+    await set_setting("news_url", new_url)
+    await message.answer(
+        f"✅ Ссылка на новости обновлена.\n<code>{new_url}</code>",
+        reply_markup=admin_back_keyboard("admin_payments", "⬅️ К реквизитам"),
+    )
+    await state.clear()
+
+
+@dp.message(AdminPaymentStates.waiting_user_agreement_url)
+async def admin_save_user_agreement_url(message: Message, state: FSMContext):
+    if not is_admin_id(message.from_user.id):
+        await message.answer("⛔ Нет доступа.")
+        await state.clear()
+        return
+    new_url = message.text.strip()
+    if not (new_url.startswith("http://") or new_url.startswith("https://")):
+        await message.answer("❗ Отправьте корректную ссылку на пользовательское соглашение.", reply_markup=admin_prompt_keyboard("admin_payments"))
+        return
+    await set_setting("user_agreement_url", new_url)
+    await message.answer(
+        f"✅ Ссылка на пользовательское соглашение обновлена.\n<code>{new_url}</code>",
         reply_markup=admin_back_keyboard("admin_payments", "⬅️ К реквизитам"),
     )
     await state.clear()
