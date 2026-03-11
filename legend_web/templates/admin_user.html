@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Карточка пользователя | Legend Trading Admin</title>
+    <link rel="stylesheet" href="/static/css/legend.css">
+</head>
+<body>
+<div class="page-bg"></div>
+<div class="app-shell" style="max-width: 1100px;">
+    <main class="content">
+        <section class="card hero">
+            <h1>Карточка пользователя</h1>
+            <div class="balance">{{ "%.2f"|format((user.balance or 0) or 0) }} {{ user.currency if user.currency else "USD" }}</div>
+            <div class="hint">{{ user.first_name if user.first_name else "Пользователь" }} · ID {{ user.tg_id }} · @{{ user.username if user.username else "-" }}</div>
+            <div class="quick-actions">
+                <a class="qa-btn" href="/admin">Назад в админку</a>
+            </div>
+        </section>
+
+        <section class="stats-grid">
+            <article class="card stat-card"><small>СДЕЛОК</small><b>{{ stats.total if stats else 0 }}</b></article>
+            <article class="card stat-card"><small>PNL</small><b>{{ "%.2f"|format((stats.total_profit if stats else 0) or 0) }}</b></article>
+            <article class="card stat-card"><small>НА ВЫВОДЕ</small><b>{{ "%.2f"|format(pending or 0) }}</b></article>
+            <article class="card stat-card"><small>ВОРКЕР</small><b>{{ worker_id if worker_id else "-" }}</b></article>
+        </section>
+
+        <section class="card">
+            <div class="section-title">Статусы пользователя</div>
+            <div class="worker-meta detail-meta">
+                <span>Админ: {{ "ДА" if user.is_admin else "НЕТ" }}</span>
+                <span>Воркер: {{ "ДА" if user.is_worker else "НЕТ" }}</span>
+                <span>Язык: {{ user.language if user.language else "ru" }}</span>
+                <span>Валюта: {{ user.currency if user.currency else "USD" }}</span>
+                <span>Регистрация: {{ user.created_at }}</span>
+            </div>
+        </section>
+
+        <section class="card">
+            <div class="section-title">История действий</div>
+            <div class="list">
+                {% for item in activity %}
+                <div class="row worker-event-row">
+                    <div class="worker-event-main">
+                        <div class="worker-event-top">
+                            <b>{{ item.title }}</b>
+                            <span class="worker-event-time">{{ item.created_at }}</span>
+                        </div>
+                        <small>{{ item.details if item.details else "Без деталей" }}</small>
+                        <small>Источник: {{ item.actor_source }} · Тип: {{ item.event_type }}</small>
+                    </div>
+                    {% if item.amount is not none %}
+                    <div class="worker-event-amount">{{ "%.2f"|format((item.amount or 0)) }} {{ item.currency if item.currency else "" }}</div>
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="empty">Событий пока нет.</div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="card">
+            <div class="section-title">Пополнения</div>
+            <div class="list">
+                {% for item in deposits %}
+                <div class="row">
+                    <div><b>{{ "%.2f"|format((item.amount or 0)) }} {{ item.currency if item.currency else "USD" }}</b><small>{{ item.method }} · {{ item.status }}</small></div>
+                    <div>{{ item.created_at }}</div>
+                </div>
+                {% else %}
+                <div class="empty">Пополнений пока нет.</div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="card">
+            <div class="section-title">Выводы</div>
+            <div class="list">
+                {% for item in withdrawals %}
+                <div class="row">
+                    <div><b>{{ "%.2f"|format((item.amount or 0)) }} {{ item.currency if item.currency else "USD" }}</b><small>{{ item.method }} · {{ item.status }}</small></div>
+                    <div>{{ item.created_at }}</div>
+                </div>
+                {% else %}
+                <div class="empty">Выводов пока нет.</div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="card">
+            <div class="section-title">Сделки</div>
+            <div class="list">
+                {% for item in deals %}
+                <div class="row">
+                    <div><b>{{ item.asset_name }}</b><small>{{ "ЛОНГ" if item.direction == "up" else "ШОРТ" }} · {{ "%.2f"|format((item.amount or 0)) }} {{ item.currency if item.currency else "USD" }}</small></div>
+                    <div class="{% if (item.profit or 0) >= 0 %}pos{% else %}neg{% endif %}">{{ "%+.2f"|format((item.profit or 0)) }}</div>
+                </div>
+                {% else %}
+                <div class="empty">Сделок пока нет.</div>
+                {% endfor %}
+            </div>
+        </section>
+    </main>
+</div>
+</body>
+</html>

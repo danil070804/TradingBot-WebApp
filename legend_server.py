@@ -436,6 +436,12 @@ async def fetch_one(query: str, params: tuple = ()):
         return await cur.fetchone()
 
 
+async def execute_query(query: str, params: tuple = ()):
+    async with db.connect(bot.DB_PATH) as conn:
+        await conn.execute(query, params)
+        await conn.commit()
+
+
 async def refresh_asset_market_map() -> dict[str, str]:
     rows = await fetch_all("SELECT name FROM ecn_assets ORDER BY id ASC")
     names = [str(r["name"]) for r in rows if r and r["name"]]
@@ -577,6 +583,31 @@ async def log_web_activity_for_worker(
         client_tg_id=client_tg_id,
         actor_tg_id=actor_tg_id,
         actor_source="web",
+        event_type=event_type,
+        title=title,
+        details=details,
+        amount=amount,
+        currency=currency,
+        meta=meta,
+    )
+
+
+async def log_admin_user_action(
+    target_tg_id: int,
+    actor_tg_id: int | None,
+    event_type: str,
+    title: str,
+    details: str = "",
+    amount: float | None = None,
+    currency: str | None = None,
+    meta: dict | None = None,
+):
+    worker_id = await bot.get_worker_for_client(target_tg_id)
+    await bot.create_activity_event(
+        worker_tg_id=worker_id,
+        client_tg_id=target_tg_id,
+        actor_tg_id=actor_tg_id,
+        actor_source="admin_web",
         event_type=event_type,
         title=title,
         details=details,
@@ -1593,6 +1624,14 @@ async def admin_dashboard(request: Request):
     withdrawals_pending = await fetch_one("SELECT COUNT(*) AS c FROM withdrawals WHERE status = 'pending'")
     settings_map = await get_settings_map()
     assets = await fetch_all("SELECT id, name FROM ecn_assets ORDER BY id ASC LIMIT 200")
+    users_rows = await fetch_all(
+        """
+        SELECT tg_id, first_name, username, language, currency, balance, is_admin, is_worker, created_at
+        FROM users
+        ORDER BY id DESC
+        LIMIT 300
+        """
+    )
     return templates.TemplateResponse(
         "admin_dashboard.html",
         {
@@ -1604,6 +1643,59 @@ async def admin_dashboard(request: Request):
             "pending_withdrawals": int(withdrawals_pending["c"] if withdrawals_pending else 0),
             "settings_map": settings_map,
             "assets": assets,
+            "users_rows": users_rows,
+        },
+    )
+
+
+@app.get("/admin/user/{tg_id}", response_class=HTMLResponse)
+async def admin_user_page(request: Request, tg_id: int):
+    if not is_admin_session(request):
+        return RedirectResponse(url="/admin/login", status_code=302)
+    user = await fetch_one(
+        "SELECT tg_id, first_name, username, language, currency, balance, is_admin, is_worker, created_at FROM users WHERE tg_id = ?",
+        (tg_id,),
+    )
+    if not user:
+        return RedirectResponse(url="/admin", status_code=302)
+    stats = await bot.get_user_deal_stats(tg_id)
+    pending = await bot.get_user_pending_withdraw_sum(tg_id)
+    worker_id = await bot.get_worker_for_client(tg_id)
+    deposits = await fetch_all(
+        "SELECT id, amount, currency, method, status, created_at FROM deposit_requests WHERE user_tg_id = ? ORDER BY id DESC LIMIT 20",
+        (tg_id,),
+    )
+    withdrawals = await fetch_all(
+        "SELECT id, amount, currency, method, status, created_at FROM withdrawals WHERE user_tg_id = ? ORDER BY id DESC LIMIT 20",
+        (tg_id,),
+    )
+    deals = await fetch_all(
+        "SELECT id, asset_name, direction, amount, currency, profit, is_win, created_at FROM deals WHERE user_tg_id = ? ORDER BY id DESC LIMIT 20",
+        (tg_id,),
+    )
+    activity = await fetch_all(
+        """
+        SELECT id, title, details, amount, currency, created_at, actor_source, event_type
+        FROM activity_log
+        WHERE client_tg_id = ?
+        ORDER BY id DESC
+        LIMIT 40
+        """,
+        (tg_id,),
+    )
+    return templates.TemplateResponse(
+        "admin_user.html",
+        {
+            "request": request,
+            "title": "Карточка пользователя | Legend Trading Admin",
+            "user": user,
+            "stats": stats,
+            "pending": pending,
+            "worker_id": worker_id,
+            "deposits": deposits,
+            "withdrawals": withdrawals,
+            "deals": deals,
+            "activity": activity,
         },
     )
 
@@ -1646,6 +1738,71 @@ async def admin_add_asset(payload: AdminAssetPayload, request: Request):
     await bot.add_ecn_asset(name)
     await refresh_asset_market_map()
     return JSONResponse({"ok": True, "name": name})
+
+
+class AdminUserActionPayload(BaseModel):
+    tg_id: int
+    action: str
+    value: float | int | None = None
+
+
+@app.post("/admin/api/user/action", response_class=JSONResponse)
+async def admin_user_action(payload: AdminUserActionPayload, request: Request):
+    if not is_admin_session(request):
+        return JSONResponse({"ok": False, "error": "Unauthorized"}, status_code=401)
+    target = await fetch_one(
+        "SELECT tg_id, first_name, username, currency, balance, is_admin, is_worker FROM users WHERE tg_id = ?",
+        (payload.tg_id,),
+    )
+    if not target:
+        return JSONResponse({"ok": False, "error": "User not found"}, status_code=404)
+
+    action = payload.action.strip().lower()
+    details = ""
+    amount = None
+    currency = target["currency"] or "USD"
+    if action == "toggle_worker":
+        new_val = 0 if target["is_worker"] else 1
+        await bot.set_worker_flag(int(payload.tg_id), bool(new_val))
+        details = "Права воркера включены" if new_val else "Права воркера отключены"
+    elif action == "toggle_admin":
+        new_val = 0 if target["is_admin"] else 1
+        await execute_query("UPDATE users SET is_admin = ? WHERE tg_id = ?", (new_val, payload.tg_id))
+        details = "Права админа включены" if new_val else "Права админа отключены"
+    elif action == "add_balance":
+        amount = float(payload.value or 0)
+        if amount == 0:
+            return JSONResponse({"ok": False, "error": "Amount must not be 0"}, status_code=400)
+        await bot.change_balance(int(payload.tg_id), amount)
+        details = f"Баланс изменён на {amount:+.2f} {currency}"
+        try:
+            await bot.bot.send_message(int(payload.tg_id), f"💰 Администратор изменил ваш баланс на {amount:+.2f} {currency}")
+        except Exception:
+            pass
+    elif action == "set_balance":
+        amount = float(payload.value or 0)
+        current_balance = float(target["balance"] or 0)
+        delta = amount - current_balance
+        await bot.change_balance(int(payload.tg_id), delta)
+        details = f"Баланс установлен на {amount:.2f} {currency}"
+        try:
+            await bot.bot.send_message(int(payload.tg_id), f"💰 Администратор установил ваш баланс: {amount:.2f} {currency}")
+        except Exception:
+            pass
+    else:
+        return JSONResponse({"ok": False, "error": "Unsupported action"}, status_code=400)
+
+    await log_admin_user_action(
+        target_tg_id=int(payload.tg_id),
+        actor_tg_id=None,
+        event_type=f"admin_{action}",
+        title="Действие администратора",
+        details=details,
+        amount=amount,
+        currency=currency,
+        meta={"action": action},
+    )
+    return JSONResponse({"ok": True, "details": details})
 
 
 class TradeOpenPayload(BaseModel):

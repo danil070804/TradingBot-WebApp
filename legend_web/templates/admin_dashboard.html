@@ -51,6 +51,48 @@
         </section>
 
         <section class="card">
+            <div class="section-title">Пользователи</div>
+            <div class="worker-toolbar">
+                <input id="admin-user-search" type="search" placeholder="Поиск по tg_id, username, имени">
+                <select id="admin-user-filter">
+                    <option value="all">Все</option>
+                    <option value="admins">Админы</option>
+                    <option value="workers">Воркеры</option>
+                    <option value="users">Обычные</option>
+                </select>
+            </div>
+            <div id="admin-user-result" class="result-box"></div>
+            <div id="admin-user-list" class="list">
+                {% for u in users_rows %}
+                <div
+                    class="row worker-row admin-user-row"
+                    data-search="{{ u.tg_id }} {{ u.first_name if u.first_name else '' }} {{ u.username if u.username else '' }}"
+                    data-admin="{{ 1 if u.is_admin else 0 }}"
+                    data-worker="{{ 1 if u.is_worker else 0 }}"
+                >
+                    <div class="worker-card-main">
+                        <div class="worker-head">
+                            <b>{{ u.first_name if u.first_name else "Пользователь" }}</b>
+                            <span class="worker-badge {% if u.is_admin %}favorite{% elif u.is_worker %}active{% else %}blocked{% endif %}">
+                                {% if u.is_admin %}Админ{% elif u.is_worker %}Воркер{% else %}Пользователь{% endif %}
+                            </span>
+                        </div>
+                        <small>ID {{ u.tg_id }} · @{{ u.username if u.username else "-" }}</small>
+                        <small>Баланс: {{ "%.2f"|format((u.balance or 0)) }} {{ u.currency if u.currency else "USD" }} · Язык: {{ u.language if u.language else "ru" }}</small>
+                    </div>
+                    <div class="worker-actions">
+                        <button class="chip admin-user-act" data-tg-id="{{ u.tg_id }}" data-action="toggle_worker">Воркер</button>
+                        <button class="chip admin-user-act" data-tg-id="{{ u.tg_id }}" data-action="toggle_admin">Админ</button>
+                        <button class="chip admin-user-prompt" data-tg-id="{{ u.tg_id }}" data-action="add_balance" data-label="Изменить баланс на">+/- Баланс</button>
+                        <button class="chip admin-user-prompt" data-tg-id="{{ u.tg_id }}" data-action="set_balance" data-label="Установить баланс">Set баланс</button>
+                        <a class="chip worker-open" href="/admin/user/{{ u.tg_id }}">Карточка</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="card">
             <button class="submit alt" type="button" onclick="logout()">Выйти из админки</button>
         </section>
     </main>
@@ -100,6 +142,64 @@ async function logout() {
     await fetch("/admin/logout", {method: "POST"});
     location.href = "/admin/login";
 }
+
+async function adminUserAction(tgId, action, value = null) {
+    const r = await fetch("/admin/api/user/action", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({tg_id: Number(tgId), action, value})
+    });
+    const data = await r.json();
+    const result = document.getElementById("admin-user-result");
+    result.innerHTML = r.ok && data.ok
+        ? `<span class="pos">${data.details || "Сохранено"}</span>`
+        : `<span class="neg">${data.error || "Ошибка"}</span>`;
+    if (r.ok && data.ok) {
+        setTimeout(() => location.reload(), 500);
+    }
+}
+
+function bindAdminUsers() {
+    const list = document.getElementById("admin-user-list");
+    const search = document.getElementById("admin-user-search");
+    const filter = document.getElementById("admin-user-filter");
+    if (!list) return;
+
+    const apply = () => {
+        const q = (search ? search.value : "").trim().toLowerCase();
+        const mode = filter ? filter.value : "all";
+        list.querySelectorAll(".admin-user-row").forEach((row) => {
+            const hay = String(row.dataset.search || "").toLowerCase();
+            const matchesQuery = !q || hay.includes(q);
+            let matchesFilter = true;
+            if (mode === "admins") matchesFilter = row.dataset.admin === "1";
+            if (mode === "workers") matchesFilter = row.dataset.worker === "1";
+            if (mode === "users") matchesFilter = row.dataset.admin === "0" && row.dataset.worker === "0";
+            row.style.display = matchesQuery && matchesFilter ? "" : "none";
+        });
+    };
+
+    list.querySelectorAll(".admin-user-act").forEach((btn) => {
+        btn.addEventListener("click", () => adminUserAction(btn.dataset.tgId, btn.dataset.action));
+    });
+    list.querySelectorAll(".admin-user-prompt").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            const raw = prompt(`${btn.dataset.label}:`);
+            if (raw === null) return;
+            const value = Number(raw);
+            if (Number.isNaN(value)) {
+                document.getElementById("admin-user-result").innerHTML = '<span class="neg">Введите корректное число</span>';
+                return;
+            }
+            adminUserAction(btn.dataset.tgId, btn.dataset.action, value);
+        });
+    });
+    if (search) search.addEventListener("input", apply);
+    if (filter) filter.addEventListener("change", apply);
+    apply();
+}
+
+bindAdminUsers();
 </script>
 </body>
 </html>
