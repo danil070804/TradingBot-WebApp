@@ -740,42 +740,46 @@ async def init_db():
         await db.execute(support_tickets_ddl)
         await db.execute(admin_audit_log_ddl)
 
-        # Lightweight migrations for CRM/support features.
-        for sql in (
-            "ALTER TABLE worker_clients ADD COLUMN crm_note TEXT DEFAULT ''",
-            "ALTER TABLE worker_clients ADD COLUMN tags TEXT DEFAULT ''",
-            "ALTER TABLE worker_clients ADD COLUMN funnel_stage TEXT DEFAULT 'new'",
-            "ALTER TABLE worker_clients ADD COLUMN last_activity_at TEXT",
-            "ALTER TABLE worker_clients ADD COLUMN min_trade_amount REAL DEFAULT 100",
-            "ALTER TABLE worker_clients ADD COLUMN trade_coefficient REAL DEFAULT 1",
-            "ALTER TABLE worker_clients ADD COLUMN auto_reject_trades INTEGER DEFAULT 0",
-            "ALTER TABLE deposit_requests ADD COLUMN processed_by TEXT",
-            "ALTER TABLE withdrawals ADD COLUMN processed_by TEXT",
-            "ALTER TABLE support_tickets ADD COLUMN assigned_to TEXT",
-            "ALTER TABLE active_trades ADD COLUMN chat_id INTEGER",
-            "ALTER TABLE active_trades ADD COLUMN message_id INTEGER",
-            "ALTER TABLE active_trades ADD COLUMN source TEXT DEFAULT 'bot'",
-            "ALTER TABLE active_trades ADD COLUMN ticker TEXT",
-            "ALTER TABLE active_trades ADD COLUMN leverage INTEGER DEFAULT 10",
-            "ALTER TABLE active_trades ADD COLUMN tp_price REAL",
-            "ALTER TABLE active_trades ADD COLUMN sl_price REAL",
-            "ALTER TABLE active_trades ADD COLUMN risk_percent REAL DEFAULT 0",
-            "ALTER TABLE active_trades ADD COLUMN close_reason TEXT DEFAULT 'time'",
-            "ALTER TABLE active_trades ADD COLUMN opened_ts REAL",
-            "ALTER TABLE active_trades ADD COLUMN close_ts REAL",
-            "ALTER TABLE active_trades ADD COLUMN closed_ts REAL",
-            "ALTER TABLE active_trades ADD COLUMN status TEXT DEFAULT 'open'",
-            "ALTER TABLE active_trades ADD COLUMN end_price REAL",
-            "ALTER TABLE active_trades ADD COLUMN change_percent REAL",
-            "ALTER TABLE active_trades ADD COLUMN profit REAL",
-            "ALTER TABLE active_trades ADD COLUMN is_win INTEGER",
-            "ALTER TABLE active_trades ADD COLUMN notified_open INTEGER DEFAULT 0",
-            "ALTER TABLE active_trades ADD COLUMN notified_closed INTEGER DEFAULT 0",
+        # Idempotent migrations without noisy PostgreSQL errors on startup.
+        for table_name, column_name, pg_definition, sqlite_definition in (
+            ("worker_clients", "crm_note", "TEXT DEFAULT ''", "TEXT DEFAULT ''"),
+            ("worker_clients", "tags", "TEXT DEFAULT ''", "TEXT DEFAULT ''"),
+            ("worker_clients", "funnel_stage", "TEXT DEFAULT 'new'", "TEXT DEFAULT 'new'"),
+            ("worker_clients", "last_activity_at", "TEXT", "TEXT"),
+            ("worker_clients", "min_trade_amount", "DOUBLE PRECISION DEFAULT 100", "REAL DEFAULT 100"),
+            ("worker_clients", "trade_coefficient", "DOUBLE PRECISION DEFAULT 1", "REAL DEFAULT 1"),
+            ("worker_clients", "auto_reject_trades", "INTEGER DEFAULT 0", "INTEGER DEFAULT 0"),
+            ("deposit_requests", "processed_by", "TEXT", "TEXT"),
+            ("withdrawals", "processed_by", "TEXT", "TEXT"),
+            ("support_tickets", "assigned_to", "TEXT", "TEXT"),
+            ("active_trades", "chat_id", "BIGINT", "INTEGER"),
+            ("active_trades", "message_id", "BIGINT", "INTEGER"),
+            ("active_trades", "source", "TEXT DEFAULT 'bot'", "TEXT DEFAULT 'bot'"),
+            ("active_trades", "ticker", "TEXT", "TEXT"),
+            ("active_trades", "leverage", "INTEGER DEFAULT 10", "INTEGER DEFAULT 10"),
+            ("active_trades", "tp_price", "DOUBLE PRECISION", "REAL"),
+            ("active_trades", "sl_price", "DOUBLE PRECISION", "REAL"),
+            ("active_trades", "risk_percent", "DOUBLE PRECISION DEFAULT 0", "REAL DEFAULT 0"),
+            ("active_trades", "close_reason", "TEXT DEFAULT 'time'", "TEXT DEFAULT 'time'"),
+            ("active_trades", "opened_ts", "DOUBLE PRECISION", "REAL"),
+            ("active_trades", "close_ts", "DOUBLE PRECISION", "REAL"),
+            ("active_trades", "closed_ts", "DOUBLE PRECISION", "REAL"),
+            ("active_trades", "status", "TEXT DEFAULT 'open'", "TEXT DEFAULT 'open'"),
+            ("active_trades", "end_price", "DOUBLE PRECISION", "REAL"),
+            ("active_trades", "change_percent", "DOUBLE PRECISION", "REAL"),
+            ("active_trades", "profit", "DOUBLE PRECISION", "REAL"),
+            ("active_trades", "is_win", "INTEGER", "INTEGER"),
+            ("active_trades", "notified_open", "INTEGER DEFAULT 0", "INTEGER DEFAULT 0"),
+            ("active_trades", "notified_closed", "INTEGER DEFAULT 0", "INTEGER DEFAULT 0"),
         ):
-            try:
-                await db.execute(sql)
-            except Exception:
-                pass
+            await add_column_if_missing(
+                db,
+                table_name,
+                column_name,
+                pg_definition,
+                sqlite_definition,
+                is_pg,
+            )
 
         # Расширяем список активов ECN (insert-ignore для уже существующих)
         default_assets = [
@@ -812,14 +816,22 @@ async def init_db():
             elif row["key"] == "webapp_url":
                 config.webapp_url = row["value"]
 
+        cur = await db.execute(
+            "SELECT key FROM settings WHERE key IN (?, ?)",
+            ("global_min_trade_usdt", "global_min_deposit_usdt"),
+        )
+        existing_setting_rows = await cur.fetchall()
+        existing_settings = {row["key"] for row in existing_setting_rows}
+
         for key, default_value in (
             ("global_min_trade_usdt", str(DEFAULT_MIN_TRADE_USDT)),
             ("global_min_deposit_usdt", str(DEFAULT_MIN_DEPOSIT_USDT)),
         ):
-            await db.execute(
-                "INSERT OR IGNORE INTO settings(key, value) VALUES (?, ?)",
-                (key, default_value),
-            )
+            if key not in existing_settings:
+                await db.execute(
+                    "INSERT INTO settings(key, value) VALUES (?, ?)",
+                    (key, default_value),
+                )
         await db.commit()
 
 async def get_user_row(tg_user) -> aiosqlite.Row:
