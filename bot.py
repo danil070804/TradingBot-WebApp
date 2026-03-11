@@ -1279,7 +1279,7 @@ async def get_worker_client_by_id(wc_id: int):
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         cur = await db.execute(
-            """SELECT wc.*, u.first_name, u.username, u.balance, u.currency
+            """SELECT wc.*, u.first_name, u.username, u.balance, u.currency, u.language
                    FROM worker_clients wc
                    JOIN users u ON u.tg_id = wc.client_tg_id
                    WHERE wc.id = ?""", (wc_id,),
@@ -2721,6 +2721,9 @@ async def open_worker_client_profile(msg: Message, wc_id: int):
     currency = row["currency"] or "USD"
     min_dep = row["min_deposit"] or 0
     min_wd = row["min_withdraw"] or 0
+    min_trade = row["min_trade_amount"] or 100
+    trade_coefficient = row["trade_coefficient"] or 1
+    auto_reject_trades = bool(row["auto_reject_trades"])
     flags = {
         "verified": bool(row["verified"]),
         "withdraw_enabled": bool(row["withdraw_enabled"]),
@@ -2733,18 +2736,38 @@ async def open_worker_client_profile(msg: Message, wc_id: int):
     worker_id = msg.from_user.id
     current_luck = await get_luck_for_worker_client(worker_id, row["client_tg_id"])
     luck_text = f"{current_luck:.2f}%" if current_luck is not None else "не установлена"
+    profile_name = row["first_name"] or "Пользователь"
+    username = f"@{row['username']}" if row["username"] else "без username"
+    lang = row["language"] or "RU"
+    activity_text = row["last_activity_at"] or "нет данных"
+    status_trade = "ВКЛ" if flags["trading_enabled"] else "ВЫКЛ"
+    status_withdraw = "ВКЛ" if flags["withdraw_enabled"] else "ВЫКЛ"
+    status_verify = "ДА" if flags["verified"] else "НЕТ"
+    status_block = "ДА" if flags["blocked"] else "НЕТ"
+    status_favorite = "ДА" if flags["favorite"] else "НЕТ"
+    auto_reject_text = "ВКЛ" if auto_reject_trades else "ВЫКЛ"
 
     text = (
-        f"📄 Профиль лохматого /n{wc_id}\n\n"
-        "Информация\n"
-        f"└ Баланс: {balance:.2f} {currency}\n"
-        f"└ Min. deposit: {min_dep} {currency}\n"
-        f"└ Min. withdraw: {min_wd} {currency}\n"
-        f"└ Удача: {luck_text}\n"
-        f"{'✅' if flags['trading_enabled'] else '❌'} Покупка включена/выключена\n"
-        f"{'✅' if flags['withdraw_enabled'] else '❌'} Withdrawal enabled\n"
-        f"{'✅' if flags['verified'] else '❌'} Верификация\n"
-        f"{'🔒 Заблокирован' if flags['blocked'] else '🔓 Не заблокирован'}\n"
+        f"📄 <b>Карточка реферала</b> /n{wc_id}\n\n"
+        f"👤 <b>{profile_name}</b>\n"
+        f"├ ID: <code>{row['client_tg_id']}</code>\n"
+        f"├ Username: {username}\n"
+        f"├ Язык: {lang}\n"
+        f"└ Последняя активность: {activity_text}\n\n"
+        f"💰 <b>Финансы и лимиты</b>\n"
+        f"├ Баланс: {balance:.2f} {currency}\n"
+        f"├ Мин. депозит: {float(min_dep):.2f} {currency}\n"
+        f"├ Мин. вывод: {float(min_wd):.2f} {currency}\n"
+        f"├ Мин. сделка: {float(min_trade):.2f} {currency}\n"
+        f"├ Коэффициент: {float(trade_coefficient):.2f}\n"
+        f"└ Удача: {luck_text}\n\n"
+        f"⚙️ <b>Статусы</b>\n"
+        f"├ Торговля: {status_trade}\n"
+        f"├ Вывод: {status_withdraw}\n"
+        f"├ Верификация: {status_verify}\n"
+        f"├ Авто-отклонение: {auto_reject_text}\n"
+        f"├ Избранное: {status_favorite}\n"
+        f"└ Блок: {status_block}"
     )
     await msg.answer(
         text,
