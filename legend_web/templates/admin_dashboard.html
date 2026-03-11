@@ -14,6 +14,7 @@
             <h1>Админ-панель</h1>
             <div class="hint">Управление реквизитами, монетами и параметрами платформы</div>
             <div class="hint" id="admin-live-status">Admin feed: online</div>
+            <div id="admin-live-meta" data-scope="admin"></div>
         </section>
 
         <section class="metrics">
@@ -481,7 +482,109 @@ async function refreshAdminDashboard() {
 
 wireAdminActionButtons();
 bindAdminTabs();
-setInterval(refreshAdminDashboard, 8000);
+let adminFallbackTimer = null;
+const startAdminFallback = () => {
+    if (!adminFallbackTimer) adminFallbackTimer = setInterval(refreshAdminDashboard, 8000);
+};
+const stopAdminFallback = () => {
+    if (adminFallbackTimer) clearInterval(adminFallbackTimer);
+    adminFallbackTimer = null;
+};
+const adminProto = window.location.protocol === "https:" ? "wss" : "ws";
+const adminWs = new WebSocket(`${adminProto}://${window.location.host}/ws/live`);
+adminWs.addEventListener("open", () => {
+    stopAdminFallback();
+    adminWs.send(JSON.stringify({scope: "admin"}));
+});
+adminWs.addEventListener("message", async (event) => {
+    try {
+        const data = JSON.parse(event.data);
+        if (!data.ok) return;
+        document.getElementById("admin-live-status").textContent = "Admin feed: live";
+        const metrics = data.metrics || {};
+        const kpiCards = document.querySelectorAll("#admin-kpi-grid .metric p");
+        if (kpiCards[0]) kpiCards[0].textContent = Number(metrics.pending_deposits || 0);
+        if (kpiCards[1]) kpiCards[1].textContent = Number(metrics.open_support || 0);
+        if (kpiCards[2]) kpiCards[2].textContent = Number(metrics.approved_deposit_sum || 0).toFixed(2);
+        if (kpiCards[3]) kpiCards[3].textContent = Number(metrics.approved_withdraw_sum || 0).toFixed(2);
+        renderSimpleList("admin-deposit-list", data.deposits, '<div class="empty">Пополнений пока нет.</div>', (d) => `
+            <div class="row worker-row admin-queue-row">
+                <div class="worker-card-main">
+                    <div class="worker-head">
+                        <b>#${d.id} ${d.first_name || "Пользователь"}</b>
+                        <span class="worker-badge ${d.status === "approved" ? "favorite" : d.status === "rejected" ? "blocked" : "active"}">${d.status}</span>
+                    </div>
+                    <small>ID ${d.user_tg_id} · @${d.username || "-"}</small>
+                    <small>${Number(d.amount || 0).toFixed(2)} ${d.currency || "USD"} · ${d.method || "-"}</small>
+                </div>
+                <div class="worker-actions">
+                    <button class="chip admin-deposit-act" data-id="${d.id}" data-action="approve">Подтв.</button>
+                    <button class="chip admin-deposit-act state-block" data-id="${d.id}" data-action="reject">Отклон.</button>
+                </div>
+            </div>`);
+        renderSimpleList("admin-withdraw-list", data.withdrawals, '<div class="empty">Выводов пока нет.</div>', (w) => `
+            <div class="row worker-row admin-queue-row">
+                <div class="worker-card-main">
+                    <div class="worker-head">
+                        <b>#${w.id} ${w.first_name || "Пользователь"}</b>
+                        <span class="worker-badge ${w.status === "approved" ? "favorite" : w.status === "rejected" ? "blocked" : "active"}">${w.status}</span>
+                    </div>
+                    <small>ID ${w.user_tg_id} · @${w.username || "-"}</small>
+                    <small>${Number(w.amount || 0).toFixed(2)} ${w.currency || "USD"} · ${w.method || "-"}</small>
+                </div>
+                <div class="worker-actions">
+                    <button class="chip admin-withdraw-act" data-id="${w.id}" data-action="approve">Подтв.</button>
+                    <button class="chip admin-withdraw-act state-block" data-id="${w.id}" data-action="reject">Отклон.</button>
+                </div>
+            </div>`);
+        renderSimpleList("admin-support-list", data.support, '<div class="empty">Тикетов пока нет.</div>', (s) => `
+            <div class="row support-row">
+                <div class="worker-event-main">
+                    <div class="worker-event-top">
+                        <b>#${s.id} ${s.subject || "Тикет"}</b>
+                        <span class="worker-event-time">${s.updated_at || ""}</span>
+                    </div>
+                    <small>${s.first_name || "Пользователь"} · ID ${s.client_tg_id || "-"} · @${s.username || "-"}</small>
+                    <small>${s.last_message || "Без комментария"}</small>
+                </div>
+                <div class="worker-actions">
+                    <button class="chip admin-support-act" data-id="${s.id}" data-action="take">Взять</button>
+                    <button class="chip admin-support-act state-off" data-id="${s.id}" data-action="hold">Пауза</button>
+                    <button class="chip admin-support-act state-fav" data-id="${s.id}" data-action="escalate">Эскал.</button>
+                    <button class="chip admin-support-act state-block" data-id="${s.id}" data-action="close">Закрыть</button>
+                </div>
+            </div>`);
+        renderSimpleList("admin-worker-stats", data.worker_stats, '<div class="empty">Воркеров пока нет.</div>', (w) => `
+            <div class="row">
+                <div>
+                    <b>${w.first_name || "Воркер"}</b>
+                    <small>ID ${w.tg_id} · @${w.username || "-"}</small>
+                </div>
+                <div>${Number(w.clients_count || 0)} клиентов / ${Number(w.favorites_count || 0)} fav</div>
+            </div>`);
+        renderSimpleList("admin-audit-list", data.audit, '<div class="empty">Аудит пока пуст.</div>', (a) => `
+            <div class="row worker-event-row">
+                <div class="worker-event-main">
+                    <div class="worker-event-top">
+                        <b>${a.action || "audit"}</b>
+                        <span class="worker-event-time">${a.created_at || ""}</span>
+                    </div>
+                    <small>${a.details || ""}</small>
+                    <small>admin: ${a.admin_actor || "-"} · target: ${a.target_tg_id || "-"}</small>
+                </div>
+                ${a.amount !== null && a.amount !== undefined ? `<div class="worker-event-amount">${Number(a.amount).toFixed(2)} ${a.currency || ""}</div>` : ""}
+            </div>`);
+        wireAdminActionButtons();
+    } catch (_) {}
+});
+adminWs.addEventListener("close", () => {
+    document.getElementById("admin-live-status").textContent = "Admin feed: polling";
+    startAdminFallback();
+});
+adminWs.addEventListener("error", () => {
+    document.getElementById("admin-live-status").textContent = "Admin feed: reconnect";
+    startAdminFallback();
+});
 </script>
 </body>
 </html>

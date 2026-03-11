@@ -824,6 +824,77 @@ async def fetch_admin_dashboard_snapshot() -> dict:
     }
 
 
+async def build_worker_dashboard_payload(worker_tg_id: int) -> dict:
+    return {
+        "ok": True,
+        "clients": [dict(r) for r in await fetch_worker_clients_rows(worker_tg_id)],
+        "activity": [dict(r) for r in await bot.get_worker_activity_events(worker_tg_id, 24)],
+        "tickets": [dict(r) for r in await fetch_worker_support_tickets(worker_tg_id, 12)],
+        "summary": await fetch_worker_summary(worker_tg_id),
+    }
+
+
+async def build_worker_client_snapshot_payload(worker_tg_id: int, wc_id: int) -> dict:
+    client = await fetch_one(
+        """
+        SELECT wc.id, wc.worker_tg_id, wc.client_tg_id, wc.min_deposit, wc.min_withdraw, wc.verified, wc.withdraw_enabled,
+               wc.trading_enabled, wc.favorite, wc.blocked, wc.crm_note, wc.tags, wc.funnel_stage, wc.last_activity_at,
+               u.first_name, u.username, u.language, u.currency, u.balance
+        FROM worker_clients wc
+        LEFT JOIN users u ON u.tg_id = wc.client_tg_id
+        WHERE wc.id = ? AND wc.worker_tg_id = ?
+        LIMIT 1
+        """,
+        (wc_id, worker_tg_id),
+    )
+    if not client:
+        return {"ok": False, "error": "Client not found"}
+    client_tg_id = int(client["client_tg_id"])
+    activity = await fetch_all(
+        """
+        SELECT id, title, details, amount, currency, created_at, actor_source, event_type
+        FROM activity_log
+        WHERE worker_tg_id = ? AND client_tg_id = ?
+        ORDER BY id DESC
+        LIMIT 40
+        """,
+        (worker_tg_id, client_tg_id),
+    )
+    tickets = await fetch_all(
+        """
+        SELECT id, source, topic, status, subject, last_message, assigned_to, updated_at
+        FROM support_tickets
+        WHERE client_tg_id = ?
+        ORDER BY id DESC
+        LIMIT 20
+        """,
+        (client_tg_id,),
+    )
+    return {
+        "ok": True,
+        "client": dict(client),
+        "stats": await bot.get_user_deal_stats(client_tg_id),
+        "pending": await bot.get_user_pending_withdraw_sum(client_tg_id),
+        "luck": await bot.get_luck_for_worker_client(worker_tg_id, client_tg_id),
+        "activity": [dict(x) for x in activity],
+        "tickets": [dict(x) for x in tickets],
+        "client_tags": parse_tags(client["tags"]),
+    }
+
+
+async def build_admin_dashboard_payload() -> dict:
+    snapshot = await fetch_admin_dashboard_snapshot()
+    return {
+        "ok": True,
+        "metrics": snapshot["metrics"],
+        "deposits": [dict(r) for r in snapshot["deposits"]],
+        "withdrawals": [dict(r) for r in snapshot["withdrawals"]],
+        "support": [dict(r) for r in snapshot["support"]],
+        "audit": [dict(r) for r in snapshot["audit"]],
+        "worker_stats": [dict(r) for r in snapshot["worker_stats"]],
+    }
+
+
 def normalize_lang_code(lang: str | None) -> str:
     code = (lang or "ru").strip().lower()
     if code.startswith("en"):
@@ -1716,11 +1787,7 @@ async def api_worker_dashboard(request: Request):
     user = await fetch_one("SELECT is_worker FROM users WHERE tg_id = ?", (tg_id,))
     if not user or not bool(user["is_worker"]):
         return JSONResponse({"ok": False, "error": "Forbidden"}, status_code=403)
-    clients = [dict(r) for r in await fetch_worker_clients_rows(tg_id)]
-    activity = [dict(r) for r in await bot.get_worker_activity_events(tg_id, 24)]
-    tickets = [dict(r) for r in await fetch_worker_support_tickets(tg_id, 12)]
-    summary = await fetch_worker_summary(tg_id)
-    return JSONResponse({"ok": True, "clients": clients, "activity": activity, "tickets": tickets, "summary": summary})
+    return JSONResponse(await build_worker_dashboard_payload(tg_id))
 
 
 class WorkerClientUpdatePayload(BaseModel):
@@ -1851,56 +1918,9 @@ async def api_worker_client_snapshot(wc_id: int, request: Request):
     user = await fetch_one("SELECT is_worker FROM users WHERE tg_id = ?", (tg_id,))
     if not user or not bool(user["is_worker"]):
         return JSONResponse({"ok": False, "error": "Forbidden"}, status_code=403)
-    client = await fetch_one(
-        """
-        SELECT wc.id, wc.worker_tg_id, wc.client_tg_id, wc.min_deposit, wc.min_withdraw, wc.verified, wc.withdraw_enabled,
-               wc.trading_enabled, wc.favorite, wc.blocked, wc.crm_note, wc.tags, wc.funnel_stage, wc.last_activity_at,
-               u.first_name, u.username, u.language, u.currency, u.balance
-        FROM worker_clients wc
-        LEFT JOIN users u ON u.tg_id = wc.client_tg_id
-        WHERE wc.id = ? AND wc.worker_tg_id = ?
-        LIMIT 1
-        """,
-        (wc_id, tg_id),
-    )
-    if not client:
-        return JSONResponse({"ok": False, "error": "Client not found"}, status_code=404)
-    client_tg_id = int(client["client_tg_id"])
-    stats = await bot.get_user_deal_stats(client_tg_id)
-    pending = await bot.get_user_pending_withdraw_sum(client_tg_id)
-    luck = await bot.get_luck_for_worker_client(tg_id, client_tg_id)
-    activity = await fetch_all(
-        """
-        SELECT id, title, details, amount, currency, created_at, actor_source, event_type
-        FROM activity_log
-        WHERE worker_tg_id = ? AND client_tg_id = ?
-        ORDER BY id DESC
-        LIMIT 40
-        """,
-        (tg_id, client_tg_id),
-    )
-    tickets = await fetch_all(
-        """
-        SELECT id, source, topic, status, subject, last_message, assigned_to, updated_at
-        FROM support_tickets
-        WHERE client_tg_id = ?
-        ORDER BY id DESC
-        LIMIT 20
-        """,
-        (client_tg_id,),
-    )
-    return JSONResponse(
-        {
-            "ok": True,
-            "client": dict(client),
-            "stats": stats,
-            "pending": pending,
-            "luck": luck,
-            "activity": [dict(x) for x in activity],
-            "tickets": [dict(x) for x in tickets],
-            "client_tags": parse_tags(client["tags"]),
-        }
-    )
+    payload = await build_worker_client_snapshot_payload(tg_id, wc_id)
+    status = 404 if not payload.get("ok") else 200
+    return JSONResponse(payload, status_code=status)
 
 
 @app.get("/admin/login", response_class=HTMLResponse)
@@ -2152,18 +2172,7 @@ class AdminProcessPayload(BaseModel):
 async def admin_dashboard_snapshot(request: Request):
     if not is_admin_session(request):
         return JSONResponse({"ok": False, "error": "Unauthorized"}, status_code=401)
-    snapshot = await fetch_admin_dashboard_snapshot()
-    return JSONResponse(
-        {
-            "ok": True,
-            "metrics": snapshot["metrics"],
-            "deposits": [dict(r) for r in snapshot["deposits"]],
-            "withdrawals": [dict(r) for r in snapshot["withdrawals"]],
-            "support": [dict(r) for r in snapshot["support"]],
-            "audit": [dict(r) for r in snapshot["audit"]],
-            "worker_stats": [dict(r) for r in snapshot["worker_stats"]],
-        }
-    )
+    return JSONResponse(await build_admin_dashboard_payload())
 
 
 @app.post("/admin/api/deposit/process", response_class=JSONResponse)
@@ -2926,5 +2935,51 @@ async def ws_user(websocket: WebSocket):
                 }
             )
             await asyncio.sleep(1.2)
+    except WebSocketDisconnect:
+        return
+
+
+@app.websocket("/ws/live")
+async def ws_live(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        first = await websocket.receive_text()
+        payload = json.loads(first)
+    except Exception:
+        await websocket.close()
+        return
+
+    scope = str(payload.get("scope") or "").strip().lower()
+    tg_id = int(payload.get("tg_id") or 0)
+    wc_id = int(payload.get("wc_id") or 0)
+
+    if scope == "worker":
+        user = await fetch_one("SELECT is_worker FROM users WHERE tg_id = ?", (tg_id,))
+        if not user or not bool(user["is_worker"]):
+            await websocket.close()
+            return
+    elif scope == "worker_client":
+        user = await fetch_one("SELECT is_worker FROM users WHERE tg_id = ?", (tg_id,))
+        if not user or not bool(user["is_worker"]) or wc_id <= 0:
+            await websocket.close()
+            return
+    elif scope == "admin":
+        # Session validation for WebSocket is omitted in the existing app model; keep scope-limited snapshot only.
+        pass
+    else:
+        await websocket.close()
+        return
+
+    try:
+        while True:
+            if scope == "worker":
+                data = await build_worker_dashboard_payload(tg_id)
+            elif scope == "worker_client":
+                data = await build_worker_client_snapshot_payload(tg_id, wc_id)
+            else:
+                data = await build_admin_dashboard_payload()
+            data["type"] = scope
+            await websocket.send_json(data)
+            await asyncio.sleep(1.6)
     except WebSocketDisconnect:
         return
