@@ -864,20 +864,39 @@ async def get_user_by_tg_id(tg_id: int):
         return await cur.fetchone()
 
 
-async def get_client_trade_settings(client_tg_id: int):
+async def get_worker_client_row(client_tg_id: int, worker_tg_id: int | None = None):
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
-        cur = await db.execute(
-            """
-            SELECT min_trade_amount, trade_coefficient, auto_reject_trades, trading_enabled, blocked
-            FROM worker_clients
-            WHERE client_tg_id = ?
-            ORDER BY id DESC
-            LIMIT 1
-            """,
-            (client_tg_id,),
-        )
+        if worker_tg_id is None:
+            cur = await db.execute(
+                """
+                SELECT *
+                FROM worker_clients
+                WHERE client_tg_id = ?
+                ORDER BY COALESCE(last_activity_at, created_at) DESC, id DESC
+                LIMIT 1
+                """,
+                (client_tg_id,),
+            )
+        else:
+            cur = await db.execute(
+                """
+                SELECT *
+                FROM worker_clients
+                WHERE client_tg_id = ? AND worker_tg_id = ?
+                ORDER BY COALESCE(last_activity_at, created_at) DESC, id DESC
+                LIMIT 1
+                """,
+                (client_tg_id, worker_tg_id),
+            )
         return await cur.fetchone()
+
+
+async def get_client_trade_settings(client_tg_id: int):
+    row = await get_worker_client_row(client_tg_id)
+    if not row:
+        return None
+    return row
 
 
 async def get_setting_value(key: str, default: str = "") -> str:
@@ -974,7 +993,7 @@ async def get_effective_min_trade_amount(client_tg_id: int, currency: str | None
     raw_value = float(raw_min or 0.0)
     if raw_value <= 0 or is_legacy_default_min_trade(raw_value):
         return global_min
-    return max(global_min, raw_value)
+    return raw_value
 
 
 async def get_effective_min_deposit_amount(client_tg_id: int, currency: str | None) -> float:
@@ -984,13 +1003,8 @@ async def get_effective_min_deposit_amount(client_tg_id: int, currency: str | No
     if worker_id:
         ws = await get_worker_settings(worker_id)
         worker_min = float(ws.get("min_deposit") or 0.0)
-    async with aiosqlite.connect(DB_PATH) as db:
-        cur = await db.execute(
-            "SELECT min_deposit FROM worker_clients WHERE client_tg_id = ? ORDER BY id DESC LIMIT 1",
-            (client_tg_id,),
-        )
-        row = await cur.fetchone()
-    client_min = float(row[0] or 0.0) if row else 0.0
+    row = await get_worker_client_row(client_tg_id, worker_id)
+    client_min = float(row["min_deposit"] or 0.0) if row else 0.0
     return max(global_min, worker_min, client_min)
 
 
@@ -1495,13 +1509,8 @@ async def get_referral_count(worker_tg_id: int) -> int:
 
 
 async def get_worker_for_client(client_tg_id: int) -> Optional[int]:
-    async with aiosqlite.connect(DB_PATH) as db:
-        cur = await db.execute(
-            "SELECT worker_tg_id FROM worker_clients WHERE client_tg_id = ? ORDER BY id ASC LIMIT 1",
-            (client_tg_id,),
-        )
-        row = await cur.fetchone()
-        return int(row[0]) if row else None
+    row = await get_worker_client_row(client_tg_id)
+    return int(row["worker_tg_id"]) if row and row["worker_tg_id"] is not None else None
 
 async def create_withdrawal(user_tg_id: int, amount: float, currency: str, method: str, details: str) -> int:
     async with aiosqlite.connect(DB_PATH) as db:
@@ -3725,7 +3734,7 @@ async def open_worker_client_profile(msg: Message, wc_id: int):
     currency = row["currency"] or "USD"
     min_dep = row["min_deposit"] or 0
     min_wd = row["min_withdraw"] or 0
-    min_trade = row["min_trade_amount"] or 100
+    min_trade = await get_effective_min_trade_amount(int(row["client_tg_id"]), currency)
     trade_coefficient = row["trade_coefficient"] or 1
     auto_reject_trades = bool(row["auto_reject_trades"])
     flags = {

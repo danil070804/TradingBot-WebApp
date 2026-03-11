@@ -2528,10 +2528,7 @@ async def api_trade_open(
         return JSONResponse({"ok": False, "error": "Пользователь не найден"}, status_code=404)
     balance = float(user["balance"] or 0.0)
     currency = user["currency"] or "USD"
-    wc_cfg = await fetch_one(
-        "SELECT min_trade_amount, auto_reject_trades, trading_enabled, blocked FROM worker_clients WHERE client_tg_id = ? ORDER BY id DESC LIMIT 1",
-        (tg_id,),
-    )
+    wc_cfg = await bot.get_client_trade_settings(tg_id)
     min_trade_amount = await bot.get_effective_min_trade_amount(tg_id, currency)
     auto_reject_trades = bool(wc_cfg["auto_reject_trades"]) if wc_cfg else False
 
