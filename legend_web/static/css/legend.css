@@ -682,18 +682,109 @@ select, input {
 
 .worker-row {
     align-items: start;
+    gap: 14px;
+    padding: 14px;
+    border-radius: 18px;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(237, 247, 252, 0.92)),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.22), transparent 40%);
+    border: 1px solid rgba(116, 200, 244, 0.18);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.worker-card-main {
+    display: grid;
+    gap: 6px;
+    flex: 1;
+}
+
+.worker-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.worker-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 9px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    border: 1px solid rgba(116, 200, 244, 0.2);
+    background: rgba(255, 255, 255, 0.76);
+    color: #447091;
+}
+
+.worker-badge.active {
+    color: #1f7ea5;
+}
+
+.worker-badge.favorite {
+    color: #c08b2d;
+    border-color: rgba(240, 183, 102, 0.34);
+    background: rgba(255, 246, 229, 0.92);
+}
+
+.worker-badge.blocked {
+    color: #c34759;
+    border-color: rgba(227, 103, 123, 0.3);
+    background: rgba(255, 238, 241, 0.92);
+}
+
+.worker-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 2px;
+}
+
+.worker-meta span {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(223, 244, 255, 0.82);
+    color: #427091;
+    font-size: 11px;
+    font-weight: 700;
 }
 
 .worker-actions {
     display: grid;
     grid-template-columns: repeat(2, minmax(100px, 1fr));
     gap: 6px;
-    width: 210px;
+    width: 252px;
 }
 
 .worker-actions .chip {
     font-size: 11px;
-    padding: 7px 4px;
+    padding: 8px 6px;
+}
+
+.worker-actions .chip.state-on {
+    color: #15784c;
+    border-color: rgba(79, 212, 143, 0.32);
+    background: rgba(232, 251, 241, 0.96);
+}
+
+.worker-actions .chip.state-off {
+    color: #6f8599;
+}
+
+.worker-actions .chip.state-fav {
+    color: #b57c18;
+    border-color: rgba(240, 183, 102, 0.34);
+    background: rgba(255, 248, 234, 0.96);
+}
+
+.worker-actions .chip.state-block {
+    color: #c34759;
+    border-color: rgba(227, 103, 123, 0.34);
+    background: rgba(255, 239, 243, 0.96);
 }
 
 .position-row .chip {
@@ -791,6 +882,10 @@ select, input {
     }
     .worker-actions {
         width: 100%;
+    }
+    .worker-head {
+        align-items: start;
+        flex-direction: column;
     }
     .stats-grid {
         grid-template-columns: repeat(2, 1fr);

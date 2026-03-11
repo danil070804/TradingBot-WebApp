@@ -1234,7 +1234,7 @@ async def worker_page(request: Request):
         {
             "request": request,
             "page": "worker",
-            "title": "Legend Trading Worker",
+            "title": "Панель воркера | Legend Trading",
             "lang": lang,
             "labels": labels,
             "worker_id": tg_id,

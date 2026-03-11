@@ -1083,7 +1083,7 @@ function bindWorkerPanel() {
         });
         const data = await resp.json();
         if (!resp.ok || !data.ok) {
-            alert(data.error || "Update failed");
+            alert(data.error || "Не удалось обновить данные");
             return false;
         }
         location.reload();
@@ -1102,12 +1102,12 @@ function bindWorkerPanel() {
         btn.addEventListener("click", async () => {
             const row = btn.closest(".worker-row");
             if (!row) return;
-            const label = btn.dataset.label || "Value";
+            const label = btn.dataset.label || "Значение";
             const valRaw = prompt(`${label}:`);
             if (valRaw === null) return;
             const val = Number(valRaw);
             if (Number.isNaN(val)) {
-                alert("Invalid number");
+                alert("Введите корректное число");
                 return;
             }
             await doUpdate(row.dataset.wcId, btn.dataset.action, val);

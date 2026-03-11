@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Worker | Legend Trading{% endblock %}
+{% block title %}Панель воркера | Legend Trading{% endblock %}
 {% block content %}
 <section class="card hero">
     <h1>{{ labels.worker_title if labels else "Панель воркера" }}</h1>
@@ -9,24 +9,34 @@
 
 <section class="card">
     <div class="section-title">{{ labels.worker_title if labels else "Панель воркера" }}</div>
+    <p class="deposit-lead">Управляйте клиентами, лимитами и статусами из одного окна. Все действия применяются сразу после подтверждения.</p>
     <div id="worker-list" class="list">
         {% for c in clients %}
         <div class="row worker-row" data-wc-id="{{ c.id }}">
-            <div>
-                <b>#{{ c.id }} {{ c.first_name if c.first_name else "user" }}</b>
+            <div class="worker-card-main">
+                <div class="worker-head">
+                    <b>#{{ c.id }} {{ c.first_name if c.first_name else "Пользователь" }}</b>
+                    <span class="worker-badge {% if c.blocked %}blocked{% elif c.favorite %}favorite{% else %}active{% endif %}">
+                        {% if c.blocked %}Заблокирован{% elif c.favorite %}Избранный{% else %}Активный{% endif %}
+                    </span>
+                </div>
                 <small>ID {{ c.client_tg_id }} · @{{ c.username if c.username else "-" }}</small>
-                <small>Balance: {{ "%.2f"|format((c.balance or 0)) }} {{ c.currency if c.currency else "USD" }}</small>
+                <small>Баланс: {{ "%.2f"|format((c.balance or 0)) }} {{ c.currency if c.currency else "USD" }}</small>
+                <div class="worker-meta">
+                    <span>Мин. депозит: {{ "%.2f"|format((c.min_deposit or 0)) }}</span>
+                    <span>Мин. вывод: {{ "%.2f"|format((c.min_withdraw or 0)) }}</span>
+                </div>
             </div>
             <div class="worker-actions">
-                <button class="chip worker-act" data-action="toggle_trade">Trade {{ "ON" if c.trading_enabled else "OFF" }}</button>
-                <button class="chip worker-act" data-action="toggle_withdraw">WD {{ "ON" if c.withdraw_enabled else "OFF" }}</button>
-                <button class="chip worker-act" data-action="toggle_verified">KYC {{ "ON" if c.verified else "OFF" }}</button>
-                <button class="chip worker-act" data-action="toggle_favorite">Fav {{ "ON" if c.favorite else "OFF" }}</button>
-                <button class="chip worker-act" data-action="toggle_block">{{ "UNBLOCK" if c.blocked else "BLOCK" }}</button>
-                <button class="chip worker-prompt" data-action="set_luck" data-label="Luck 0-100">Luck</button>
-                <button class="chip worker-prompt" data-action="set_min_deposit" data-label="Min deposit">Min dep</button>
-                <button class="chip worker-prompt" data-action="set_min_withdraw" data-label="Min withdraw">Min wd</button>
-                <button class="chip worker-prompt" data-action="add_balance" data-label="Add balance">+Balance</button>
+                <button class="chip worker-act {% if c.trading_enabled %}state-on{% else %}state-off{% endif %}" data-action="toggle_trade">Торговля {{ "ВКЛ" if c.trading_enabled else "ВЫКЛ" }}</button>
+                <button class="chip worker-act {% if c.withdraw_enabled %}state-on{% else %}state-off{% endif %}" data-action="toggle_withdraw">Вывод {{ "ВКЛ" if c.withdraw_enabled else "ВЫКЛ" }}</button>
+                <button class="chip worker-act {% if c.verified %}state-on{% else %}state-off{% endif %}" data-action="toggle_verified">KYC {{ "ВКЛ" if c.verified else "ВЫКЛ" }}</button>
+                <button class="chip worker-act {% if c.favorite %}state-fav{% else %}state-off{% endif %}" data-action="toggle_favorite">Избранное {{ "ДА" if c.favorite else "НЕТ" }}</button>
+                <button class="chip worker-act {% if c.blocked %}state-block{% else %}state-on{% endif %}" data-action="toggle_block">{{ "Разблок" if c.blocked else "Блок" }}</button>
+                <button class="chip worker-prompt" data-action="set_luck" data-label="Удача 0-100">Удача</button>
+                <button class="chip worker-prompt" data-action="set_min_deposit" data-label="Минимальный депозит">Мин. деп</button>
+                <button class="chip worker-prompt" data-action="set_min_withdraw" data-label="Минимальный вывод">Мин. вывод</button>
+                <button class="chip worker-prompt" data-action="add_balance" data-label="Пополнение баланса">+Баланс</button>
             </div>
         </div>
         {% else %}
