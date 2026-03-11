@@ -38,11 +38,14 @@
         <p class="{{ 'pos' if stats.total_profit >= 0 else 'neg' }}">{{ "%+.2f"|format(stats.total_profit) }}</p>
     </article>
 </section>
-{% if user and user.is_worker %}
 <section class="quick-actions">
+    {% if support_url %}
+    <a class="qa-btn" href="{{ support_url }}" target="_blank" rel="noopener noreferrer">{{ labels.quick_verify if labels else "Пройти верификацию" }}</a>
+    {% endif %}
+    {% if user and user.is_worker %}
     <a class="qa-btn" href="/worker">{{ labels.quick_worker if labels else "Панель воркера" }}</a>
+    {% endif %}
 </section>
-{% endif %}
 <section class="card">
     <div class="section-title">{{ labels.profile_recent_deposits if labels else "Последние пополнения" }}</div>
     <div class="list">
