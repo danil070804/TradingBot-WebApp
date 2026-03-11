@@ -699,6 +699,30 @@ select, input {
     margin-bottom: 12px;
 }
 
+.worker-ref-box {
+    display: grid;
+    gap: 6px;
+    margin-top: 12px;
+    padding: 12px;
+    border-radius: 16px;
+    border: 1px solid rgba(116, 200, 244, 0.24);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(232, 246, 255, 0.88));
+}
+
+.worker-ref-box small {
+    color: #6988a3;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    font-size: 11px;
+}
+
+.worker-ref-box code {
+    display: block;
+    overflow-wrap: anywhere;
+    color: #21597f;
+    font-size: 13px;
+}
+
 .worker-card-main {
     display: grid;
     gap: 6px;
@@ -762,14 +786,15 @@ select, input {
 
 .worker-actions {
     display: grid;
-    grid-template-columns: repeat(2, minmax(100px, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 6px;
-    width: 252px;
+    width: min(360px, 100%);
 }
 
 .worker-actions .chip {
     font-size: 11px;
-    padding: 8px 6px;
+    padding: 9px 6px;
+    min-height: 38px;
 }
 
 .worker-open {

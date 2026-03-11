@@ -565,6 +565,13 @@ def build_support_redirect_url(amount: float | None = None, method: str | None =
     return f"/deposit/support?{urlencode(params)}" if params else "/deposit/support"
 
 
+def build_worker_ref_link(worker_tg_id: int) -> str:
+    username = (bot.BOT_USERNAME or "").strip()
+    if not username:
+        return ""
+    return f"https://t.me/{username}?start=ref{worker_tg_id}"
+
+
 async def log_web_activity_for_worker(
     client_tg_id: int,
     actor_tg_id: int | None,
@@ -1390,6 +1397,7 @@ async def worker_page(request: Request):
             "lang": lang,
             "labels": labels,
             "worker_id": tg_id,
+            "worker_ref_link": build_worker_ref_link(tg_id),
             "clients": rows,
             "activity": activity,
         },

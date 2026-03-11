@@ -5,6 +5,12 @@
     <h1>{{ labels.worker_title if labels else "Панель воркера" }}</h1>
     <div class="hint">{{ labels.worker_hint if labels else "Управление вашими рефералами в реальном времени" }}</div>
     <div class="hint">ID: {{ worker_id }}</div>
+    {% if worker_ref_link %}
+    <div class="worker-ref-box">
+        <small>Реферальная ссылка</small>
+        <code>{{ worker_ref_link }}</code>
+    </div>
+    {% endif %}
 </section>
 
 <section class="card">
@@ -48,15 +54,15 @@
                 </div>
             </div>
             <div class="worker-actions">
-                <button class="chip worker-act {% if c.trading_enabled %}state-on{% else %}state-off{% endif %}" data-action="toggle_trade">Торговля {{ "ВКЛ" if c.trading_enabled else "ВЫКЛ" }}</button>
-                <button class="chip worker-act {% if c.withdraw_enabled %}state-on{% else %}state-off{% endif %}" data-action="toggle_withdraw">Вывод {{ "ВКЛ" if c.withdraw_enabled else "ВЫКЛ" }}</button>
-                <button class="chip worker-act {% if c.verified %}state-on{% else %}state-off{% endif %}" data-action="toggle_verified">KYC {{ "ВКЛ" if c.verified else "ВЫКЛ" }}</button>
-                <button class="chip worker-act {% if c.favorite %}state-fav{% else %}state-off{% endif %}" data-action="toggle_favorite">Избранное {{ "ДА" if c.favorite else "НЕТ" }}</button>
+                <button class="chip worker-act {% if c.trading_enabled %}state-on{% else %}state-off{% endif %}" data-action="toggle_trade">Покупка</button>
+                <button class="chip worker-act {% if c.withdraw_enabled %}state-on{% else %}state-off{% endif %}" data-action="toggle_withdraw">Вывод</button>
+                <button class="chip worker-act {% if c.verified %}state-on{% else %}state-off{% endif %}" data-action="toggle_verified">Вериф</button>
+                <button class="chip worker-act {% if c.favorite %}state-fav{% else %}state-off{% endif %}" data-action="toggle_favorite">Избранное</button>
                 <button class="chip worker-act {% if c.blocked %}state-block{% else %}state-on{% endif %}" data-action="toggle_block">{{ "Разблок" if c.blocked else "Блок" }}</button>
                 <button class="chip worker-prompt" data-action="set_luck" data-label="Удача 0-100">Удача</button>
                 <button class="chip worker-prompt" data-action="set_min_deposit" data-label="Минимальный депозит">Мин. деп</button>
                 <button class="chip worker-prompt" data-action="set_min_withdraw" data-label="Минимальный вывод">Мин. вывод</button>
-                <button class="chip worker-prompt" data-action="add_balance" data-label="Пополнение баланса">+Баланс</button>
+                <button class="chip worker-prompt" data-action="add_balance" data-label="Пополнение баланса">Баланс</button>
                 <a class="chip worker-open" href="/worker/client/{{ c.id }}">Карточка</a>
             </div>
         </div>
