@@ -687,7 +687,7 @@ async def fetch_worker_clients_rows(worker_tg_id: int):
         return await fetch_all(
             """
             SELECT wc.id, wc.client_tg_id, wc.min_deposit, wc.min_withdraw, wc.verified, wc.withdraw_enabled,
-                   wc.min_trade_amount, wc.trading_enabled, wc.favorite, wc.blocked, wc.crm_note, wc.tags, wc.funnel_stage, wc.last_activity_at,
+                   wc.min_trade_amount, wc.trade_coefficient, wc.auto_reject_trades, wc.trading_enabled, wc.favorite, wc.blocked, wc.crm_note, wc.tags, wc.funnel_stage, wc.last_activity_at,
                    u.first_name, u.username, u.balance, u.currency, cl.luck_percent
             FROM worker_clients wc
             LEFT JOIN users u ON u.tg_id = wc.client_tg_id
@@ -702,7 +702,7 @@ async def fetch_worker_clients_rows(worker_tg_id: int):
         return await fetch_all(
             """
             SELECT wc.id, wc.client_tg_id, wc.min_deposit, wc.min_withdraw, wc.verified, wc.withdraw_enabled,
-                   wc.min_trade_amount, wc.trading_enabled, wc.favorite, wc.blocked, '' AS crm_note, '' AS tags, 'new' AS funnel_stage, wc.created_at AS last_activity_at,
+                   wc.min_trade_amount, 1 AS trade_coefficient, 0 AS auto_reject_trades, wc.trading_enabled, wc.favorite, wc.blocked, '' AS crm_note, '' AS tags, 'new' AS funnel_stage, wc.created_at AS last_activity_at,
                    u.first_name, u.username, u.balance, u.currency, 0 AS luck_percent
             FROM worker_clients wc
             LEFT JOIN users u ON u.tg_id = wc.client_tg_id
@@ -878,7 +878,7 @@ async def build_worker_client_snapshot_payload(worker_tg_id: int, wc_id: int) ->
     client = await fetch_one(
         """
             SELECT wc.id, wc.worker_tg_id, wc.client_tg_id, wc.min_deposit, wc.min_withdraw, wc.verified, wc.withdraw_enabled,
-                   wc.min_trade_amount, wc.trading_enabled, wc.favorite, wc.blocked, wc.crm_note, wc.tags, wc.funnel_stage, wc.last_activity_at,
+                   wc.min_trade_amount, wc.trade_coefficient, wc.auto_reject_trades, wc.trading_enabled, wc.favorite, wc.blocked, wc.crm_note, wc.tags, wc.funnel_stage, wc.last_activity_at,
                    u.first_name, u.username, u.language, u.currency, u.balance, cl.luck_percent
         FROM worker_clients wc
         LEFT JOIN users u ON u.tg_id = wc.client_tg_id
@@ -1756,7 +1756,7 @@ async def worker_client_page(request: Request, wc_id: int):
         client = await fetch_one(
             """
             SELECT wc.id, wc.worker_tg_id, wc.client_tg_id, wc.min_deposit, wc.min_withdraw, wc.verified, wc.withdraw_enabled,
-                   wc.min_trade_amount, wc.trading_enabled, wc.favorite, wc.blocked, wc.crm_note, wc.tags, wc.funnel_stage, wc.last_activity_at, wc.created_at,
+                   wc.min_trade_amount, wc.trade_coefficient, wc.auto_reject_trades, wc.trading_enabled, wc.favorite, wc.blocked, wc.crm_note, wc.tags, wc.funnel_stage, wc.last_activity_at, wc.created_at,
                    u.first_name, u.username, u.language, u.currency, u.balance, u.created_at AS user_created_at, cl.luck_percent
             FROM worker_clients wc
             LEFT JOIN users u ON u.tg_id = wc.client_tg_id
@@ -1770,7 +1770,7 @@ async def worker_client_page(request: Request, wc_id: int):
         client = await fetch_one(
             """
             SELECT wc.id, wc.worker_tg_id, wc.client_tg_id, wc.min_deposit, wc.min_withdraw, wc.verified, wc.withdraw_enabled,
-                   wc.min_trade_amount, wc.trading_enabled, wc.favorite, wc.blocked, '' AS crm_note, '' AS tags, 'new' AS funnel_stage, wc.created_at AS last_activity_at, wc.created_at,
+                   wc.min_trade_amount, 1 AS trade_coefficient, 0 AS auto_reject_trades, wc.trading_enabled, wc.favorite, wc.blocked, '' AS crm_note, '' AS tags, 'new' AS funnel_stage, wc.created_at AS last_activity_at, wc.created_at,
                    u.first_name, u.username, u.language, u.currency, u.balance, u.created_at AS user_created_at, 0 AS luck_percent
             FROM worker_clients wc
             LEFT JOIN users u ON u.tg_id = wc.client_tg_id
@@ -1876,7 +1876,7 @@ async def api_worker_client_update(payload: WorkerClientUpdatePayload, request: 
         return JSONResponse({"ok": False, "error": "Forbidden"}, status_code=403)
 
     wc = await fetch_one(
-        "SELECT id, client_tg_id, worker_tg_id, min_trade_amount, verified, withdraw_enabled, trading_enabled, favorite, blocked "
+        "SELECT id, client_tg_id, worker_tg_id, min_trade_amount, trade_coefficient, auto_reject_trades, verified, withdraw_enabled, trading_enabled, favorite, blocked "
         "FROM worker_clients WHERE id = ?",
         (payload.wc_id,),
     )
@@ -1936,6 +1936,18 @@ async def api_worker_client_update(payload: WorkerClientUpdatePayload, request: 
         activity_title = "Мин. сумма сделки"
         activity_details = f"Установлена минимальная сумма сделки {val:.2f}"
         activity_amount = val
+    elif action == "set_trade_coefficient":
+        val = float(payload.value or 0)
+        if val <= 0 or val > 10:
+            return JSONResponse({"ok": False, "error": "Coefficient must be in 0..10"}, status_code=400)
+        await bot.update_worker_client_field(payload.wc_id, "trade_coefficient", val)
+        activity_title = "Коэффициент сделок"
+        activity_details = f"Коэффициент изменён на {val:.2f}"
+    elif action == "toggle_auto_reject_trades":
+        new_val = 0 if wc["auto_reject_trades"] else 1
+        await bot.update_worker_client_field(payload.wc_id, "auto_reject_trades", new_val)
+        activity_title = "Авто-отклонение сделок"
+        activity_details = "Авто-отклонение включено" if new_val else "Авто-отклонение отключено"
     elif action == "set_luck":
         val = float(payload.value or 0)
         if val < 0 or val > 100:
@@ -1973,6 +1985,37 @@ async def api_worker_client_update(payload: WorkerClientUpdatePayload, request: 
         await bot.update_worker_client_field(payload.wc_id, "crm_note", note)
         activity_title = "Заметка воркера"
         activity_details = "Обновлена заметка по рефералу"
+    elif action == "send_message":
+        message_text = str(payload.value or "").strip()
+        if not message_text:
+            return JSONResponse({"ok": False, "error": "Message is empty"}, status_code=400)
+        if len(message_text) > 2000:
+            return JSONResponse({"ok": False, "error": "Message is too long"}, status_code=400)
+        try:
+            await bot.bot.send_message(int(wc["client_tg_id"]), f"💬 Сообщение от поддержки:\n{message_text}")
+        except Exception:
+            return JSONResponse({"ok": False, "error": "Не удалось отправить сообщение"}, status_code=502)
+        ticket = await bot.get_latest_open_support_ticket(int(wc["client_tg_id"]))
+        if ticket:
+            await bot.update_support_ticket_status(
+                int(ticket["id"]),
+                "in_progress",
+                assigned_to=str(tg_id),
+                last_message=message_text,
+            )
+        else:
+            await bot.create_support_ticket(
+                client_tg_id=int(wc["client_tg_id"]),
+                worker_tg_id=tg_id,
+                source="worker_web",
+                topic="support",
+                subject="Сообщение от воркера",
+                status="in_progress",
+                last_message=message_text,
+                meta={"from": "worker_web"},
+            )
+        activity_title = "Сообщение рефералу"
+        activity_details = f"Воркер отправил сообщение: {message_text[:120]}"
     elif action == "set_tags":
         tags = ",".join(parse_tags(str(payload.value or "")))
         await bot.update_worker_client_field(payload.wc_id, "tags", tags)
@@ -2449,10 +2492,11 @@ async def api_trade_open(
     balance = float(user["balance"] or 0.0)
     currency = user["currency"] or "USD"
     wc_cfg = await fetch_one(
-        "SELECT min_trade_amount FROM worker_clients WHERE client_tg_id = ? ORDER BY id DESC LIMIT 1",
+        "SELECT min_trade_amount, auto_reject_trades FROM worker_clients WHERE client_tg_id = ? ORDER BY id DESC LIMIT 1",
         (tg_id,),
     )
     min_trade_amount = float(wc_cfg["min_trade_amount"] or 100) if wc_cfg else 100.0
+    auto_reject_trades = bool(wc_cfg["auto_reject_trades"]) if wc_cfg else False
 
     risk_percent = float(payload.risk_percent or 0.0)
     if risk_percent > 0:
@@ -2460,6 +2504,8 @@ async def api_trade_open(
 
     if amount < min_trade_amount:
         return JSONResponse({"ok": False, "error": f"Минимальная сумма сделки: {min_trade_amount:.2f}"}, status_code=400)
+    if auto_reject_trades:
+        return JSONResponse({"ok": False, "error": "Сделки для этого аккаунта временно отклоняются"}, status_code=403)
     if amount > balance:
         return JSONResponse({"ok": False, "error": "Недостаточно средств"}, status_code=400)
 
@@ -2942,6 +2988,13 @@ async def settle_web_trade(trade_id: str) -> dict | None:
         start_price=float(start_price),
         end_price=float(end_price),
     )
+    client_trade_cfg = await fetch_one(
+        "SELECT trade_coefficient FROM worker_clients WHERE client_tg_id = ? ORDER BY id DESC LIMIT 1",
+        (tg_id,),
+    )
+    trade_coefficient = float(client_trade_cfg["trade_coefficient"] or 1) if client_trade_cfg else 1.0
+    if profit > 0 and trade_coefficient != 1.0:
+        profit = round(profit * trade_coefficient, 2)
     is_win = profit > 0
     credit = max(0.0, amount + profit)
     if credit > 0:

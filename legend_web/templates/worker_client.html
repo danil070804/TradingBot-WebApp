@@ -50,6 +50,8 @@
         <span id="worker-client-min-deposit">Мин. депозит: {{ "%.2f"|format((client.min_deposit or 0)) }}</span>
         <span id="worker-client-min-withdraw">Мин. вывод: {{ "%.2f"|format((client.min_withdraw or 0)) }}</span>
         <span id="worker-client-min-trade">Мин. сделка: {{ "%.2f"|format((client.min_trade_amount or 100)) }}</span>
+        <span id="worker-client-trade-coefficient">Коэфф: {{ "%.2f"|format((client.trade_coefficient or 1)) }}</span>
+        <span id="worker-client-auto-reject">Авто-откл: {{ "ВКЛ" if client.auto_reject_trades else "ВЫКЛ" }}</span>
         <span id="worker-client-stage">Этап: {{ client.funnel_stage if client.funnel_stage else "new" }}</span>
         <span id="worker-client-verified">KYC: {{ "ВКЛ" if client.verified else "ВЫКЛ" }}</span>
         <span id="worker-client-trading">Торговля: {{ "ВКЛ" if client.trading_enabled else "ВЫКЛ" }}</span>
@@ -103,9 +105,12 @@
         <button class="chip worker-client-prompt" data-action="add_balance" data-label="Пополнение баланса">Баланс+</button>
         <button class="chip worker-client-prompt" data-action="subtract_balance" data-label="Списание баланса">Баланс-</button>
         <button class="chip worker-client-prompt" data-action="set_balance" data-label="Установить баланс">Set баланс</button>
+        <button class="chip worker-client-prompt" data-action="set_trade_coefficient" data-label="Коэффициент сделки">Коэфф</button>
+        <button class="chip worker-client-toggle {% if client.auto_reject_trades %}state-block{% else %}state-on{% endif %}" data-action="toggle_auto_reject_trades">Авто-откл</button>
         <button class="chip worker-client-text" data-action="set_funnel_stage" data-label="Этап воронки">Этап</button>
         <button class="chip worker-client-text" data-action="set_tags" data-label="Теги через запятую">Теги</button>
         <button class="chip worker-client-text" data-action="set_note" data-label="Заметка по рефералу">Заметка</button>
+        <button class="chip worker-client-text" data-action="send_message" data-label="Сообщение рефералу">Сообщение</button>
     </div>
     <div id="worker-client-control-result" class="result-box"></div>
 </section>

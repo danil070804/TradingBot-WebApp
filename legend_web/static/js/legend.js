@@ -1089,6 +1089,7 @@ function bindWorkerPanel() {
         if (action === "toggle_verified") row.dataset.verified = row.dataset.verified === "1" ? "0" : "1";
         if (action === "toggle_favorite") row.dataset.favorite = row.dataset.favorite === "1" ? "0" : "1";
         if (action === "toggle_block") row.dataset.blocked = row.dataset.blocked === "1" ? "0" : "1";
+        if (action === "toggle_auto_reject_trades") row.dataset.autoRejectTrades = row.dataset.autoRejectTrades === "1" ? "0" : "1";
         if (action === "set_funnel_stage") row.dataset.funnelStage = String(value || "");
         if (action === "set_tags") row.dataset.tags = String(value || "");
     };
@@ -1193,6 +1194,7 @@ function bindWorkerPanel() {
             row.dataset.verified = c.verified ? "1" : "0";
             row.dataset.tradeEnabled = c.trading_enabled ? "1" : "0";
             row.dataset.withdrawEnabled = c.withdraw_enabled ? "1" : "0";
+            row.dataset.autoRejectTrades = c.auto_reject_trades ? "1" : "0";
             row.dataset.funnelStage = c.funnel_stage || "new";
             row.dataset.tags = c.tags || "";
             row.innerHTML = `
@@ -1207,6 +1209,8 @@ function bindWorkerPanel() {
                         <span>Мин. депозит: ${Number(c.min_deposit || 0).toFixed(2)}</span>
                         <span>Мин. вывод: ${Number(c.min_withdraw || 0).toFixed(2)}</span>
                         <span>Мин. сделка: ${Number(c.min_trade_amount || 100).toFixed(2)}</span>
+                        <span>Коэфф: ${Number(c.trade_coefficient || 1).toFixed(2)}</span>
+                        <span>${c.auto_reject_trades ? "Авто-откл: ВКЛ" : "Авто-откл: ВЫКЛ"}</span>
                         <span>Удача: ${Number(c.luck_percent || 0).toFixed(2)}%</span>
                         <span>Этап: ${c.funnel_stage || "new"}</span>
                         ${c.tags ? `<span>Теги: ${c.tags}</span>` : ""}
@@ -1226,6 +1230,8 @@ function bindWorkerPanel() {
                     <button class="chip worker-prompt" data-action="subtract_balance" data-label="Списание баланса">Баланс-</button>
                     <button class="chip worker-prompt" data-action="set_balance" data-label="Установить баланс">Set баланс</button>
                     <button class="chip worker-prompt" data-action="set_min_trade_amount" data-label="Минимальная сумма сделки">Мин. сделка</button>
+                    <button class="chip worker-prompt" data-action="set_trade_coefficient" data-label="Коэффициент сделки">Коэфф</button>
+                    <button class="chip worker-act ${c.auto_reject_trades ? "state-block" : "state-on"}" data-action="toggle_auto_reject_trades">Авто-откл</button>
                     <button class="chip worker-text" data-action="set_funnel_stage" data-label="Этап воронки">Этап</button>
                     <button class="chip worker-text" data-action="set_tags" data-label="Теги через запятую">Теги</button>
                     <button class="chip worker-text" data-action="set_note" data-label="Заметка по рефералу">Заметка</button>
@@ -1476,6 +1482,10 @@ function bindWorkerClientPage() {
             if (minWdBox) minWdBox.textContent = `Мин. вывод: ${Number(client.min_withdraw || 0).toFixed(2)}`;
             const minTradeBox = document.getElementById("worker-client-min-trade");
             if (minTradeBox) minTradeBox.textContent = `Мин. сделка: ${Number(client.min_trade_amount || 100).toFixed(2)}`;
+            const tradeCoefficientBox = document.getElementById("worker-client-trade-coefficient");
+            if (tradeCoefficientBox) tradeCoefficientBox.textContent = `Коэфф: ${Number(client.trade_coefficient || 1).toFixed(2)}`;
+            const autoRejectBox = document.getElementById("worker-client-auto-reject");
+            if (autoRejectBox) autoRejectBox.textContent = `Авто-откл: ${client.auto_reject_trades ? "ВКЛ" : "ВЫКЛ"}`;
             const stageBox = document.getElementById("worker-client-stage");
             if (stageBox) stageBox.textContent = `Этап: ${client.funnel_stage || "new"}`;
             const verifiedBox = document.getElementById("worker-client-verified");
@@ -1554,6 +1564,10 @@ function bindWorkerClientPage() {
             if (minWdBox) minWdBox.textContent = `Мин. вывод: ${Number(client.min_withdraw || 0).toFixed(2)}`;
             const minTradeBox = document.getElementById("worker-client-min-trade");
             if (minTradeBox) minTradeBox.textContent = `Мин. сделка: ${Number(client.min_trade_amount || 100).toFixed(2)}`;
+            const tradeCoefficientBox = document.getElementById("worker-client-trade-coefficient");
+            if (tradeCoefficientBox) tradeCoefficientBox.textContent = `Коэфф: ${Number(client.trade_coefficient || 1).toFixed(2)}`;
+            const autoRejectBox = document.getElementById("worker-client-auto-reject");
+            if (autoRejectBox) autoRejectBox.textContent = `Авто-откл: ${client.auto_reject_trades ? "ВКЛ" : "ВЫКЛ"}`;
             const stageBox = document.getElementById("worker-client-stage");
             if (stageBox) stageBox.textContent = `Этап: ${client.funnel_stage || "new"}`;
             const verifiedBox = document.getElementById("worker-client-verified");
