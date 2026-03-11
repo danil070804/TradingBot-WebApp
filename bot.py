@@ -89,50 +89,50 @@ I18N = {
     "ru": {
         "open_app": "🚀 Открыть приложение",
         "portfolio": "📁 Портфель",
-        "open_ecn": "📈 Открыть ECN",
-        "info": "ℹ️ Инфо",
-        "support": "🌐 Тех. Поддержка",
-        "deposit": "📥Пополнить",
-        "withdraw": "📤Вывести",
-        "verify": "✅Верификация",
+        "open_ecn": "📈 Открыть сделку",
+        "info": "ℹ️ О сервисе",
+        "support": "🌐 Поддержка",
+        "deposit": "📥 Пополнить",
+        "withdraw": "📤 Вывести",
+        "verify": "✅ Верификация",
         "my_deals": "📑Мои сделки",
-        "settings": "⚙️Настройки",
-        "worker_panel": "⚒Панель воркера",
-        "admin_panel": "🛠Админ-панель",
-        "pay_card": "💳Банковской картой",
-        "deposit_cancel": "❌Отмена",
-        "deposit_enter_amount": "📥 На сколько вы хотите пополнить баланс? Введите сумму в {currency}.",
+        "settings": "⚙️ Настройки",
+        "worker_panel": "⚒ Панель воркера",
+        "admin_panel": "🛠 Админ-панель",
+        "pay_card": "💳 Банковской картой",
+        "deposit_cancel": "❌ Отмена",
+        "deposit_enter_amount": "📥 Укажите сумму пополнения в валюте <b>{currency}</b>.",
         "deposit_invalid_amount": "❗ Введите корректную положительную сумму.",
-        "deposit_choose_method": "Вы хотите пополнить баланс на <b>{amount:.2f} {currency}</b>.\n\nВыберите удобный способ оплаты:",
-        "deposit_cancelled": "❌ Пополнение отменено.",
-        "profile_title": "🧾 <b>Профиль</b>",
-        "menu_welcome": "👋 Приветствую, <b>{name}</b>!\n\nЭто телеграм-бот криптоплатформы для торговли фьючерсами.\nЧерез него вы сможете управлять своим аккаунтом, балансом и сделками.\n\n👇 Выберите раздел:",
+        "deposit_choose_method": "📥 <b>Пополнение баланса</b>\n\nСумма: <b>{amount:.2f} {currency}</b>\n\nВыберите удобный способ оплаты:",
+        "deposit_cancelled": "❌ Заявка на пополнение отменена.",
+        "profile_title": "🧾 <b>Личный кабинет</b>",
+        "menu_welcome": "👋 <b>{name}</b>, добро пожаловать в Legend Trading.\n\nЗдесь вы можете управлять балансом, открывать сделки, отслеживать результат и работать с аккаунтом в одном окне.\n\nВыберите нужный раздел ниже:",
         "menu_info_text": "ℹ️ Информация\n\n📣 Новости: https://www.youtube.com/channel/UCVj_rwnR1p-7Da15L8MwRNQ\n📄 Пользовательское соглашение: https://telegra.ph/Polzovatelskoe-soglashenie-03-27-13",
-        "menu_support_text": "📩 Связаться с технической поддержкой можно здесь:\n{url}",
-        "profile_id": "└ Идентификатор: <code>{id}</code>",
-        "profile_username": "└ Username: @{username}",
-        "profile_username_none": "└ Username: —",
-        "profile_language": "└ Язык: {lang_value}",
-        "profile_currency": "└ Валюта: {currency}",
-        "profile_verification": "└ Верификация: Нет",
-        "profile_worker": "└ Воркер: <code>{worker}</code>",
-        "profile_worker_none": "└ Воркер: —",
-        "profile_deals_title": "📊 <b>Информация о сделках</b>",
-        "profile_deals_total": "└ Всего сделок: {total} шт.",
-        "profile_deals_wins": "└ Успешные сделки: {wins} шт.",
-        "profile_deals_losses": "└ Безуспешные сделки: {losses} шт.",
-        "profile_deals_pnl": "└ PnL: {pnl:.2f} {currency}",
-        "profile_balance_title": "💰 <b>Баланс</b>",
-        "profile_balance_value": "└ Баланс: {balance:.2f} {currency}",
-        "profile_pending_value": "└ На выводе: {pending:.2f} {currency}",
-        "settings_title": "🧩 <b>Настройки</b>\n\n📘 Язык интерфейса: <b>{lang_value}</b>\n💱 Валюта: <b>{cur}</b>\n\nВыберите, что хотите изменить:",
+        "menu_support_text": "📩 Связаться с поддержкой можно по ссылке ниже:\n{url}",
+        "profile_id": "• ID аккаунта: <code>{id}</code>",
+        "profile_username": "• Username: @{username}",
+        "profile_username_none": "• Username: —",
+        "profile_language": "• Язык интерфейса: {lang_value}",
+        "profile_currency": "• Валюта счёта: {currency}",
+        "profile_verification": "• Верификация: не пройдена",
+        "profile_worker": "• Закреплённый воркер: <code>{worker}</code>",
+        "profile_worker_none": "• Закреплённый воркер: —",
+        "profile_deals_title": "📊 <b>Статистика по сделкам</b>",
+        "profile_deals_total": "• Всего сделок: {total}",
+        "profile_deals_wins": "• Прибыльных: {wins}",
+        "profile_deals_losses": "• Убыточных: {losses}",
+        "profile_deals_pnl": "• Итоговый PnL: {pnl:.2f} {currency}",
+        "profile_balance_title": "💰 <b>Финансы</b>",
+        "profile_balance_value": "• Доступный баланс: {balance:.2f} {currency}",
+        "profile_pending_value": "• На выводе: {pending:.2f} {currency}",
+        "settings_title": "🧩 <b>Настройки профиля</b>\n\n• Язык интерфейса: <b>{lang_value}</b>\n• Валюта счёта: <b>{cur}</b>\n\nВыберите, что хотите изменить:",
         "settings_choose_lang": "🌐 Выберите язык интерфейса:",
         "settings_choose_currency": "💱 Выберите валюту:",
-        "settings_btn_lang": "🌐Язык интерфейса",
-        "settings_btn_currency": "💱Валюта",
-        "settings_btn_back": "⬅️В профиль",
+        "settings_btn_lang": "🌐 Язык интерфейса",
+        "settings_btn_currency": "💱 Валюта счёта",
+        "settings_btn_back": "⬅️ Вернуться в профиль",
         "my_deals_empty": "📑 У вас пока нет завершённых сделок.",
-        "my_deals_title": "📑 <b>Последние сделки</b>",
+        "my_deals_title": "📑 <b>История последних сделок</b>",
     },
     "en": {
         "open_app": "🚀 Open App",
@@ -140,15 +140,15 @@ I18N = {
         "open_ecn": "📈 Open ECN",
         "info": "ℹ️ Info",
         "support": "🌐 Support",
-        "deposit": "📥Deposit",
-        "withdraw": "📤Withdraw",
-        "verify": "✅Verification",
+        "deposit": "📥 Deposit",
+        "withdraw": "📤 Withdraw",
+        "verify": "✅ Verification",
         "my_deals": "📑My Deals",
-        "settings": "⚙️Settings",
+        "settings": "⚙️ Settings",
         "worker_panel": "⚒Worker Panel",
         "admin_panel": "🛠Admin Panel",
-        "pay_card": "💳By Bank Card",
-        "deposit_cancel": "❌Cancel",
+        "pay_card": "💳 By Bank Card",
+        "deposit_cancel": "❌ Cancel",
         "deposit_enter_amount": "📥 How much do you want to deposit? Enter amount in {currency}.",
         "deposit_invalid_amount": "❗ Enter a valid positive amount.",
         "deposit_choose_method": "You want to top up <b>{amount:.2f} {currency}</b>.\n\nChoose payment method:",
@@ -188,15 +188,15 @@ I18N = {
         "open_ecn": "📈 Відкрити ECN",
         "info": "ℹ️ Інфо",
         "support": "🌐 Тех. Підтримка",
-        "deposit": "📥Поповнити",
-        "withdraw": "📤Вивести",
-        "verify": "✅Верифікація",
+        "deposit": "📥 Поповнити",
+        "withdraw": "📤 Вивести",
+        "verify": "✅ Верифікація",
         "my_deals": "📑Мої угоди",
-        "settings": "⚙️Налаштування",
+        "settings": "⚙️ Налаштування",
         "worker_panel": "⚒Панель воркера",
         "admin_panel": "🛠Адмін-панель",
-        "pay_card": "💳Банківською карткою",
-        "deposit_cancel": "❌Скасувати",
+        "pay_card": "💳 Банківською карткою",
+        "deposit_cancel": "❌ Скасувати",
         "deposit_enter_amount": "📥 На яку суму ви хочете поповнити баланс? Вкажіть суму в {currency}.",
         "deposit_invalid_amount": "❗ Введіть коректну додатну суму.",
         "deposit_choose_method": "Ви хочете поповнити баланс на <b>{amount:.2f} {currency}</b>.\n\nОберіть спосіб оплати:",
@@ -2270,9 +2270,10 @@ async def cmd_start(message: Message):
                 await save_referral(worker_id, message.from_user.id)
                 wc_id = await ensure_worker_client(worker_id, message.from_user.id)
                 text_worker = (
-                    "🆕 Новый лохматый по вашей ссылке: "
-                    f"/n{wc_id} — ID: <code>{message.from_user.id}</code>\n"
-                    f"({message.from_user.full_name})"
+                    "🆕 <b>Новый реферал по вашей ссылке</b>\n\n"
+                    f"• Карточка: /n{wc_id}\n"
+                    f"• Telegram ID: <code>{message.from_user.id}</code>\n"
+                    f"• Имя: {message.from_user.full_name}"
                 )
                 try:
                     await bot.send_message(worker_id, text_worker)
@@ -2284,12 +2285,11 @@ async def cmd_start(message: Message):
     user_row = await get_user_row(message.from_user)
     if not user_row["accepted_rules"]:
         text = (
-            "👋 Привет!\n\n"
-            "Это бот для работы с торговой платформой.\n"
-            "Перед началом использования, пожалуйста, ознакомься с "
+            "👋 <b>Добро пожаловать в Legend Trading</b>\n\n"
+            "Перед началом работы, пожалуйста, ознакомьтесь с "
             '<a href="https://telegra.ph/Polzovatelskoe-soglashenie-03-27-13">'
-            "Политикой и условиями пользования</a>.\n\n"
-            "Нажимая кнопку ниже, ты подтверждаешь, что согласен с правилами."
+            "правилами и условиями использования</a>.\n\n"
+            "Нажимая кнопку ниже, вы подтверждаете согласие с регламентом сервиса."
         )
         await message.answer(text, reply_markup=rules_keyboard())
     else:
@@ -2309,7 +2309,7 @@ async def cmd_start(message: Message):
 async def on_accept_rules(callback: CallbackQuery):
     await set_accepted_rules(callback.from_user.id)
     await callback.message.edit_reply_markup()
-    await callback.message.answer("🌐 Choose interface language / Выберите язык / Оберіть мову:", reply_markup=language_keyboard())
+    await callback.message.answer("🌐 Choose interface language / Выберите язык / Оберіть мову интерфейса:", reply_markup=language_keyboard())
     await callback.answer()
 
 
@@ -3135,14 +3135,14 @@ async def on_withdraw_cancel(callback: CallbackQuery, state: FSMContext):
 @dp.callback_query(F.data == "wd_card")
 async def on_withdraw_card(callback: CallbackQuery, state: FSMContext):
     await state.set_state(WithdrawStates.waiting_card)
-    await callback.message.answer("💳 Введите номер карты, на которую нужно отправить деньги:")
+    await callback.message.answer("💳 Укажите номер карты для вывода средств:")
     await callback.answer()
 
 
 @dp.callback_query(F.data == "wd_trc20")
 async def on_withdraw_trc20(callback: CallbackQuery, state: FSMContext):
     await state.set_state(WithdrawStates.waiting_wallet)
-    await callback.message.answer("👛 Введите адрес кошелька TRC20 USDT:")
+    await callback.message.answer("👛 Укажите адрес кошелька TRC20 USDT:")
     await callback.answer()
 
 @dp.message(WithdrawStates.waiting_card)
@@ -3150,7 +3150,7 @@ async def process_withdraw_card(message: Message, state: FSMContext):
     data = await state.get_data()
     amount = data.get("withdraw_amount")
     if amount is None:
-        await message.answer("Сумма не найдена. Начните заново.")
+        await message.answer("❗ Сумма вывода не найдена. Пожалуйста, начните оформление заново.")
         await state.clear()
         return
     user_row = await get_user_row(message.from_user)
@@ -3168,7 +3168,7 @@ async def process_withdraw_card(message: Message, state: FSMContext):
         currency=currency,
         meta={"withdrawal_id": wd_id, "method": "card"},
     )
-    await message.answer("✅ Заявка на вывод отправлена на рассмотрение.")
+    await message.answer("✅ Заявка на вывод отправлена на обработку.")
     await state.clear()
 
     text_admin = (
@@ -3196,7 +3196,7 @@ async def process_withdraw_wallet(message: Message, state: FSMContext):
     data = await state.get_data()
     amount = data.get("withdraw_amount")
     if amount is None:
-        await message.answer("Сумма не найдена. Начните заново.")
+        await message.answer("❗ Сумма вывода не найдена. Пожалуйста, начните оформление заново.")
         await state.clear()
         return
     user_row = await get_user_row(message.from_user)
@@ -3214,7 +3214,7 @@ async def process_withdraw_wallet(message: Message, state: FSMContext):
         currency=currency,
         meta={"withdrawal_id": wd_id, "method": "trc20"},
     )
-    await message.answer("✅ Заявка на вывод отправлена на рассмотрение.")
+    await message.answer("✅ Заявка на вывод отправлена на обработку.")
     await state.clear()
 
     text_admin = (
@@ -3258,7 +3258,7 @@ async def approve_withdrawal(callback: CallbackQuery):
         balance = urow["balance"] if urow else 0.0
     if balance < amount:
         await callback.message.answer(
-            f"⚠️ Недостаточный баланс пользователя (на счёте {balance:.2f})."
+            f"⚠️ Недостаточно средств на счёте пользователя. Доступно: <b>{balance:.2f}</b>."
         )
         await callback.answer()
         return
@@ -3279,11 +3279,11 @@ async def approve_withdrawal(callback: CallbackQuery):
     try:
         await bot.send_message(
             user_id,
-            "✅ Ваша заявка на вывод одобрена. Средства поступят в течение 1 часа.",
+            "✅ Ваша заявка на вывод одобрена.\n\nСредства будут отправлены в ближайшее время.",
         )
     except Exception:
         pass
-    await callback.message.answer(f"✅ Заявка #{w_id} одобрена.")
+    await callback.message.answer(f"✅ Заявка на вывод <b>#{w_id}</b> одобрена.")
     await callback.answer()
 
 
@@ -3313,11 +3313,11 @@ async def reject_withdrawal(callback: CallbackQuery):
     try:
         await bot.send_message(
             user_id,
-            "❌ Не удалось вывести средства. Обратитесь в техническую поддержку.",
+            "❌ Заявка на вывод отклонена.\n\nЕсли нужна помощь, пожалуйста, обратитесь в поддержку.",
         )
     except Exception:
         pass
-    await callback.message.answer(f"❌ Заявка #{w_id} отклонена.")
+    await callback.message.answer(f"❌ Заявка на вывод <b>#{w_id}</b> отклонена.")
     await callback.answer()
 
 
@@ -3348,10 +3348,10 @@ async def approve_deposit(callback: CallbackQuery):
         meta={"deposit_id": dep_id},
     )
     try:
-        await bot.send_message(user_id, f"✅ Пополнение подтверждено: +{amount:.2f} {currency}")
+        await bot.send_message(user_id, f"✅ Пополнение подтверждено.\n\nНа баланс зачислено <b>+{amount:.2f} {currency}</b>.")
     except Exception:
         pass
-    await callback.message.answer(f"✅ Пополнение #{dep_id} подтверждено.")
+    await callback.message.answer(f"✅ Пополнение <b>#{dep_id}</b> подтверждено.")
     await callback.answer()
 
 
@@ -3378,10 +3378,10 @@ async def reject_deposit(callback: CallbackQuery):
         meta={"deposit_id": dep_id},
     )
     try:
-        await bot.send_message(int(dep["user_tg_id"]), "❌ Пополнение отклонено администратором.")
+        await bot.send_message(int(dep["user_tg_id"]), "❌ Заявка на пополнение отклонена администратором.")
     except Exception:
         pass
-    await callback.message.answer(f"❌ Пополнение #{dep_id} отклонено.")
+    await callback.message.answer(f"❌ Пополнение <b>#{dep_id}</b> отклонено.")
     await callback.answer()
 
 # ---------- VERIFICATION & SETTINGS ----------
@@ -3389,9 +3389,8 @@ async def reject_deposit(callback: CallbackQuery):
 @dp.callback_query(F.data == "verify")
 async def on_verify(callback: CallbackQuery):
     text = (
-        "🔐 <b>Ваш аккаунт не верифицирован</b>\n\n"
-        "Для прохождения верификации нажмите кнопку «Поддержка», "
-        "затем свяжитесь с агентом, укажите ваш ID и следуйте инструкциям."
+        "🔐 <b>Верификация ещё не пройдена</b>\n\n"
+        "Чтобы пройти проверку, откройте поддержку, сообщите свой ID и следуйте инструкциям менеджера."
     )
     await callback.message.answer(text, reply_markup=verification_keyboard())
     await callback.answer()
@@ -3435,11 +3434,13 @@ async def on_my_deals(callback: CallbackQuery):
 
     lines = [t(lang, "my_deals_title"), ""]
     for row in rows:
-        side = "UP" if row["direction"] == "up" else "DOWN"
+        side = tr(lang, "ЛОНГ", "LONG", "ЛОНГ") if row["direction"] == "up" else tr(lang, "ШОРТ", "SHORT", "ШОРТ")
         outcome = "✅" if row["is_win"] else "❌"
         lines.append(
-            f"{outcome} #{row['id']} {row['asset_name']} {side} | "
-            f"{row['amount']:.2f} {row['currency']} | PnL: {row['profit']:+.2f}"
+            f"{outcome} <b>#{row['id']} {row['asset_name']}</b>\n"
+            f"• Позиция: {side}\n"
+            f"• Сумма: {row['amount']:.2f} {row['currency']}\n"
+            f"• PnL: {row['profit']:+.2f} {row['currency']}"
         )
 
     await callback.message.answer("\n".join(lines))
@@ -3472,10 +3473,10 @@ async def send_worker_panel(msg: Message, tg_user):
     ref_count = await get_referral_count(tg_user.id)
     text = (
         "⚒ <b>Панель воркера</b>\n\n"
-        f"Ваш ID: <code>{tg_user.id}</code>\n"
-        f"Реферальная ссылка:\n<code>{ref_link}</code>\n\n"
-        f"Приглашено пользователей: <b>{ref_count}</b>\n\n"
-        "Выберите раздел:"
+        f"• Ваш ID: <code>{tg_user.id}</code>\n"
+        f"• Реферальная ссылка:\n<code>{ref_link}</code>\n\n"
+        f"• Приглашено клиентов: <b>{ref_count}</b>\n\n"
+        "Выберите нужный раздел:"
     )
     await msg.answer(text, reply_markup=worker_panel_keyboard())
 
@@ -3486,12 +3487,12 @@ async def worker_sheeps(callback: CallbackQuery):
         await callback.answer("⛔ Только для воркеров.")
         return
     rows = await get_worker_clients_list(callback.from_user.id)
-    text = "🐑 <b>Список лохматых</b>\n\n"
+    text = "🐑 <b>База рефералов</b>\n\n"
     if not rows:
-        text += "—\nПервая запись: -"
+        text += "Список пока пуст."
     else:
         first = rows[0]
-        text += f"—\nПервая запись: /n{first['id']} (ID {first['client_tg_id']})"
+        text += f"Последняя активная карточка: /n{first['id']} (ID <code>{first['client_tg_id']}</code>)"
     await callback.message.answer(text, reply_markup=worker_sheeps_keyboard(rows))
     await callback.answer()
 
@@ -3504,19 +3505,19 @@ async def sheep_period_stub(callback: CallbackQuery):
 @dp.callback_query(F.data == "sheep_fav")
 async def sheep_fav(callback: CallbackQuery):
     rows = await get_worker_clients_list(callback.from_user.id, favorites_only=True)
-    text = "⭐ <b>Избранные лохматые</b>\n\n"
+    text = "⭐ <b>Избранные рефералы</b>\n\n"
     if not rows:
-        text += "— список пуст."
+        text += "Список избранного пока пуст."
     else:
         first = rows[0]
-        text += f"Первая запись: /n{first['id']} (ID {first['client_tg_id']})"
+        text += f"Первая карточка: /n{first['id']} (ID <code>{first['client_tg_id']}</code>)"
     await callback.message.answer(text, reply_markup=worker_sheeps_keyboard(rows))
     await callback.answer()
 
 
 @dp.callback_query(F.data == "sheep_search")
 async def sheep_search(callback: CallbackQuery):
-    await callback.message.answer("🔍 Поиск по ID пока не реализован.")
+    await callback.message.answer("🔍 Поиск по ID пока в разработке. Пока можно открыть карточку командой вида <code>/n123</code>.")
     await callback.answer()
 
 @dp.message(F.text.startswith("/n"))
@@ -3527,7 +3528,7 @@ async def worker_open_by_command(message: Message):
     try:
         wc_id = int(message.text[2:])
     except ValueError:
-        await message.answer("Некорректный формат. Используйте /n<ID>.")
+        await message.answer("❗ Некорректный формат команды. Используйте шаблон <code>/n&lt;ID&gt;</code>.")
         return
     await open_worker_client_profile(message, wc_id)
 
@@ -3545,7 +3546,7 @@ async def wc_profile_callback(callback: CallbackQuery):
 async def open_worker_client_profile(msg: Message, wc_id: int):
     row = await get_worker_client_by_id(wc_id)
     if not row:
-        await msg.answer("Лохматый не найден.")
+        await msg.answer("❗ Карточка реферала не найдена.")
         return
     balance = row["balance"] or 0.0
     currency = row["currency"] or "USD"
@@ -3623,9 +3624,9 @@ async def wc_luck(callback: CallbackQuery, state: FSMContext):
 
     current_luck = await get_luck_for_worker_client(callback.from_user.id, row["client_tg_id"])
     if current_luck is None:
-        text = "☘️ Текущий процент удачи не установлен.\nВведите новое значение от 0 до 100:"
+        text = "☘️ Для этого клиента удача пока не задана.\n\nВведите значение от <b>0</b> до <b>100</b>:"
     else:
-        text = f"☘️ Текущий процент удачи: {current_luck:.2f}%\nВведите новое значение от 0 до 100:"
+        text = f"☘️ Текущая удача клиента: <b>{current_luck:.2f}%</b>\n\nВведите новое значение от <b>0</b> до <b>100</b>:"
 
     await state.update_data(wc_id=wc_id)
     await state.set_state(WorkerLuckStates.waiting_luck_percent)
@@ -3642,19 +3643,19 @@ async def wc_luck_percent_entered(message: Message, state: FSMContext):
         if not (0 <= luck_percent <= 100):
             raise ValueError
     except ValueError:
-        await message.answer("❗ Введите число от 0 до 100 (процент удачи).")
+        await message.answer("❗ Введите число от <b>0</b> до <b>100</b>.")
         return
 
     row = await get_worker_client_by_id(wc_id)
     if not row:
-        await message.answer("Лохматый не найден.")
+        await message.answer("❗ Карточка реферала не найдена.")
         await state.clear()
         return
 
     worker_id = message.from_user.id
     client_id = row["client_tg_id"]
     await set_client_luck(worker_id, client_id, luck_percent)
-    await message.answer(f"✅ Удача клиента установлена на {luck_percent:.2f}%.")
+    await message.answer(f"✅ Удача клиента обновлена: <b>{luck_percent:.2f}%</b>.")
     await state.clear()
 
 
@@ -3665,7 +3666,7 @@ async def wc_adj_balance(callback: CallbackQuery, state: FSMContext):
     wc_id = int(callback.data.split(":", 1)[1])
     await state.update_data(wc_id=wc_id)
     await state.set_state(WorkerClientStates.waiting_balance_amount)
-    await callback.message.answer("💰 Введите сумму, на которую увеличить баланс лохматого:")
+    await callback.message.answer("💰 Укажите сумму, на которую нужно увеличить баланс клиента:")
     await callback.answer()
 
 
@@ -3678,18 +3679,18 @@ async def wc_adj_balance_amount(message: Message, state: FSMContext):
         if amount <= 0:
             raise ValueError
     except ValueError:
-        await message.answer("❗ Введите положительное число.")
+        await message.answer("❗ Введите корректную положительную сумму.")
         return
     row = await get_worker_client_by_id(wc_id)
     if not row:
-        await message.answer("Лохматый не найден.")
+        await message.answer("❗ Карточка реферала не найдена.")
         await state.clear()
         return
     client_id = row["client_tg_id"]
     await change_balance(client_id, amount)
-    await message.answer(f"✅ Баланс клиента увеличен на {amount:.2f}.")
+    await message.answer(f"✅ Баланс клиента увеличен на <b>{amount:.2f}</b>.")
     try:
-        await bot.send_message(client_id, f"💰 Ваш баланс был пополнен на {amount:.2f}.")
+        await bot.send_message(client_id, f"💰 Ваш баланс пополнен на <b>{amount:.2f}</b>.")
     except Exception:
         pass
     await state.clear()
@@ -3699,7 +3700,7 @@ async def wc_min_dep_cb(callback: CallbackQuery, state: FSMContext):
     wc_id = int(callback.data.split(":", 1)[1])
     await state.update_data(wc_id=wc_id)
     await state.set_state(WorkerClientStates.waiting_min_dep)
-    await callback.message.answer("📨 Введите Min. deposit для этого лохматого:")
+    await callback.message.answer("📨 Укажите минимальную сумму пополнения для этого клиента:")
     await callback.answer()
 
 
@@ -3715,7 +3716,7 @@ async def wc_min_dep_set(message: Message, state: FSMContext):
         await message.answer("❗ Введите неотрицательное число.")
         return
     await update_worker_client_field(wc_id, "min_deposit", value)
-    await message.answer(f"✅ Min. deposit клиента установлен: {value}")
+    await message.answer(f"✅ Минимальное пополнение для клиента обновлено: <b>{value:.2f}</b>")
     await state.clear()
 
 
@@ -3724,7 +3725,7 @@ async def wc_min_wd_cb(callback: CallbackQuery, state: FSMContext):
     wc_id = int(callback.data.split(":", 1)[1])
     await state.update_data(wc_id=wc_id)
     await state.set_state(WorkerClientStates.waiting_min_wd)
-    await callback.message.answer("📨 Введите Min. withdraw для этого лохматого:")
+    await callback.message.answer("📨 Укажите минимальную сумму вывода для этого клиента:")
     await callback.answer()
 
 
@@ -3740,7 +3741,7 @@ async def wc_min_wd_set(message: Message, state: FSMContext):
         await message.answer("❗ Введите неотрицательное число.")
         return
     await update_worker_client_field(wc_id, "min_withdraw", value)
-    await message.answer(f"✅ Min. withdraw клиента установлен: {value}")
+    await message.answer(f"✅ Минимальный вывод для клиента обновлён: <b>{value:.2f}</b>")
     await state.clear()
 
 @dp.callback_query(F.data.startswith("wc_toggle_verif:"))
@@ -3748,12 +3749,12 @@ async def wc_toggle_verif(callback: CallbackQuery):
     wc_id = int(callback.data.split(":", 1)[1])
     row = await get_worker_client_by_id(wc_id)
     if not row:
-        await callback.answer("Не найден.")
+        await callback.answer("Карточка не найдена.")
         return
     new_val = 0 if row["verified"] else 1
     await update_worker_client_field(wc_id, "verified", new_val)
     await open_worker_client_profile(callback.message, wc_id)
-    await callback.answer("Статус верификации изменён.")
+    await callback.answer("Статус верификации обновлён.")
 
 
 @dp.callback_query(F.data.startswith("wc_toggle_withdraw:"))
@@ -3761,12 +3762,12 @@ async def wc_toggle_withdraw(callback: CallbackQuery):
     wc_id = int(callback.data.split(":", 1)[1])
     row = await get_worker_client_by_id(wc_id)
     if not row:
-        await callback.answer("Не найден.")
+        await callback.answer("Карточка не найдена.")
         return
     new_val = 0 if row["withdraw_enabled"] else 1
     await update_worker_client_field(wc_id, "withdraw_enabled", new_val)
     await open_worker_client_profile(callback.message, wc_id)
-    await callback.answer("Статус вывода изменён.")
+    await callback.answer("Настройка вывода обновлена.")
 
 
 @dp.callback_query(F.data.startswith("wc_toggle_trade:"))
@@ -3774,12 +3775,12 @@ async def wc_toggle_trade(callback: CallbackQuery):
     wc_id = int(callback.data.split(":", 1)[1])
     row = await get_worker_client_by_id(wc_id)
     if not row:
-        await callback.answer("Не найден.")
+        await callback.answer("Карточка не найдена.")
         return
     new_val = 0 if row["trading_enabled"] else 1
     await update_worker_client_field(wc_id, "trading_enabled", new_val)
     await open_worker_client_profile(callback.message, wc_id)
-    await callback.answer("Статус торговли изменён.")
+    await callback.answer("Настройка торговли обновлена.")
 
 
 @dp.callback_query(F.data.startswith("wc_toggle_fav:"))
@@ -3787,12 +3788,12 @@ async def wc_toggle_fav(callback: CallbackQuery):
     wc_id = int(callback.data.split(":", 1)[1])
     row = await get_worker_client_by_id(wc_id)
     if not row:
-        await callback.answer("Не найден.")
+        await callback.answer("Карточка не найдена.")
         return
     new_val = 0 if row["favorite"] else 1
     await update_worker_client_field(wc_id, "favorite", new_val)
     await open_worker_client_profile(callback.message, wc_id)
-    await callback.answer("Избранное обновлено.")
+    await callback.answer("Список избранного обновлён.")
 
 
 @dp.callback_query(F.data.startswith("wc_toggle_block:"))
@@ -3800,19 +3801,19 @@ async def wc_toggle_block(callback: CallbackQuery):
     wc_id = int(callback.data.split(":", 1)[1])
     row = await get_worker_client_by_id(wc_id)
     if not row:
-        await callback.answer("Не найден.")
+        await callback.answer("Карточка не найдена.")
         return
     new_val = 0 if row["blocked"] else 1
     await update_worker_client_field(wc_id, "blocked", new_val)
     await open_worker_client_profile(callback.message, wc_id)
-    await callback.answer("Статус блокировки изменён.")
+    await callback.answer("Статус блокировки обновлён.")
 
 @dp.callback_query(F.data.startswith("wc_transfer:"))
 async def wc_transfer_cb(callback: CallbackQuery, state: FSMContext):
     wc_id = int(callback.data.split(":", 1)[1])
     await state.update_data(wc_id=wc_id)
     await state.set_state(WorkerClientStates.waiting_transfer_worker)
-    await callback.message.answer("📤 Введите ID воркера, которому хотите передать лохматого:")
+    await callback.message.answer("📤 Укажите Telegram ID воркера, которому нужно передать клиента:")
     await callback.answer()
 
 
@@ -3823,7 +3824,7 @@ async def wc_transfer_set(message: Message, state: FSMContext):
     try:
         new_worker_id = int(message.text.strip())
     except ValueError:
-        await message.answer("❗ Введите числовой ID воркера.")
+        await message.answer("❗ Введите корректный числовой ID воркера.")
         return
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
@@ -3831,7 +3832,7 @@ async def wc_transfer_set(message: Message, state: FSMContext):
             (new_worker_id, wc_id),
         )
         await db.commit()
-    await message.answer(f"✅ Лохматый передан воркеру {new_worker_id}.")
+    await message.answer(f"✅ Клиент передан воркеру <code>{new_worker_id}</code>.")
     await state.clear()
 
 # ---------- WORKER SERVICE SETTINGS ----------
@@ -3845,14 +3846,14 @@ async def worker_settings_cb(callback: CallbackQuery):
     ws = await get_worker_settings(callback.from_user.id)
     currency = user_row["currency"] or "RUB"
     text = (
-        "⚙️ <b>Settings сервиса</b>\n\n"
-        "Current values:\n"
-        f"— Min. deposit: {ws['min_deposit']} {currency}\n"
-        f"— Min. withdraw: {ws['min_withdraw']} {currency}\n"
+        "⚙️ <b>Настройки сервиса</b>\n\n"
+        "Текущие лимиты по вашей ссылке:\n"
+        f"• Мин. пополнение: {ws['min_deposit']} {currency}\n"
+        f"• Мин. вывод: {ws['min_withdraw']} {currency}\n"
     )
     kb = InlineKeyboardBuilder()
-    kb.button(text="📨 Min. deposit", callback_data="ws_min_dep")
-    kb.button(text="📨 Min. withdraw", callback_data="ws_min_wd")
+    kb.button(text="📨 Мин. пополнение", callback_data="ws_min_dep")
+    kb.button(text="📨 Мин. вывод", callback_data="ws_min_wd")
     kb.button(text="⬅ Назад", callback_data="open_worker_panel")
     kb.adjust(1)
     await callback.message.answer(text, reply_markup=kb.as_markup())
@@ -3861,7 +3862,7 @@ async def worker_settings_cb(callback: CallbackQuery):
 
 @dp.callback_query(F.data == "ws_min_dep")
 async def ws_min_dep_cb(callback: CallbackQuery, state: FSMContext):
-    await callback.message.answer("📨 Введите новое значение Min. deposit для вашей ссылки:")
+    await callback.message.answer("📨 Укажите новую минимальную сумму пополнения для вашей ссылки:")
     await state.set_state(WorkerServiceStates.waiting_min_dep)
     await callback.answer()
 
@@ -3876,13 +3877,13 @@ async def ws_min_dep_set(message: Message, state: FSMContext):
         await message.answer("❗ Введите неотрицательное число.")
         return
     await set_worker_setting(message.from_user.id, "min_deposit", value)
-    await message.answer(f"✅ Min. deposit установлен: {value}")
+    await message.answer(f"✅ Минимальное пополнение обновлено: <b>{value:.2f}</b>")
     await state.clear()
 
 
 @dp.callback_query(F.data == "ws_min_wd")
 async def ws_min_wd_cb(callback: CallbackQuery, state: FSMContext):
-    await callback.message.answer("📨 Введите новое значение Min. withdraw для вашей ссылки:")
+    await callback.message.answer("📨 Укажите новую минимальную сумму вывода для вашей ссылки:")
     await state.set_state(WorkerServiceStates.waiting_min_wd)
     await callback.answer()
 
@@ -3897,7 +3898,7 @@ async def ws_min_wd_set(message: Message, state: FSMContext):
         await message.answer("❗ Введите неотрицательное число.")
         return
     await set_worker_setting(message.from_user.id, "min_withdraw", value)
-    await message.answer(f"✅ Min. withdraw установлен: {value}")
+    await message.answer(f"✅ Минимальный вывод обновлён: <b>{value:.2f}</b>")
     await state.clear()
 
 # ---------- ADMIN PANEL ----------
@@ -3920,7 +3921,7 @@ async def admin_cmd(message: Message):
 
 
 async def send_admin_panel(msg: Message):
-    await msg.answer("🛠 <b>Админ-панель</b>\n\nВыберите действие:", reply_markup=admin_keyboard())
+    await msg.answer("🛠 <b>Админ-панель</b>\n\nВыберите действие из списка ниже:", reply_markup=admin_keyboard())
 
 @dp.callback_query(F.data == "admin_stats")
 async def on_admin_stats(callback: CallbackQuery):
@@ -3937,7 +3938,7 @@ async def on_admin_add_worker(callback: CallbackQuery, state: FSMContext):
     if not is_admin_id(callback.from_user.id):
         await callback.answer("⛔ Нет доступа.")
         return
-    await callback.message.answer("👷 Отправьте ID пользователя, которому выдать роль воркера.")
+    await callback.message.answer("👷 Отправьте Telegram ID пользователя, которому нужно выдать роль воркера.")
     await state.set_state(AdminStates.waiting_worker_id)
     await callback.answer()
 
@@ -3951,10 +3952,10 @@ async def admin_set_worker(message: Message, state: FSMContext):
     try:
         user_id = int(message.text.strip())
     except ValueError:
-        await message.answer("❗ Введите числовой ID.")
+        await message.answer("❗ Введите корректный числовой Telegram ID.")
         return
     await set_worker_flag(user_id, True)
-    await message.answer(f"✅ Пользователь {user_id} назначен воркером.")
+    await message.answer(f"✅ Пользователь <code>{user_id}</code> назначен воркером.")
     await state.clear()
 
 @dp.callback_query(F.data == "admin_workers")
@@ -3964,13 +3965,13 @@ async def on_admin_workers(callback: CallbackQuery):
         return
     rows = await get_workers_with_ref_counts()
     if not rows:
-        await callback.message.answer("Пока нет ни одного воркера.")
+        await callback.message.answer("Пока не зарегистрировано ни одного воркера.")
         await callback.answer()
         return
     text = "👷 <b>Список воркеров</b>\n\n"
     for row in rows:
         username = f"@{row['username']}" if row["username"] else (row["first_name"] or "без имени")
-        text += f"• {row['tg_id']} ({username}) — рефов: <b>{row['ref_count']}</b>\n"
+        text += f"• <code>{row['tg_id']}</code> ({username}) — клиентов: <b>{row['ref_count']}</b>\n"
     await callback.message.answer(text, reply_markup=workers_list_keyboard(rows))
     await callback.answer()
 
@@ -3987,8 +3988,8 @@ async def on_admin_worker_details(callback: CallbackQuery):
         text = f"👷 Воркер <code>{worker_id}</code> пока не привёл ни одного клиента."
     else:
         text = (
-            f"👷 <b>Рефералы воркера {worker_id}</b>\n"
-            f"Всего: <b>{ref_count}</b>\n\n"
+            f"👷 <b>Клиенты воркера {worker_id}</b>\n"
+            f"Всего клиентов: <b>{ref_count}</b>\n\n"
         )
         for i, row in enumerate(refs, start=1):
             username = f"@{row['username']}" if row["username"] else (row["first_name"] or "без имени")
@@ -4014,16 +4015,16 @@ async def on_admin_payments(callback: CallbackQuery):
     global_min_deposit_usdt = await get_global_min_deposit_usdt()
     global_min_trade_usdt = await get_global_min_trade_usdt()
     text = (
-        "💳 <b>Платёжные реквизиты</b>\n\n"
-        f"💎 Ссылка на Crypto bot:\n<code>{crypto_url}</code>\n\n"
-        f"👛 Адрес TRC20 USDT:\n<code>{trc20}</code>\n\n"
-        f"💳 Ссылка оплаты картой:\n<code>{card_url}</code>\n\n"
-        f"🏦 Реквизиты карты:\n<code>{card_req}</code>\n\n"
-        f"🛟 Ссылка поддержки:\n<code>{support_url}</code>\n\n"
+        "💳 <b>Системные реквизиты и лимиты</b>\n\n"
+        f"💎 Crypto Bot URL:\n<code>{crypto_url}</code>\n\n"
+        f"👛 TRC20 USDT address:\n<code>{trc20}</code>\n\n"
+        f"💳 Card Pay URL:\n<code>{card_url}</code>\n\n"
+        f"🏦 Card requisites:\n<code>{card_req}</code>\n\n"
+        f"🛟 Support URL:\n<code>{support_url}</code>\n\n"
         f"🌐 WebApp URL:\n<code>{webapp_url}</code>\n\n"
         f"📥 Глобальный мин. депозит:\n<code>{global_min_deposit_usdt:.2f} USDT</code>\n\n"
         f"📈 Глобальная мин. сделка:\n<code>{global_min_trade_usdt:.2f} USDT</code>\n\n"
-        "Выберите, что хотите изменить:"
+        "Выберите параметр для изменения:"
     )
     kb = InlineKeyboardBuilder()
     kb.button(text="✏️Изменить ссылку Crypto bot", callback_data="admin_set_crypto")
@@ -4045,7 +4046,7 @@ async def on_admin_set_crypto(callback: CallbackQuery, state: FSMContext):
     if not is_admin_id(callback.from_user.id):
         await callback.answer("⛔ Нет доступа.")
         return
-    await callback.message.answer("🔗 Отправьте новую ссылку на Crypto bot:")
+    await callback.message.answer("🔗 Отправьте новый URL для Crypto Bot:")
     await state.set_state(AdminPaymentStates.waiting_crypto_url)
     await callback.answer()
 
@@ -4055,7 +4056,7 @@ async def on_admin_set_trc20(callback: CallbackQuery, state: FSMContext):
     if not is_admin_id(callback.from_user.id):
         await callback.answer("⛔ Нет доступа.")
         return
-    await callback.message.answer("👛 Отправьте новый адрес TRC20 USDT:")
+    await callback.message.answer("👛 Отправьте новый адрес кошелька TRC20 USDT:")
     await state.set_state(AdminPaymentStates.waiting_trc20)
     await callback.answer()
 
@@ -4065,7 +4066,7 @@ async def on_admin_set_card_url(callback: CallbackQuery, state: FSMContext):
     if not is_admin_id(callback.from_user.id):
         await callback.answer("⛔ Нет доступа.")
         return
-    await callback.message.answer("💳 Отправьте ссылку на оплату банковской картой:")
+    await callback.message.answer("💳 Отправьте новый URL для оплаты банковской картой:")
     await state.set_state(AdminPaymentStates.waiting_card_url)
     await callback.answer()
 
@@ -4075,7 +4076,7 @@ async def on_admin_set_card_req(callback: CallbackQuery, state: FSMContext):
     if not is_admin_id(callback.from_user.id):
         await callback.answer("⛔ Нет доступа.")
         return
-    await callback.message.answer("🏦 Отправьте реквизиты карты (текстом):")
+    await callback.message.answer("🏦 Отправьте актуальные реквизиты карты одним сообщением:")
     await state.set_state(AdminPaymentStates.waiting_card_requisites)
     await callback.answer()
 
@@ -4085,7 +4086,7 @@ async def on_admin_set_support(callback: CallbackQuery, state: FSMContext):
     if not is_admin_id(callback.from_user.id):
         await callback.answer("⛔ Нет доступа.")
         return
-    await callback.message.answer("🛟 Отправьте новую ссылку поддержки:")
+    await callback.message.answer("🛟 Отправьте новый URL технической поддержки:")
     await state.set_state(AdminPaymentStates.waiting_support_url)
     await callback.answer()
 
@@ -4129,8 +4130,8 @@ async def on_admin_assets(callback: CallbackQuery, state: FSMContext):
     preview = ", ".join([r["name"] for r in rows[:20]])
     text = (
         f"🪙 <b>Активы ECN</b>\n\n"
-        f"Всего активов: <b>{len(rows)}</b>\n"
-        f"Топ-20: {preview if preview else 'нет'}\n\n"
+        f"• Всего активов: <b>{len(rows)}</b>\n"
+        f"• Предпросмотр: {preview if preview else 'список пока пуст'}\n\n"
         "Отправьте название нового актива одним сообщением."
     )
     await state.set_state(AdminPaymentStates.waiting_asset_name)
@@ -4184,7 +4185,7 @@ async def admin_save_card_url(message: Message, state: FSMContext):
         await message.answer("❗ Отправьте корректный URL.")
         return
     await set_setting("card_pay_url", new_url)
-    await message.answer(f"✅ Ссылка оплаты картой обновлена:\n<code>{new_url}</code>")
+    await message.answer(f"✅ URL оплаты картой обновлён.\n<code>{new_url}</code>")
     await state.clear()
 
 
@@ -4196,7 +4197,7 @@ async def admin_save_card_requisites(message: Message, state: FSMContext):
         return
     value = message.text.strip()
     if len(value) < 8:
-        await message.answer("❗ Слишком короткие реквизиты.")
+        await message.answer("❗ Реквизиты выглядят слишком короткими. Проверьте и отправьте ещё раз.")
         return
     await set_setting("card_requisites", value)
     await message.answer("✅ Реквизиты карты обновлены.")
@@ -4216,7 +4217,7 @@ async def admin_save_support_url(message: Message, state: FSMContext):
     if new_url.startswith("t.me/"):
         new_url = f"https://{new_url}"
     await set_setting("support_url", new_url)
-    await message.answer(f"✅ Ссылка поддержки обновлена:\n<code>{new_url}</code>")
+    await message.answer(f"✅ Ссылка поддержки обновлена.\n<code>{new_url}</code>")
     await state.clear()
 
 
@@ -4231,7 +4232,7 @@ async def admin_save_webapp_url(message: Message, state: FSMContext):
         await message.answer("❗ Отправьте корректный URL WebApp.")
         return
     await set_setting("webapp_url", new_url)
-    await message.answer(f"✅ WebApp URL обновлён:\n<code>{new_url}</code>")
+    await message.answer(f"✅ WebApp URL обновлён.\n<code>{new_url}</code>")
     await state.clear()
 
 
@@ -4282,7 +4283,7 @@ async def admin_add_asset_from_text(message: Message, state: FSMContext):
         await message.answer("❗ Слишком короткое название актива.")
         return
     await add_ecn_asset(name)
-    await message.answer(f"✅ Актив добавлен (или уже существует): <b>{name}</b>")
+    await message.answer(f"✅ Актив добавлен в список ECN или уже существовал ранее: <b>{name}</b>")
     await state.clear()
 
 # ---------- WORKER ↔ CLIENT DIALOG ----------
