@@ -683,13 +683,32 @@ select, input {
 .worker-row {
     align-items: start;
     gap: 14px;
-    padding: 14px;
-    border-radius: 18px;
+    padding: 16px;
+    border-radius: 24px;
     background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(237, 247, 252, 0.92)),
-        linear-gradient(135deg, rgba(255, 255, 255, 0.22), transparent 40%);
-    border: 1px solid rgba(116, 200, 244, 0.18);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+        radial-gradient(160px 80px at 0% 0%, rgba(170, 227, 255, 0.34), transparent 70%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(235, 247, 255, 0.9)),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.24), transparent 42%);
+    border: 1px solid rgba(116, 200, 244, 0.22);
+    box-shadow:
+        0 18px 40px rgba(109, 152, 182, 0.14),
+        inset 0 1px 0 rgba(255, 255, 255, 0.88);
+    position: relative;
+    overflow: hidden;
+}
+
+.worker-row::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(120deg, transparent 12%, rgba(255, 255, 255, 0.38) 34%, transparent 56%);
+    transform: translateX(-120%);
+    transition: transform .55s ease;
+    pointer-events: none;
+}
+
+.worker-row:hover::after {
+    transform: translateX(120%);
 }
 
 .worker-toolbar {
@@ -703,10 +722,13 @@ select, input {
     display: grid;
     gap: 6px;
     margin-top: 12px;
-    padding: 12px;
-    border-radius: 16px;
-    border: 1px solid rgba(116, 200, 244, 0.24);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(232, 246, 255, 0.88));
+    padding: 14px;
+    border-radius: 18px;
+    border: 1px solid rgba(116, 200, 244, 0.28);
+    background:
+        radial-gradient(140px 70px at 100% 0%, rgba(160, 223, 255, 0.28), transparent 70%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(232, 246, 255, 0.92));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
 }
 
 .worker-ref-box small {
@@ -725,14 +747,16 @@ select, input {
 
 .crm-note-preview,
 .crm-note-box {
-    margin-top: 4px;
-    padding: 10px 12px;
-    border-radius: 14px;
-    background: rgba(237, 247, 255, 0.9);
-    border: 1px solid rgba(116, 200, 244, 0.2);
+    margin-top: 6px;
+    padding: 12px 14px;
+    border-radius: 16px;
+    background:
+        linear-gradient(180deg, rgba(245, 251, 255, 0.96), rgba(232, 245, 255, 0.9));
+    border: 1px solid rgba(116, 200, 244, 0.22);
     color: #456a84;
     font-size: 12px;
     line-height: 1.45;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86);
 }
 
 .worker-card-main {
@@ -745,11 +769,12 @@ select, input {
     text-decoration: none;
     color: inherit;
     cursor: pointer;
-    transition: transform .18s ease, box-shadow .18s ease;
+    transition: transform .18s ease, filter .18s ease;
 }
 
 .worker-card-link:hover {
-    transform: translateY(-1px);
+    transform: translateY(-2px);
+    filter: saturate(1.05);
 }
 
 .worker-head {
@@ -762,7 +787,7 @@ select, input {
 .worker-badge {
     display: inline-flex;
     align-items: center;
-    padding: 5px 9px;
+    padding: 6px 10px;
     border-radius: 999px;
     font-size: 10px;
     font-weight: 800;
@@ -805,25 +830,33 @@ select, input {
 .worker-meta span {
     display: inline-flex;
     align-items: center;
-    padding: 6px 10px;
+    padding: 7px 11px;
     border-radius: 999px;
-    background: rgba(223, 244, 255, 0.82);
+    background: linear-gradient(180deg, rgba(232, 248, 255, 0.96), rgba(216, 241, 253, 0.84));
     color: #427091;
     font-size: 11px;
     font-weight: 700;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86);
 }
 
 .worker-actions {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 6px;
+    gap: 8px;
     width: min(360px, 100%);
 }
 
 .worker-actions .chip {
     font-size: 11px;
-    padding: 9px 6px;
-    min-height: 38px;
+    padding: 10px 8px;
+    min-height: 40px;
+    border-radius: 14px;
+    transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+
+.worker-actions .chip:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 18px rgba(119, 159, 187, 0.14);
 }
 
 .worker-open {
@@ -859,6 +892,11 @@ select, input {
 .worker-event-row {
     align-items: start;
     gap: 12px;
+    padding: 14px 16px;
+    border-radius: 18px;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(240, 249, 255, 0.92));
+    border: 1px solid rgba(116, 200, 244, 0.16);
 }
 
 .worker-event-main {
@@ -901,6 +939,12 @@ select, input {
 .support-row {
     align-items: start;
     gap: 12px;
+    padding: 14px 16px;
+    border-radius: 20px;
+    background:
+        radial-gradient(120px 60px at 100% 0%, rgba(174, 229, 255, 0.22), transparent 70%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(239, 248, 255, 0.92));
+    border: 1px solid rgba(116, 200, 244, 0.18);
 }
 
 .admin-tabs-shell {
@@ -950,6 +994,65 @@ select, input {
 
 .worker-client-actions {
     width: 100%;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+#worker-summary-grid .stat-card,
+.stats-grid .stat-card {
+    position: relative;
+    overflow: hidden;
+    border-radius: 22px;
+    background:
+        radial-gradient(120px 70px at 100% 0%, rgba(167, 227, 255, 0.28), transparent 70%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(232, 246, 255, 0.92));
+    border: 1px solid rgba(116, 200, 244, 0.18);
+    box-shadow: 0 18px 34px rgba(112, 151, 181, 0.12);
+}
+
+#worker-summary-grid .stat-card b,
+.stats-grid .stat-card b {
+    font-size: 28px;
+    letter-spacing: -.03em;
+}
+
+#worker-summary-grid .stat-card small,
+.stats-grid .stat-card small {
+    color: #6e8aa1;
+    letter-spacing: .12em;
+}
+
+.hero {
+    position: relative;
+    overflow: hidden;
+}
+
+.hero::before {
+    content: "";
+    position: absolute;
+    width: 260px;
+    height: 260px;
+    top: -110px;
+    right: -60px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(164, 225, 255, 0.34), transparent 68%);
+    pointer-events: none;
+}
+
+.hero::after {
+    content: "";
+    position: absolute;
+    left: -40px;
+    bottom: -90px;
+    width: 220px;
+    height: 220px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(118, 204, 245, 0.16), transparent 70%);
+    pointer-events: none;
+}
+
+.hero > * {
+    position: relative;
+    z-index: 1;
 }
 
 .position-row .chip {
@@ -1054,6 +1157,9 @@ select, input {
     .worker-head {
         align-items: start;
         flex-direction: column;
+    }
+    .worker-client-actions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
     .worker-event-top {
         align-items: start;

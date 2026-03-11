@@ -5,7 +5,10 @@
     <h1>Карточка реферала</h1>
     <div class="balance">{{ "%.2f"|format((client.balance or 0) or 0) }} {{ client.currency if client.currency else "USD" }}</div>
     <div class="hint">{{ client.first_name if client.first_name else "Пользователь" }} · ID {{ client.client_tg_id }} · @{{ client.username if client.username else "-" }}</div>
-    <div class="hint" id="worker-client-live-status">Client feed: online</div>
+    <div class="worker-meta">
+        <span id="worker-client-live-status">Client feed: online</span>
+        <span>Этап: {{ client.funnel_stage if client.funnel_stage else "new" }}</span>
+    </div>
     <div id="worker-client-live-meta" data-worker-id="{{ worker_id }}" data-wc-id="{{ client.id }}"></div>
     <div class="quick-actions">
         <a class="qa-btn" href="/worker">Назад к панели</a>
