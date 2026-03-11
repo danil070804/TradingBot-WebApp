@@ -284,6 +284,31 @@ def build_menu_info_text(lang: str) -> str:
     )
 
 
+def format_trade_duration(lang: str, seconds: int) -> str:
+    total_seconds = max(0, int(seconds or 0))
+    minutes, secs = divmod(total_seconds, 60)
+    if minutes and secs:
+        return tr(
+            lang,
+            f"{minutes} мин. {secs} сек.",
+            f"{minutes} min. {secs} sec.",
+            f"{minutes} хв. {secs} сек.",
+        )
+    if minutes:
+        return tr(
+            lang,
+            f"{minutes} мин.",
+            f"{minutes} min.",
+            f"{minutes} хв.",
+        )
+    return tr(
+        lang,
+        f"{secs} сек.",
+        f"{secs} sec.",
+        f"{secs} сек.",
+    )
+
+
 class WithdrawStates(StatesGroup):
     waiting_amount = State()
     waiting_card = State()
@@ -1134,12 +1159,14 @@ async def mark_trade_closed_notified(trade_id: str) -> bool:
 
 def format_trade_open_message(lang: str, asset_name: str, direction: str, amount: float, currency: str, seconds: int) -> str:
     direction_text = tr(lang, "Повышение", "Up", "Вгору") if direction == "up" else tr(lang, "Понижение", "Down", "Вниз")
+    side_badge = "📈" if direction == "up" else "📉"
     return (
-        f"🟦 <b>{tr(lang, 'Сделка открыта', 'Trade opened', 'Угоду відкрито')}</b>\n\n"
-        f"• <b>{tr(lang, 'Актив', 'Asset', 'Актив')}:</b> <code>{asset_name}</code>\n"
-        f"• <b>{tr(lang, 'Направление', 'Direction', 'Напрям')}:</b> {direction_text}\n"
-        f"• <b>{tr(lang, 'Сумма', 'Amount', 'Сума')}:</b> {amount:.2f} {currency}\n"
-        f"• <b>{tr(lang, 'Время до фиксации', 'Time left', 'Час до фіксації')}:</b> {seconds} {tr(lang, 'сек.', 'sec', 'с')}"
+        f"🟦 <b>{tr(lang, 'Сделка активна', 'Trade is active', 'Угода активна')}</b>\n\n"
+        f"╭ <b>{tr(lang, 'Параметры позиции', 'Position details', 'Параметри позиції')}</b>\n"
+        f"├ {tr(lang, 'Актив', 'Asset', 'Актив')}: <code>{asset_name}</code>\n"
+        f"├ {tr(lang, 'Сторона', 'Side', 'Сторона')}: {side_badge} <b>{direction_text}</b>\n"
+        f"├ {tr(lang, 'Объём', 'Amount', 'Обсяг')}: <b>{amount:.2f} {currency}</b>\n"
+        f"╰ {tr(lang, 'До фиксации', 'Until close', 'До фіксації')}: <b>{format_trade_duration(lang, seconds)}</b>"
     )
 
 
@@ -1736,15 +1763,17 @@ async def notify_worker_trade_event(
     source_text = "Telegram-бот" if source == "bot" else "WebApp"
     trade_line = f"\nСделка: <code>{trade_id}</code>" if trade_id else ""
     text = (
-        "📈 <b>Реферал открыл сделку</b>\n\n"
-        f"Реферал: <b>{name}</b>\n"
-        f"User ID: <code>{client_tg_id}</code>\n"
-        f"Username: {username_line}\n"
-        f"Актив: <b>{asset_name}</b>\n"
-        f"Направление: <b>{direction_text}</b>\n"
-        f"Сумма: <b>{float(amount):.2f} {currency}</b>\n"
-        f"Экспирация: <b>{int(seconds)} сек.</b>\n"
-        f"Источник: <b>{source_text}</b>"
+        "📈 <b>Новая сделка реферала</b>\n\n"
+        f"╭ <b>Клиент</b>\n"
+        f"├ Имя: <b>{name}</b>\n"
+        f"├ ID: <code>{client_tg_id}</code>\n"
+        f"╰ Username: {username_line}\n\n"
+        f"╭ <b>Параметры сделки</b>\n"
+        f"├ Актив: <b>{asset_name}</b>\n"
+        f"├ Направление: <b>{direction_text}</b>\n"
+        f"├ Сумма: <b>{float(amount):.2f} {currency}</b>\n"
+        f"├ Экспирация: <b>{format_trade_duration('ru', seconds)}</b>\n"
+        f"╰ Источник: <b>{source_text}</b>"
         f"{trade_line}"
     )
     try:
@@ -2812,8 +2841,10 @@ async def ecn_choose_asset(callback: CallbackQuery, state: FSMContext):
     await state.set_state(ECNStates.choosing_direction)
 
     text = (
-        f"{tr(lang, 'Открытие сделки', 'Open deal', 'Відкриття угоди')} [{asset['name']}]\n"
-        f"{tr(lang, 'Выберите, в какую сторону пойдет график:', 'Choose direction:', 'Оберіть напрям:')}"
+        f"📈 <b>{tr(lang, 'Открытие сделки', 'Open deal', 'Відкриття угоди')}</b>\n\n"
+        f"╭ <b>{tr(lang, 'Выбранный актив', 'Selected asset', 'Обраний актив')}</b>\n"
+        f"╰ <code>{asset['name']}</code>\n\n"
+        f"{tr(lang, 'Выберите направление движения графика.', 'Choose the chart direction.', 'Оберіть напрям руху графіка.')}"
     )
     await callback.message.answer(text, reply_markup=ecn_direction_keyboard(asset_id, lang))
     await callback.answer()
@@ -2844,9 +2875,12 @@ async def ecn_choose_direction(callback: CallbackQuery, state: FSMContext):
     currency = user_row["currency"] or "USD"
 
     text = (
-        f"{tr(lang, 'Открытие сделки', 'Open deal', 'Відкриття угоди')} [{asset_name}]\n"
-        f"{tr(lang, 'Направление', 'Direction', 'Напрям')}: {tr(lang, 'Повышение', 'Up', 'Вгору') if direction == 'up' else tr(lang, 'Понижение', 'Down', 'Вниз')}\n\n"
-        f"{tr(lang, 'Введите сумму для открытия сделки', 'Enter amount to open deal', 'Введіть суму для відкриття угоди')} {currency}:"
+        f"📈 <b>{tr(lang, 'Открытие сделки', 'Open deal', 'Відкриття угоди')}</b>\n\n"
+        f"╭ <b>{tr(lang, 'Параметры входа', 'Entry details', 'Параметри входу')}</b>\n"
+        f"├ {tr(lang, 'Актив', 'Asset', 'Актив')}: <code>{asset_name}</code>\n"
+        f"╰ {tr(lang, 'Направление', 'Direction', 'Напрям')}: <b>{tr(lang, 'Повышение', 'Up', 'Вгору') if direction == 'up' else tr(lang, 'Понижение', 'Down', 'Вниз')}</b>\n\n"
+        f"{tr(lang, 'Введите сумму сделки в валюте счёта.', 'Enter the trade amount in your account currency.', 'Введіть суму угоди у валюті рахунку.')}\n"
+        f"<b>{currency}</b>:"
     )
     await callback.message.answer(text)
     await callback.answer()
@@ -2902,10 +2936,12 @@ async def ecn_enter_amount(message: Message, state: FSMContext):
     await state.set_state(ECNStates.choosing_expiration)
 
     text = (
-        f"{tr(lang, 'Открытие сделки', 'Open deal', 'Відкриття угоди')} [{asset_name}]\n"
-        f"{tr(lang, 'Направление', 'Direction', 'Напрям')}: {tr(lang, 'Повышение', 'Up', 'Вгору') if direction == 'up' else tr(lang, 'Понижение', 'Down', 'Вниз')}\n"
-        f"{tr(lang, 'Сумма', 'Amount', 'Сума')}: {amount:.2f} {currency}\n\n"
-        f"{tr(lang, 'Выберите время фиксации:', 'Choose expiration time:', 'Оберіть час експірації:')}"
+        f"📈 <b>{tr(lang, 'Открытие сделки', 'Open deal', 'Відкриття угоди')}</b>\n\n"
+        f"╭ <b>{tr(lang, 'Параметры входа', 'Entry details', 'Параметри входу')}</b>\n"
+        f"├ {tr(lang, 'Актив', 'Asset', 'Актив')}: <code>{asset_name}</code>\n"
+        f"├ {tr(lang, 'Направление', 'Direction', 'Напрям')}: <b>{tr(lang, 'Повышение', 'Up', 'Вгору') if direction == 'up' else tr(lang, 'Понижение', 'Down', 'Вниз')}</b>\n"
+        f"╰ {tr(lang, 'Сумма', 'Amount', 'Сума')}: <b>{amount:.2f} {currency}</b>\n\n"
+        f"{tr(lang, 'Выберите время фиксации сделки.', 'Choose the trade expiration time.', 'Оберіть час фіксації угоди.')}"
     )
     await message.answer(text, reply_markup=ecn_time_keyboard(lang))
 
@@ -3013,19 +3049,17 @@ async def run_demo_deal(
     remaining = seconds
     while remaining > 0:
         try:
-            text = (
-                f"🟦 <b>{tr(lang, 'Сделка открыта', 'Trade opened', 'Угоду відкрито')}</b>\n\n"
-                f"• <b>{tr(lang, 'Актив', 'Asset', 'Актив')}:</b> <code>{asset_name}</code>\n"
-                f"• <b>{tr(lang, 'Направление', 'Direction', 'Напрям')}:</b> "
-                f"{tr(lang, 'Повышение', 'Up', 'Вгору') if direction == 'up' else tr(lang, 'Понижение', 'Down', 'Вниз')}\n"
-                f"• <b>{tr(lang, 'Сумма', 'Amount', 'Сума')}:</b> {amount:.2f} {currency}\n"
-                f"• <b>{tr(lang, 'Время до фиксации', 'Time left', 'Час до фіксації')}:</b> "
-                f"{remaining} {tr(lang, 'сек.', 'sec', 'с')}"
-            )
             await bot.edit_message_text(
                 chat_id=chat_id,
                 message_id=message_id,
-                text=text,
+                text=format_trade_open_message(
+                    lang=lang,
+                    asset_name=asset_name,
+                    direction=direction,
+                    amount=amount,
+                    currency=currency,
+                    seconds=remaining,
+                ),
             )
         except Exception:
             pass
