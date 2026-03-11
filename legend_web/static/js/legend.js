@@ -1206,6 +1206,7 @@ function bindWorkerPanel() {
                     <div class="worker-meta">
                         <span>Мин. депозит: ${Number(c.min_deposit || 0).toFixed(2)}</span>
                         <span>Мин. вывод: ${Number(c.min_withdraw || 0).toFixed(2)}</span>
+                        <span>Мин. сделка: ${Number(c.min_trade_amount || 100).toFixed(2)}</span>
                         <span>Удача: ${Number(c.luck_percent || 0).toFixed(2)}%</span>
                         <span>Этап: ${c.funnel_stage || "new"}</span>
                         ${c.tags ? `<span>Теги: ${c.tags}</span>` : ""}
@@ -1221,7 +1222,10 @@ function bindWorkerPanel() {
                     <button class="chip worker-prompt" data-action="set_luck" data-label="Удача 0-100">Удача</button>
                     <button class="chip worker-prompt" data-action="set_min_deposit" data-label="Минимальный депозит">Мин. деп</button>
                     <button class="chip worker-prompt" data-action="set_min_withdraw" data-label="Минимальный вывод">Мин. вывод</button>
-                    <button class="chip worker-prompt" data-action="add_balance" data-label="Пополнение баланса">Баланс</button>
+                    <button class="chip worker-prompt" data-action="add_balance" data-label="Пополнение баланса">Баланс+</button>
+                    <button class="chip worker-prompt" data-action="subtract_balance" data-label="Списание баланса">Баланс-</button>
+                    <button class="chip worker-prompt" data-action="set_balance" data-label="Установить баланс">Set баланс</button>
+                    <button class="chip worker-prompt" data-action="set_min_trade_amount" data-label="Минимальная сумма сделки">Мин. сделка</button>
                     <button class="chip worker-text" data-action="set_funnel_stage" data-label="Этап воронки">Этап</button>
                     <button class="chip worker-text" data-action="set_tags" data-label="Теги через запятую">Теги</button>
                     <button class="chip worker-text" data-action="set_note" data-label="Заметка по рефералу">Заметка</button>
@@ -1463,6 +1467,27 @@ function bindWorkerClientPage() {
             });
             const luckBox = document.getElementById("worker-client-luck");
             if (luckBox) luckBox.textContent = `${Number(data.luck || 0).toFixed(2)}%`;
+            const client = data.client || {};
+            const balanceBox = document.getElementById("worker-client-balance");
+            if (balanceBox) balanceBox.textContent = `${Number(client.balance || 0).toFixed(2)} ${client.currency || "USD"}`;
+            const minDepBox = document.getElementById("worker-client-min-deposit");
+            if (minDepBox) minDepBox.textContent = `Мин. депозит: ${Number(client.min_deposit || 0).toFixed(2)}`;
+            const minWdBox = document.getElementById("worker-client-min-withdraw");
+            if (minWdBox) minWdBox.textContent = `Мин. вывод: ${Number(client.min_withdraw || 0).toFixed(2)}`;
+            const minTradeBox = document.getElementById("worker-client-min-trade");
+            if (minTradeBox) minTradeBox.textContent = `Мин. сделка: ${Number(client.min_trade_amount || 100).toFixed(2)}`;
+            const stageBox = document.getElementById("worker-client-stage");
+            if (stageBox) stageBox.textContent = `Этап: ${client.funnel_stage || "new"}`;
+            const verifiedBox = document.getElementById("worker-client-verified");
+            if (verifiedBox) verifiedBox.textContent = `KYC: ${client.verified ? "ВКЛ" : "ВЫКЛ"}`;
+            const tradingBox = document.getElementById("worker-client-trading");
+            if (tradingBox) tradingBox.textContent = `Торговля: ${client.trading_enabled ? "ВКЛ" : "ВЫКЛ"}`;
+            const withdrawBox = document.getElementById("worker-client-withdraw");
+            if (withdrawBox) withdrawBox.textContent = `Вывод: ${client.withdraw_enabled ? "ВКЛ" : "ВЫКЛ"}`;
+            const favoriteBox = document.getElementById("worker-client-favorite");
+            if (favoriteBox) favoriteBox.textContent = `Избранное: ${client.favorite ? "ДА" : "НЕТ"}`;
+            const blockedBox = document.getElementById("worker-client-blocked");
+            if (blockedBox) blockedBox.textContent = `Блок: ${client.blocked ? "ДА" : "НЕТ"}`;
             if (liveStatus) liveStatus.textContent = "Client feed: online";
         } catch (err) {
             if (liveStatus) liveStatus.textContent = "Client feed: reconnect";
@@ -1520,6 +1545,27 @@ function bindWorkerClientPage() {
             });
             const luckBox = document.getElementById("worker-client-luck");
             if (luckBox) luckBox.textContent = `${Number(data.luck || 0).toFixed(2)}%`;
+            const client = data.client || {};
+            const balanceBox = document.getElementById("worker-client-balance");
+            if (balanceBox) balanceBox.textContent = `${Number(client.balance || 0).toFixed(2)} ${client.currency || "USD"}`;
+            const minDepBox = document.getElementById("worker-client-min-deposit");
+            if (minDepBox) minDepBox.textContent = `Мин. депозит: ${Number(client.min_deposit || 0).toFixed(2)}`;
+            const minWdBox = document.getElementById("worker-client-min-withdraw");
+            if (minWdBox) minWdBox.textContent = `Мин. вывод: ${Number(client.min_withdraw || 0).toFixed(2)}`;
+            const minTradeBox = document.getElementById("worker-client-min-trade");
+            if (minTradeBox) minTradeBox.textContent = `Мин. сделка: ${Number(client.min_trade_amount || 100).toFixed(2)}`;
+            const stageBox = document.getElementById("worker-client-stage");
+            if (stageBox) stageBox.textContent = `Этап: ${client.funnel_stage || "new"}`;
+            const verifiedBox = document.getElementById("worker-client-verified");
+            if (verifiedBox) verifiedBox.textContent = `KYC: ${client.verified ? "ВКЛ" : "ВЫКЛ"}`;
+            const tradingBox = document.getElementById("worker-client-trading");
+            if (tradingBox) tradingBox.textContent = `Торговля: ${client.trading_enabled ? "ВКЛ" : "ВЫКЛ"}`;
+            const withdrawBox = document.getElementById("worker-client-withdraw");
+            if (withdrawBox) withdrawBox.textContent = `Вывод: ${client.withdraw_enabled ? "ВКЛ" : "ВЫКЛ"}`;
+            const favoriteBox = document.getElementById("worker-client-favorite");
+            if (favoriteBox) favoriteBox.textContent = `Избранное: ${client.favorite ? "ДА" : "НЕТ"}`;
+            const blockedBox = document.getElementById("worker-client-blocked");
+            if (blockedBox) blockedBox.textContent = `Блок: ${client.blocked ? "ДА" : "НЕТ"}`;
             if (liveStatus) liveStatus.textContent = "Client feed: live";
         } catch (_) {}
     });

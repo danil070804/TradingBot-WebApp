@@ -86,6 +86,7 @@
                 <div class="worker-meta">
                     <span>Мин. депозит: {{ "%.2f"|format((c.min_deposit or 0)) }}</span>
                     <span>Мин. вывод: {{ "%.2f"|format((c.min_withdraw or 0)) }}</span>
+                    <span>Мин. сделка: {{ "%.2f"|format((c.min_trade_amount or 100)) }}</span>
                     <span class="luck-badge {% if (c.luck_percent or 0) >= 75 %}high{% elif (c.luck_percent or 0) >= 40 %}mid{% else %}low{% endif %}">Удача: {{ "%.2f"|format((c.luck_percent or 0)) }}%</span>
                     <span>Этап: {{ c.funnel_stage if c.funnel_stage else "new" }}</span>
                     {% if c.tags %}<span>Теги: {{ c.tags }}</span>{% endif %}
@@ -103,7 +104,10 @@
                 <button class="chip worker-prompt" data-action="set_luck" data-label="Удача 0-100">Удача</button>
                 <button class="chip worker-prompt" data-action="set_min_deposit" data-label="Минимальный депозит">Мин. деп</button>
                 <button class="chip worker-prompt" data-action="set_min_withdraw" data-label="Минимальный вывод">Мин. вывод</button>
-                <button class="chip worker-prompt" data-action="add_balance" data-label="Пополнение баланса">Баланс</button>
+                <button class="chip worker-prompt" data-action="add_balance" data-label="Пополнение баланса">Баланс+</button>
+                <button class="chip worker-prompt" data-action="subtract_balance" data-label="Списание баланса">Баланс-</button>
+                <button class="chip worker-prompt" data-action="set_balance" data-label="Установить баланс">Set баланс</button>
+                <button class="chip worker-prompt" data-action="set_min_trade_amount" data-label="Минимальная сумма сделки">Мин. сделка</button>
                 <button class="chip worker-text" data-action="set_funnel_stage" data-label="Этап воронки">Этап</button>
                 <button class="chip worker-text" data-action="set_tags" data-label="Теги через запятую">Теги</button>
                 <button class="chip worker-text" data-action="set_note" data-label="Заметка по рефералу">Заметка</button>

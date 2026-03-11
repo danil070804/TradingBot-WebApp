@@ -687,7 +687,7 @@ async def fetch_worker_clients_rows(worker_tg_id: int):
         return await fetch_all(
             """
             SELECT wc.id, wc.client_tg_id, wc.min_deposit, wc.min_withdraw, wc.verified, wc.withdraw_enabled,
-                   wc.trading_enabled, wc.favorite, wc.blocked, wc.crm_note, wc.tags, wc.funnel_stage, wc.last_activity_at,
+                   wc.min_trade_amount, wc.trading_enabled, wc.favorite, wc.blocked, wc.crm_note, wc.tags, wc.funnel_stage, wc.last_activity_at,
                    u.first_name, u.username, u.balance, u.currency, cl.luck_percent
             FROM worker_clients wc
             LEFT JOIN users u ON u.tg_id = wc.client_tg_id
@@ -702,7 +702,7 @@ async def fetch_worker_clients_rows(worker_tg_id: int):
         return await fetch_all(
             """
             SELECT wc.id, wc.client_tg_id, wc.min_deposit, wc.min_withdraw, wc.verified, wc.withdraw_enabled,
-                   wc.trading_enabled, wc.favorite, wc.blocked, '' AS crm_note, '' AS tags, 'new' AS funnel_stage, wc.created_at AS last_activity_at,
+                   wc.min_trade_amount, wc.trading_enabled, wc.favorite, wc.blocked, '' AS crm_note, '' AS tags, 'new' AS funnel_stage, wc.created_at AS last_activity_at,
                    u.first_name, u.username, u.balance, u.currency, 0 AS luck_percent
             FROM worker_clients wc
             LEFT JOIN users u ON u.tg_id = wc.client_tg_id
@@ -877,9 +877,9 @@ async def build_worker_dashboard_payload(worker_tg_id: int) -> dict:
 async def build_worker_client_snapshot_payload(worker_tg_id: int, wc_id: int) -> dict:
     client = await fetch_one(
         """
-        SELECT wc.id, wc.worker_tg_id, wc.client_tg_id, wc.min_deposit, wc.min_withdraw, wc.verified, wc.withdraw_enabled,
-               wc.trading_enabled, wc.favorite, wc.blocked, wc.crm_note, wc.tags, wc.funnel_stage, wc.last_activity_at,
-               u.first_name, u.username, u.language, u.currency, u.balance, cl.luck_percent
+            SELECT wc.id, wc.worker_tg_id, wc.client_tg_id, wc.min_deposit, wc.min_withdraw, wc.verified, wc.withdraw_enabled,
+                   wc.min_trade_amount, wc.trading_enabled, wc.favorite, wc.blocked, wc.crm_note, wc.tags, wc.funnel_stage, wc.last_activity_at,
+                   u.first_name, u.username, u.language, u.currency, u.balance, cl.luck_percent
         FROM worker_clients wc
         LEFT JOIN users u ON u.tg_id = wc.client_tg_id
         LEFT JOIN client_luck cl ON cl.worker_tg_id = wc.worker_tg_id AND cl.client_tg_id = wc.client_tg_id
@@ -1756,7 +1756,7 @@ async def worker_client_page(request: Request, wc_id: int):
         client = await fetch_one(
             """
             SELECT wc.id, wc.worker_tg_id, wc.client_tg_id, wc.min_deposit, wc.min_withdraw, wc.verified, wc.withdraw_enabled,
-                   wc.trading_enabled, wc.favorite, wc.blocked, wc.crm_note, wc.tags, wc.funnel_stage, wc.last_activity_at, wc.created_at,
+                   wc.min_trade_amount, wc.trading_enabled, wc.favorite, wc.blocked, wc.crm_note, wc.tags, wc.funnel_stage, wc.last_activity_at, wc.created_at,
                    u.first_name, u.username, u.language, u.currency, u.balance, u.created_at AS user_created_at, cl.luck_percent
             FROM worker_clients wc
             LEFT JOIN users u ON u.tg_id = wc.client_tg_id
@@ -1770,7 +1770,7 @@ async def worker_client_page(request: Request, wc_id: int):
         client = await fetch_one(
             """
             SELECT wc.id, wc.worker_tg_id, wc.client_tg_id, wc.min_deposit, wc.min_withdraw, wc.verified, wc.withdraw_enabled,
-                   wc.trading_enabled, wc.favorite, wc.blocked, '' AS crm_note, '' AS tags, 'new' AS funnel_stage, wc.created_at AS last_activity_at, wc.created_at,
+                   wc.min_trade_amount, wc.trading_enabled, wc.favorite, wc.blocked, '' AS crm_note, '' AS tags, 'new' AS funnel_stage, wc.created_at AS last_activity_at, wc.created_at,
                    u.first_name, u.username, u.language, u.currency, u.balance, u.created_at AS user_created_at, 0 AS luck_percent
             FROM worker_clients wc
             LEFT JOIN users u ON u.tg_id = wc.client_tg_id
@@ -1876,7 +1876,7 @@ async def api_worker_client_update(payload: WorkerClientUpdatePayload, request: 
         return JSONResponse({"ok": False, "error": "Forbidden"}, status_code=403)
 
     wc = await fetch_one(
-        "SELECT id, client_tg_id, worker_tg_id, verified, withdraw_enabled, trading_enabled, favorite, blocked "
+        "SELECT id, client_tg_id, worker_tg_id, min_trade_amount, verified, withdraw_enabled, trading_enabled, favorite, blocked "
         "FROM worker_clients WHERE id = ?",
         (payload.wc_id,),
     )
@@ -1928,6 +1928,14 @@ async def api_worker_client_update(payload: WorkerClientUpdatePayload, request: 
         activity_title = "Мин. вывод"
         activity_details = f"Установлен минимальный вывод {val:.2f}"
         activity_amount = val
+    elif action == "set_min_trade_amount":
+        val = float(payload.value or 0)
+        if val <= 0:
+            return JSONResponse({"ok": False, "error": "Value must be > 0"}, status_code=400)
+        await bot.update_worker_client_field(payload.wc_id, "min_trade_amount", val)
+        activity_title = "Мин. сумма сделки"
+        activity_details = f"Установлена минимальная сумма сделки {val:.2f}"
+        activity_amount = val
     elif action == "set_luck":
         val = float(payload.value or 0)
         if val < 0 or val > 100:
@@ -1943,6 +1951,23 @@ async def api_worker_client_update(payload: WorkerClientUpdatePayload, request: 
         activity_title = "Пополнение баланса"
         activity_details = f"Воркер добавил баланс {val:.2f}"
         activity_amount = val
+    elif action == "subtract_balance":
+        val = float(payload.value or 0)
+        if val <= 0:
+            return JSONResponse({"ok": False, "error": "Amount must be > 0"}, status_code=400)
+        await bot.change_balance(int(wc["client_tg_id"]), -val)
+        activity_title = "Списание баланса"
+        activity_details = f"Воркер списал баланс {val:.2f}"
+        activity_amount = -val
+    elif action == "set_balance":
+        target = await fetch_one("SELECT balance, currency FROM users WHERE tg_id = ?", (int(wc["client_tg_id"]),))
+        new_balance = float(payload.value or 0)
+        current_balance = float(target["balance"] or 0) if target else 0.0
+        delta = new_balance - current_balance
+        await bot.change_balance(int(wc["client_tg_id"]), delta)
+        activity_title = "Установка баланса"
+        activity_details = f"Баланс установлен на {new_balance:.2f}"
+        activity_amount = new_balance
     elif action == "set_note":
         note = str(payload.value or "").strip()
         await bot.update_worker_client_field(payload.wc_id, "crm_note", note)
@@ -2423,13 +2448,18 @@ async def api_trade_open(
         return JSONResponse({"ok": False, "error": "Пользователь не найден"}, status_code=404)
     balance = float(user["balance"] or 0.0)
     currency = user["currency"] or "USD"
+    wc_cfg = await fetch_one(
+        "SELECT min_trade_amount FROM worker_clients WHERE client_tg_id = ? ORDER BY id DESC LIMIT 1",
+        (tg_id,),
+    )
+    min_trade_amount = float(wc_cfg["min_trade_amount"] or 100) if wc_cfg else 100.0
 
     risk_percent = float(payload.risk_percent or 0.0)
     if risk_percent > 0:
         amount = round(balance * (risk_percent / 100.0), 2)
 
-    if amount < 100:
-        return JSONResponse({"ok": False, "error": "Минимальная сумма сделки: 100"}, status_code=400)
+    if amount < min_trade_amount:
+        return JSONResponse({"ok": False, "error": f"Минимальная сумма сделки: {min_trade_amount:.2f}"}, status_code=400)
     if amount > balance:
         return JSONResponse({"ok": False, "error": "Недостаточно средств"}, status_code=400)
 
