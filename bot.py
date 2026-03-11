@@ -2089,21 +2089,68 @@ async def set_worker_flag(tg_id: int, is_worker: bool = True):
 async def get_admin_stats_text() -> str:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
-        cur = await db.execute("SELECT COUNT(*) AS c FROM users")
-        total_users = (await cur.fetchone())["c"]
-        cur = await db.execute("SELECT COUNT(*) AS c FROM users WHERE is_worker = 1")
-        total_workers = (await cur.fetchone())["c"]
-        cur = await db.execute("SELECT IFNULL(SUM(balance),0) AS s FROM users")
-        total_balance = (await cur.fetchone())["s"]
-        cur = await db.execute("SELECT COUNT(*) AS c FROM withdrawals WHERE status = 'pending'")
-        pending_withdrawals = (await cur.fetchone())["c"]
+        cur = await db.execute(
+            """
+            SELECT
+                (SELECT COUNT(*) FROM users) AS total_users,
+                (SELECT COUNT(*) FROM users WHERE is_worker = 1) AS total_workers,
+                (SELECT COUNT(*) FROM deals) AS total_deals,
+                (SELECT IFNULL(SUM(balance), 0) FROM users) AS total_balance,
+                (SELECT COUNT(*) FROM withdrawals WHERE status = 'pending') AS pending_withdrawals,
+                (SELECT COUNT(*) FROM deposit_requests WHERE status = 'pending') AS pending_deposits,
+                (SELECT COUNT(*) FROM support_tickets WHERE status IN ('new', 'in_progress')) AS open_support,
+                (SELECT IFNULL(SUM(amount), 0) FROM deposit_requests WHERE status = 'approved') AS approved_deposit_sum,
+                (SELECT IFNULL(SUM(amount), 0) FROM withdrawals WHERE status = 'approved') AS approved_withdraw_sum,
+                (SELECT IFNULL(SUM(profit), 0) FROM deals) AS total_pnl,
+                (SELECT COUNT(*) FROM worker_clients WHERE blocked = 1) AS blocked_clients,
+                (SELECT COUNT(*) FROM worker_clients WHERE favorite = 1) AS favorite_clients
+            """
+        )
+        metrics = await cur.fetchone()
+        cur = await db.execute(
+            """
+            SELECT u.tg_id, u.first_name, u.username,
+                   COUNT(wc.id) AS clients_count,
+                   SUM(CASE WHEN wc.favorite = 1 THEN 1 ELSE 0 END) AS favorite_count
+            FROM users u
+            LEFT JOIN worker_clients wc ON wc.worker_tg_id = u.tg_id
+            WHERE u.is_worker = 1
+            GROUP BY u.tg_id, u.first_name, u.username
+            ORDER BY clients_count DESC, u.tg_id ASC
+            LIMIT 3
+            """
+        )
+        top_workers = await cur.fetchall()
+
+    top_lines = []
+    for idx, row in enumerate(top_workers, start=1):
+        name = (row["first_name"] or "").strip() or (f"@{row['username']}" if row["username"] else f"ID {row['tg_id']}")
+        username_suffix = f" · @{row['username']}" if row["username"] else ""
+        top_lines.append(
+            f"{idx}. <b>{name}</b>{username_suffix} — "
+            f"клиентов: <b>{int(row['clients_count'] or 0)}</b>, избранных: <b>{int(row['favorite_count'] or 0)}</b>"
+        )
+    top_block = "\n".join(top_lines) if top_lines else "— пока нет данных по воркерам"
 
     return (
-        "📊 <b>Статистика</b>\n\n"
-        f"• Пользователей: <b>{total_users}</b>\n"
-        f"• Воркеров: <b>{total_workers}</b>\n"
-        f"• Суммарный баланс: <b>{total_balance:.2f}</b>\n"
-        f"• Заявок на вывод (ожидают): <b>{pending_withdrawals}</b>\n"
+        "📊 <b>Статистика платформы</b>\n\n"
+        "╭ <b>Основные KPI</b>\n"
+        f"├ Пользователи: <b>{int(metrics['total_users'] or 0)}</b>\n"
+        f"├ Воркеры: <b>{int(metrics['total_workers'] or 0)}</b>\n"
+        f"├ Сделки: <b>{int(metrics['total_deals'] or 0)}</b>\n"
+        f"╰ Общий PnL: <b>{float(metrics['total_pnl'] or 0):+.2f}</b>\n\n"
+        "╭ <b>Финансы</b>\n"
+        f"├ Суммарный баланс: <b>{float(metrics['total_balance'] or 0):.2f}</b>\n"
+        f"├ Подтверждено пополнений: <b>{float(metrics['approved_deposit_sum'] or 0):.2f}</b>\n"
+        f"╰ Подтверждено выводов: <b>{float(metrics['approved_withdraw_sum'] or 0):.2f}</b>\n\n"
+        "╭ <b>Очереди и поддержка</b>\n"
+        f"├ Пополнения в ожидании: <b>{int(metrics['pending_deposits'] or 0)}</b>\n"
+        f"├ Выводы в ожидании: <b>{int(metrics['pending_withdrawals'] or 0)}</b>\n"
+        f"├ Открытые тикеты: <b>{int(metrics['open_support'] or 0)}</b>\n"
+        f"╰ Заблокированные клиенты: <b>{int(metrics['blocked_clients'] or 0)}</b>\n\n"
+        "╭ <b>CRM и активность</b>\n"
+        f"├ Избранные рефералы: <b>{int(metrics['favorite_clients'] or 0)}</b>\n"
+        f"╰ Топ воркеры:\n{top_block}"
     )
 
 async def get_workers_with_ref_counts():
@@ -2612,6 +2659,16 @@ def admin_keyboard():
     return kb.as_markup()
 
 
+def admin_stats_keyboard():
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🔄 Обновить", callback_data="admin_stats")
+    kb.button(text="👷 Воркеры", callback_data="admin_workers")
+    kb.button(text="💳 Реквизиты", callback_data="admin_payments")
+    kb.button(text="⬅️ К админке", callback_data="open_admin_panel")
+    kb.adjust(2, 1, 1)
+    return kb.as_markup()
+
+
 def workers_list_keyboard(rows):
     kb = InlineKeyboardBuilder()
     for row in rows:
@@ -2809,11 +2866,10 @@ def ecn_direction_keyboard(asset_id: int, lang: str = "ru"):
 
 def ecn_time_keyboard(lang: str = "ru"):
     kb = InlineKeyboardBuilder()
+    kb.button(text=tr(lang, "10 сек.", "10 sec", "10 с"), callback_data="ecn_time:10")
     kb.button(text=tr(lang, "30 сек.", "30 sec", "30 с"), callback_data="ecn_time:30")
     kb.button(text=tr(lang, "1 мин.", "1 min", "1 хв"), callback_data="ecn_time:60")
-    kb.button(text=tr(lang, "3 мин.", "3 min", "3 хв"), callback_data="ecn_time:180")
     kb.button(text=tr(lang, "5 мин.", "5 min", "5 хв"), callback_data="ecn_time:300")
-    kb.button(text=tr(lang, "10 мин.", "10 min", "10 хв"), callback_data="ecn_time:600")
     kb.adjust(2)
     return kb.as_markup()
 
@@ -4501,7 +4557,7 @@ async def on_admin_stats(callback: CallbackQuery, state: FSMContext):
         return
     await state.clear()
     text = await get_admin_stats_text()
-    await callback.message.answer(text, reply_markup=admin_back_keyboard("open_admin_panel", "⬅️ К админке"))
+    await callback.message.answer(text, reply_markup=admin_stats_keyboard())
     await callback.answer()
 
 
