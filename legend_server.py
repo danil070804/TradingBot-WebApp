@@ -3067,6 +3067,12 @@ async def ws_user(websocket: WebSocket):
                 "SELECT id, asset_name, profit, created_at FROM deals WHERE user_tg_id = ? ORDER BY id DESC LIMIT 1",
                 (tg_id,),
             )
+            latest_deal_payload = None
+            if latest_deal:
+                latest_deal_payload = dict(latest_deal)
+                created_at = latest_deal_payload.get("created_at")
+                if created_at is not None:
+                    latest_deal_payload["created_at"] = str(created_at)
             await websocket.send_json(
                 {
                     "type": "user",
@@ -3074,7 +3080,7 @@ async def ws_user(websocket: WebSocket):
                     "currency": str(user["currency"] if user and user["currency"] else "USD"),
                     "open_trades": open_count,
                     "open_positions": open_positions[:10],
-                    "latest_deal": dict(latest_deal) if latest_deal else None,
+                    "latest_deal": latest_deal_payload,
                 }
             )
             await asyncio.sleep(1.2)
