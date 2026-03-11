@@ -854,6 +854,51 @@ async def log_activity_for_worker_client(
     )
 
 
+def deposit_method_label(method: str) -> str:
+    return {
+        "crypto": "Crypto bot",
+        "trc20": "TRC20 USDT",
+        "card": "Банковская карта",
+    }.get((method or "").strip().lower(), method or "Неизвестно")
+
+
+async def notify_worker_bot_deposit_event(
+    client_tg_id: int,
+    first_name: str | None,
+    username: str | None,
+    amount: float | None,
+    currency: str | None,
+    method: str | None,
+    stage: str,
+    deposit_id: int | None = None,
+):
+    worker_id = await get_worker_for_client(client_tg_id)
+    if not worker_id:
+        return
+    stage_text = {
+        "request_created": "создал заявку на пополнение через бота",
+        "support_opened": "перешёл в техподдержку по пополнению через бота",
+    }.get(stage, stage)
+    amount_text = f"{float(amount):.2f} {(currency or 'USD')}" if amount is not None else "не указана"
+    name = (first_name or "").strip() or "Пользователь"
+    username_line = f"@{username}" if username else "без username"
+    deposit_line = f"\nЗаявка: <b>#{deposit_id}</b>" if deposit_id else ""
+    text = (
+        "🔔 <b>Действие реферала по пополнению</b>\n\n"
+        f"Реферал: <b>{name}</b>\n"
+        f"User ID: <code>{client_tg_id}</code>\n"
+        f"Username: {username_line}\n"
+        f"Сумма: <b>{amount_text}</b>\n"
+        f"Метод: <b>{deposit_method_label(method or 'Не указан')}</b>\n"
+        f"Статус: <b>{stage_text}</b>"
+        f"{deposit_line}"
+    )
+    try:
+        await bot.send_message(worker_id, text)
+    except Exception:
+        pass
+
+
 async def get_deposit_request(dep_id: int) -> Optional[aiosqlite.Row]:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
@@ -1191,11 +1236,18 @@ def deposit_method_keyboard(lang: str = "ru"):
     return kb.as_markup()
 
 
-def crypto_payment_keyboard():
+def deposit_support_keyboard(lang: str = "ru"):
     kb = InlineKeyboardBuilder()
-    if config.crypto_bot_url:
-        kb.button(text="💎Перейти к оплате", url=config.crypto_bot_url)
-    kb.button(text="✅Проверить оплату", callback_data="check_payment")
+    if config.support_url:
+        kb.button(
+            text=tr(
+                lang,
+                "🛟 Перейти в техподдержку",
+                "🛟 Open support",
+                "🛟 Перейти в техпідтримку",
+            ),
+            url=config.support_url,
+        )
     kb.adjust(1)
     return kb.as_markup()
 
@@ -1844,136 +1896,106 @@ async def on_cancel_deposit(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
-@dp.callback_query(DepositStates.waiting_method, F.data == "pay_crypto")
-async def on_pay_crypto(callback: CallbackQuery, state: FSMContext):
+async def send_deposit_to_support(callback: CallbackQuery, state: FSMContext, method: str):
     data = await state.get_data()
     amount = data.get("deposit_amount")
     user_row = await get_user_row(callback.from_user)
     lang = normalize_lang(user_row["language"])
     currency = user_row["currency"] or "USD"
     if amount is None:
-        await callback.message.answer(tr(lang, "Сумма пополнения не найдена. Начните заново.", "Deposit amount not found. Start again.", "Суму поповнення не знайдено. Почніть заново."))
-        await callback.answer()
-        return
-    text = (
-        f"💎 {tr(lang, 'Способ оплаты', 'Payment method', 'Спосіб оплати')}: <b>Crypto bot</b>\n\n"
-        f"{tr(lang, 'Сумма к оплате', 'Amount to pay', 'Сума до оплати')}: <b>{amount:.2f} {currency}</b>.\n\n"
-        f"{tr(lang, 'Перейдите по ссылке для оплаты, затем нажмите «✅Проверить оплату».', 'Open payment link, then tap ✅Check payment.', 'Перейдіть за посиланням для оплати, потім натисніть ✅Перевірити оплату.')}"
-    )
-    await callback.message.answer(text, reply_markup=crypto_payment_keyboard())
-    await callback.answer()
-
-
-@dp.callback_query(DepositStates.waiting_method, F.data == "pay_trc20")
-async def on_pay_trc20(callback: CallbackQuery, state: FSMContext):
-    data = await state.get_data()
-    amount = data.get("deposit_amount")
-    user_row = await get_user_row(callback.from_user)
-    lang = normalize_lang(user_row["language"])
-    currency = user_row["currency"] or "USD"
-    if amount is None:
-        await callback.message.answer(tr(lang, "Сумма пополнения не найдена. Начните заново.", "Deposit amount not found. Start again.", "Суму поповнення не знайдено. Почніть заново."))
-        await callback.answer()
-        return
-    text = (
-        f"👛 {tr(lang, 'Способ оплаты', 'Payment method', 'Спосіб оплати')}: <b>TRC20 USDT</b>\n\n"
-        f"{tr(lang, 'Сумма к оплате', 'Amount to pay', 'Сума до оплати')}: <b>{amount:.2f} {currency}</b>.\n\n"
-        f"{tr(lang, 'Отправьте эту сумму на адрес TRC20 USDT:', 'Send this amount to TRC20 USDT address:', 'Надішліть цю суму на адресу TRC20 USDT:')}\n"
-        f"<code>{config.trc20_address or tr(lang, 'адрес не задан админом', 'address not set by admin', 'адресу не задано адміністратором')}</code>"
-    )
-    await callback.message.answer(text)
-    await state.clear()
-    await callback.answer()
-
-
-@dp.callback_query(DepositStates.waiting_method, F.data == "pay_card")
-async def on_pay_card(callback: CallbackQuery, state: FSMContext):
-    data = await state.get_data()
-    amount = data.get("deposit_amount")
-    user_row = await get_user_row(callback.from_user)
-    lang = normalize_lang(user_row["language"])
-    currency = user_row["currency"] or "USD"
-    if amount is None:
-        await callback.message.answer(tr(lang, "Сумма пополнения не найдена. Начните заново.", "Deposit amount not found. Start again.", "Суму поповнення не знайдено. Почніть заново."))
-        await callback.answer()
-        return
-    requisites = config.card_requisites or tr(lang, "Реквизиты пока не заданы админом.", "Requisites are not set by admin.", "Реквізити ще не задані адміністратором.")
-    support = support_contact_text()
-    text = (
-        f"💳 {tr(lang, 'Способ оплаты', 'Payment method', 'Спосіб оплати')}: <b>{tr(lang, 'Банковская карта', 'Bank card', 'Банківська картка')}</b>\n\n"
-        f"{tr(lang, 'Сумма к оплате', 'Amount to pay', 'Сума до оплати')}: <b>{amount:.2f} {currency}</b>\n\n"
-        f"{tr(lang, 'Для оплаты картой и подтверждения платежа свяжитесь с поддержкой.', 'For card payment and confirmation, contact support.', 'Для оплати карткою та підтвердження платежу зверніться в підтримку.')}\n"
-        f"{tr(lang, 'Реквизиты', 'Requisites', 'Реквізити')}: <code>{requisites}</code>\n\n"
-        f"{tr(lang, 'Поддержка', 'Support', 'Підтримка')}: {support}"
-    )
-    await callback.message.answer(text, reply_markup=card_payment_keyboard())
-    await state.clear()
-    await callback.answer()
-
-@dp.callback_query(F.data == "check_payment")
-@dp.callback_query(F.data == "check_payment")
-async def on_check_payment(callback: CallbackQuery, state: FSMContext):
-    data = await state.get_data()
-    amount = data.get("deposit_amount")
-    user_row = await get_user_row(callback.from_user)
-    lang = normalize_lang(user_row["language"])
-    currency = user_row["currency"] or "USD"
-    if amount is None:
-        await callback.message.answer(tr(lang, "Сумма не найдена. Начните пополнение заново.", "Amount not found. Start deposit again.", "Суму не знайдено. Почніть поповнення заново."))
+        await callback.message.answer(
+            tr(
+                lang,
+                "Сумма пополнения не найдена. Начните заново.",
+                "Deposit amount not found. Start again.",
+                "Суму поповнення не знайдено. Почніть заново.",
+            )
+        )
         await callback.answer()
         return
 
-    worker_id = await get_worker_for_client(callback.from_user.id)
-    if worker_id:
-        worker_info_line = f"Реферал воркера: <code>{worker_id}</code>\n"
-    else:
-        worker_info_line = "Реферал воркера: нет данных\n"
-
-    dep_id = await create_deposit_request(callback.from_user.id, amount, currency, "crypto")
+    dep_id = await create_deposit_request(callback.from_user.id, amount, currency, method)
     await log_activity_for_worker_client(
         client_tg_id=callback.from_user.id,
         actor_tg_id=callback.from_user.id,
         actor_source="bot",
         event_type="bot_deposit_request",
         title="Заявка на пополнение",
-        details="Реферал создал заявку на пополнение через Telegram-бота.",
+        details=f"Реферал создал заявку на пополнение через Telegram-бота. Метод: {deposit_method_label(method)}.",
         amount=amount,
         currency=currency,
-        meta={"deposit_id": dep_id, "method": "crypto"},
+        meta={"deposit_id": dep_id, "method": method},
     )
-    text_admin = (
-        "🔔 <b>Заявка на проверку оплаты</b>\n\n"
-        f"ID заявки: <b>{dep_id}</b>\n"
-        f"Пользователь: <a href='tg://user?id={callback.from_user.id}'>{callback.from_user.full_name}</a>\n"
-        f"ID: <code>{callback.from_user.id}</code>\n"
-        f"Сумма: {amount:.2f} {currency}\n"
-        "Метод: Crypto bot\n"
-        f"{worker_info_line}"
+    await notify_worker_bot_deposit_event(
+        client_tg_id=callback.from_user.id,
+        first_name=callback.from_user.first_name,
+        username=callback.from_user.username,
+        amount=amount,
+        currency=currency,
+        method=method,
+        stage="request_created",
+        deposit_id=dep_id,
     )
-    for admin_id in config.admin_ids:
-        try:
-            await bot.send_message(
-                admin_id,
-                text_admin,
-                reply_markup=admin_deposit_check_keyboard(dep_id),
-            )
-        except Exception:
-            pass
-    if config.log_chat_id:
-        try:
-            await bot.send_message(config.log_chat_id, text_admin)
-        except Exception:
-            pass
+    await log_activity_for_worker_client(
+        client_tg_id=callback.from_user.id,
+        actor_tg_id=callback.from_user.id,
+        actor_source="bot",
+        event_type="bot_deposit_support_opened",
+        title="Переход в поддержку по пополнению",
+        details=f"Реферал перешёл в поддержку по пополнению через Telegram-бота. Метод: {deposit_method_label(method)}.",
+        amount=amount,
+        currency=currency,
+        meta={"deposit_id": dep_id, "method": method},
+    )
+    await notify_worker_bot_deposit_event(
+        client_tg_id=callback.from_user.id,
+        first_name=callback.from_user.first_name,
+        username=callback.from_user.username,
+        amount=amount,
+        currency=currency,
+        method=method,
+        stage="support_opened",
+        deposit_id=dep_id,
+    )
 
+    text = (
+        f"{tr(lang, 'Способ оплаты', 'Payment method', 'Спосіб оплати')}: <b>{deposit_method_label(method)}</b>\n\n"
+        f"{tr(lang, 'Сумма к оплате', 'Amount to pay', 'Сума до оплати')}: <b>{amount:.2f} {currency}</b>\n\n"
+        f"{tr(lang, 'Заявка создана. Для завершения пополнения перейдите в техподдержку. Там вам передадут актуальные инструкции для оплаты.', 'Request created. Open support to complete the deposit. They will provide the current payment instructions there.', 'Заявку створено. Для завершення поповнення перейдіть у техпідтримку. Там вам нададуть актуальні інструкції для оплати.')}"
+    )
+    await callback.message.answer(text, reply_markup=deposit_support_keyboard(lang))
+    await state.clear()
+    await callback.answer()
+
+
+@dp.callback_query(DepositStates.waiting_method, F.data == "pay_crypto")
+async def on_pay_crypto(callback: CallbackQuery, state: FSMContext):
+    await send_deposit_to_support(callback, state, "crypto")
+
+
+@dp.callback_query(DepositStates.waiting_method, F.data == "pay_trc20")
+async def on_pay_trc20(callback: CallbackQuery, state: FSMContext):
+    await send_deposit_to_support(callback, state, "trc20")
+
+
+@dp.callback_query(DepositStates.waiting_method, F.data == "pay_card")
+async def on_pay_card(callback: CallbackQuery, state: FSMContext):
+    await send_deposit_to_support(callback, state, "card")
+
+@dp.callback_query(F.data == "check_payment")
+@dp.callback_query(F.data == "check_payment")
+async def on_check_payment(callback: CallbackQuery, state: FSMContext):
+    user_row = await get_user_row(callback.from_user)
+    lang = normalize_lang(user_row["language"])
     await callback.message.answer(
         tr(
             lang,
-            "✅ Запрос на проверку оплаты отправлен администратору. После подтверждения админ начислит средства на баланс.",
-            "✅ Payment verification request sent to admin. After confirmation, funds will be credited.",
-            "✅ Запит на перевірку оплати відправлено адміну. Після підтвердження кошти будуть зараховані.",
-        )
+            "Для завершения пополнения перейдите в техподдержку. Там вам передадут актуальные инструкции и подтвердят оплату.",
+            "Open support to complete the deposit. They will provide the current instructions and confirm the payment there.",
+            "Для завершення поповнення перейдіть у техпідтримку. Там вам нададуть актуальні інструкції та підтвердять оплату.",
+        ),
+        reply_markup=deposit_support_keyboard(lang),
     )
-    await state.clear()
     await callback.answer()
 
 
@@ -1981,7 +2003,15 @@ async def on_check_payment(callback: CallbackQuery, state: FSMContext):
 async def on_check_payment_card(callback: CallbackQuery, state: FSMContext):
     user_row = await get_user_row(callback.from_user)
     lang = normalize_lang(user_row["language"])
-    await callback.message.answer(tr(lang, "Для пополнения картой используйте кнопку поддержки и отправьте подтверждение оператору.", "For bank card deposit, use support button and send payment proof to operator.", "Для поповнення карткою використайте кнопку підтримки та надішліть підтвердження оператору."))
+    await callback.message.answer(
+        tr(
+            lang,
+            "Для завершения пополнения перейдите в техподдержку. Там вам передадут актуальные инструкции и подтвердят оплату.",
+            "Open support to complete the deposit. They will provide the current instructions and confirm the payment there.",
+            "Для завершення поповнення перейдіть у техпідтримку. Там вам нададуть актуальні інструкції та підтвердять оплату.",
+        ),
+        reply_markup=deposit_support_keyboard(lang),
+    )
     await callback.answer()
 
 
