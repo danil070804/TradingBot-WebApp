@@ -496,6 +496,19 @@ def is_admin_session(request: Request) -> bool:
     return bool(request.session.get("is_admin"))
 
 
+async def is_admin_request(request: Request) -> bool:
+    if is_admin_session(request):
+        return True
+    tg_id = await get_current_user_id(request)
+    if not tg_id:
+        return False
+    user = await fetch_one("SELECT is_admin FROM users WHERE tg_id = ?", (tg_id,))
+    is_admin = bool(user["is_admin"]) if user else bool(tg_id in bot.config.admin_ids)
+    if is_admin:
+        request.session["is_admin"] = True
+    return is_admin
+
+
 async def get_or_pick_user_id() -> int:
     if ALLOW_DEFAULT_TG_FALLBACK and DEFAULT_TG_ID:
         return DEFAULT_TG_ID
@@ -2139,7 +2152,7 @@ async def api_worker_client_snapshot(wc_id: int, request: Request):
 
 @app.get("/admin/login", response_class=HTMLResponse)
 async def admin_login_page(request: Request):
-    if is_admin_session(request):
+    if await is_admin_request(request):
         return RedirectResponse(url="/admin", status_code=302)
     return templates.TemplateResponse("admin_login.html", {"request": request, "title": "Legend Trading Admin"})
 
@@ -2165,7 +2178,7 @@ async def admin_logout(request: Request):
 
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_dashboard(request: Request):
-    if not is_admin_session(request):
+    if not await is_admin_request(request):
         return RedirectResponse(url="/admin/login", status_code=302)
     settings_map = await get_settings_map()
     assets = await fetch_all("SELECT id, name FROM ecn_assets ORDER BY id ASC LIMIT 200")
@@ -2198,7 +2211,7 @@ async def admin_dashboard(request: Request):
 
 @app.get("/admin/user/{tg_id}", response_class=HTMLResponse)
 async def admin_user_page(request: Request, tg_id: int):
-    if not is_admin_session(request):
+    if not await is_admin_request(request):
         return RedirectResponse(url="/admin/login", status_code=302)
     user = await fetch_one(
         "SELECT tg_id, first_name, username, language, currency, balance, is_admin, is_worker, created_at FROM users WHERE tg_id = ?",
@@ -2255,7 +2268,7 @@ class AdminSettingPayload(BaseModel):
 
 @app.post("/admin/api/settings", response_class=JSONResponse)
 async def admin_update_setting(payload: AdminSettingPayload, request: Request):
-    if not is_admin_session(request):
+    if not await is_admin_request(request):
         return JSONResponse({"ok": False, "error": "Unauthorized"}, status_code=401)
     allowed_keys = {
         "crypto_bot_url",
@@ -2287,7 +2300,7 @@ class AdminAssetPayload(BaseModel):
 
 @app.post("/admin/api/assets", response_class=JSONResponse)
 async def admin_add_asset(payload: AdminAssetPayload, request: Request):
-    if not is_admin_session(request):
+    if not await is_admin_request(request):
         return JSONResponse({"ok": False, "error": "Unauthorized"}, status_code=401)
     name = payload.name.strip()
     if len(name) < 2:
@@ -2312,7 +2325,7 @@ class AdminUserActionPayload(BaseModel):
 
 @app.post("/admin/api/user/action", response_class=JSONResponse)
 async def admin_user_action(payload: AdminUserActionPayload, request: Request):
-    if not is_admin_session(request):
+    if not await is_admin_request(request):
         return JSONResponse({"ok": False, "error": "Unauthorized"}, status_code=401)
     target = await fetch_one(
         "SELECT tg_id, first_name, username, currency, balance, is_admin, is_worker FROM users WHERE tg_id = ?",
@@ -2386,14 +2399,14 @@ class AdminProcessPayload(BaseModel):
 
 @app.get("/admin/api/dashboard", response_class=JSONResponse)
 async def admin_dashboard_snapshot(request: Request):
-    if not is_admin_session(request):
+    if not await is_admin_request(request):
         return JSONResponse({"ok": False, "error": "Unauthorized"}, status_code=401)
     return JSONResponse(await build_admin_dashboard_payload())
 
 
 @app.post("/admin/api/deposit/process", response_class=JSONResponse)
 async def admin_process_deposit(payload: AdminProcessPayload, request: Request):
-    if not is_admin_session(request):
+    if not await is_admin_request(request):
         return JSONResponse({"ok": False, "error": "Unauthorized"}, status_code=401)
     dep = await fetch_one("SELECT * FROM deposit_requests WHERE id = ?", (payload.entity_id,))
     if not dep:
@@ -2442,7 +2455,7 @@ async def admin_process_deposit(payload: AdminProcessPayload, request: Request):
 
 @app.post("/admin/api/withdraw/process", response_class=JSONResponse)
 async def admin_process_withdraw(payload: AdminProcessPayload, request: Request):
-    if not is_admin_session(request):
+    if not await is_admin_request(request):
         return JSONResponse({"ok": False, "error": "Unauthorized"}, status_code=401)
     wd = await fetch_one("SELECT * FROM withdrawals WHERE id = ?", (payload.entity_id,))
     if not wd:
@@ -2489,7 +2502,7 @@ async def admin_process_withdraw(payload: AdminProcessPayload, request: Request)
 
 @app.post("/admin/api/support/process", response_class=JSONResponse)
 async def admin_process_support(payload: AdminProcessPayload, request: Request):
-    if not is_admin_session(request):
+    if not await is_admin_request(request):
         return JSONResponse({"ok": False, "error": "Unauthorized"}, status_code=401)
     ticket = await fetch_one("SELECT * FROM support_tickets WHERE id = ?", (payload.entity_id,))
     if not ticket:

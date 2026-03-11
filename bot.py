@@ -1728,6 +1728,31 @@ async def log_activity_for_worker_client(
     await touch_worker_client_activity(client_tg_id)
 
 
+async def notify_admin_referral_activity(client_tg_id: int, title: str, details: str):
+    if not config.admin_ids:
+        return
+    worker_id = await get_worker_for_client(client_tg_id)
+    client = await get_user_by_tg_id(client_tg_id)
+    worker = await get_user_by_tg_id(worker_id) if worker_id else None
+    client_name = (client["first_name"] if client and client["first_name"] else "").strip() or "Пользователь"
+    client_username = f"@{client['username']}" if client and client["username"] else "без username"
+    worker_name = (worker["first_name"] if worker and worker["first_name"] else "").strip() or "Не назначен"
+    worker_username = f"@{worker['username']}" if worker and worker["username"] else "без username"
+    text = (
+        f"🛰 <b>{title}</b>\n\n"
+        f"╭ <b>Реферал</b>\n"
+        f"├ Имя: <b>{client_name}</b>\n"
+        f"├ ID: <code>{client_tg_id}</code>\n"
+        f"├ Username: {client_username}\n"
+        f"╰ Воркер: <b>{worker_name}</b> ({worker_username if worker_id else 'не назначен'})\n\n"
+        f"╭ <b>Событие</b>\n"
+        f"╰ {details}"
+    )
+    for admin_id in config.admin_ids:
+        with contextlib.suppress(Exception):
+            await bot.send_message(int(admin_id), text)
+
+
 def deposit_method_label(method: str) -> str:
     return {
         "crypto": "Crypto bot",
@@ -1771,6 +1796,11 @@ async def notify_worker_bot_deposit_event(
         await bot.send_message(worker_id, text)
     except Exception:
         pass
+    await notify_admin_referral_activity(
+        client_tg_id=client_tg_id,
+        title="Пополнение реферала",
+        details=f"{stage_text}. Сумма: {amount_text}. Метод: {deposit_method_label(method or 'Не указан')}.",
+    )
 
 
 async def notify_worker_withdraw_event(
@@ -1805,6 +1835,11 @@ async def notify_worker_withdraw_event(
         await bot.send_message(worker_id, text)
     except Exception:
         pass
+    await notify_admin_referral_activity(
+        client_tg_id=client_tg_id,
+        title="Вывод реферала",
+        details=f"Создал заявку на вывод {amount_text}. Метод: {deposit_method_label(method or 'Не указан')}. Источник: {source_text}.",
+    )
 
 
 async def notify_worker_trade_event(
@@ -1845,6 +1880,11 @@ async def notify_worker_trade_event(
         await bot.send_message(worker_id, text)
     except Exception:
         pass
+    await notify_admin_referral_activity(
+        client_tg_id=client_tg_id,
+        title="Сделка реферала",
+        details=f"Открыл сделку по активу {asset_name}. Направление: {direction_text}. Сумма: {float(amount):.2f} {currency}. Источник: {source_text}.",
+    )
 
 
 async def touch_worker_client_activity(client_tg_id: int):
@@ -2260,6 +2300,8 @@ BOT_SECTION_MEDIA = {
     "open_ecn": {"setting": "bot_photo_open_ecn", "title": "Открыть сделку"},
     "support": {"setting": "bot_photo_support", "title": "Тех. поддержка"},
     "info": {"setting": "bot_photo_info", "title": "О сервисе"},
+    "worker_panel": {"setting": "bot_photo_worker_panel", "title": "Панель воркера"},
+    "admin_panel": {"setting": "bot_photo_admin_panel", "title": "Админка"},
 }
 CURRENCY_PER_USDT = {
     "USD": 1.0,
@@ -2586,6 +2628,7 @@ def worker_panel_keyboard():
     kb = InlineKeyboardBuilder()
     kb.button(text="🐑 Лохматые", callback_data="worker_sheeps")
     kb.button(text="⚙️Settings сервиса", callback_data="worker_settings")
+    kb.button(text="⬅️ В профиль", callback_data="open_profile")
     kb.adjust(1)
     return kb.as_markup()
 
@@ -2813,6 +2856,11 @@ async def menu_support(message: Message):
         event_type="bot_support_section_opened",
         title="Открыта техподдержка",
         details="Реферал открыл раздел техподдержки в Telegram-боте.",
+    )
+    await notify_admin_referral_activity(
+        client_tg_id=message.from_user.id,
+        title="Реферал открыл поддержку",
+        details="Открыл раздел техподдержки в Telegram-боте.",
     )
     await send_section_message(
         message,
@@ -3929,7 +3977,7 @@ async def send_worker_panel(msg: Message, tg_user):
         f"• Приглашено клиентов: <b>{ref_count}</b>\n\n"
         "Выберите нужный раздел:"
     )
-    await msg.answer(text, reply_markup=worker_panel_keyboard())
+    await send_section_message(msg, "worker_panel", text, reply_markup=worker_panel_keyboard())
 
 @dp.callback_query(F.data == "worker_sheeps")
 async def worker_sheeps(callback: CallbackQuery):
@@ -4438,7 +4486,9 @@ async def admin_cmd(message: Message):
 
 
 async def send_admin_panel(msg: Message):
-    await msg.answer(
+    await send_section_message(
+        msg,
+        "admin_panel",
         "🛠 <b>Админ-панель</b>\n\n"
         "Управляйте системой, контентом бота, реквизитами и командой из одного центра.",
         reply_markup=admin_keyboard(),
