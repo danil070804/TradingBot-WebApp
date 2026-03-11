@@ -1836,8 +1836,6 @@ bindMarketSocket();
 bindUserSocket();
 bindOpenPositionsActions();
 bindMarketMiniCharts();
-bindMarketCards();
-bindDealHistoryCards();
 hydrateInitialTradeState();
 
 const tapeWrap = document.getElementById("market-tape-list");

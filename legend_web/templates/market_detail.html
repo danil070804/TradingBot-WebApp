@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}{{ snapshot.asset_name }} | Legend Trading{% endblock %}
+{% block content %}
+<section class="card market-detail-card">
+    <div class="section-title">Обзор рынка</div>
+    <div class="detail-actions">
+        <a class="detail-link" href="{{ back_href }}">← Назад к рынкам</a>
+        <a class="detail-link" href="/trade?asset={{ snapshot.asset_name|urlencode }}">Открыть сделку</a>
+        <a class="detail-link" href="/trade/chart?symbol={{ snapshot.asset_name|urlencode }}">Открыть график</a>
+    </div>
+    <div class="detail-hero">
+        <div>
+            <strong>{{ snapshot.symbol }}</strong>
+            <small>{{ snapshot.asset_name }}</small>
+        </div>
+        <span class="detail-badge {{ 'pos' if snapshot.market_mode == 'live' else '' }}">{{ "LIVE" if snapshot.market_mode == "live" else "SYNTHETIC" }}</span>
+    </div>
+    <div class="detail-grid">
+        <div class="detail-cell">
+            <span>Mark</span>
+            <b>{{ snapshot.mark }}</b>
+        </div>
+        <div class="detail-cell">
+            <span>Spread</span>
+            <b>{{ snapshot.spread }}</b>
+        </div>
+        <div class="detail-cell">
+            <span>24H High</span>
+            <b>{{ snapshot.high }}</b>
+        </div>
+        <div class="detail-cell">
+            <span>24H Low</span>
+            <b>{{ snapshot.low }}</b>
+        </div>
+    </div>
+    <div class="detail-note">
+        {% if snapshot.tick %}
+        Последний тик: {{ snapshot.tick.side|upper }} • {{ snapshot.tick.price }} • {{ snapshot.tick.qty }}
+        {% else %}
+        Рыночные данные, depth и обзор инструмента доступны на этой странице.
+        {% endif %}
+    </div>
+    <div class="detail-book">
+        {% for item in snapshot.asks[:3] %}
+        <div class="detail-book-row ask">
+            <span>{{ item.price }}</span>
+            <b>{{ item.qty }}</b>
+        </div>
+        {% endfor %}
+        {% for item in snapshot.bids[:3] %}
+        <div class="detail-book-row bid">
+            <span>{{ item.price }}</span>
+            <b>{{ item.qty }}</b>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

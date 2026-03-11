@@ -1551,6 +1551,26 @@ async def markets(request: Request):
     )
 
 
+@app.get("/markets/{asset_name}", response_class=HTMLResponse)
+async def market_detail(request: Request, asset_name: str):
+    tg_id = await get_current_user_id(request)
+    lang, labels = await get_request_lang_labels(request, tg_id)
+    snapshot = await build_market_snapshot_payload(asset_name)
+    return templates.TemplateResponse(
+        "market_detail.html",
+        {
+            "request": request,
+            "page": "markets",
+            "title": f"{snapshot['asset_name']} | Legend Trading",
+            "snapshot": snapshot,
+            "back_href": "/markets",
+            "lang": lang,
+            "labels": labels,
+            "user": await get_nav_user(tg_id),
+        },
+    )
+
+
 @app.get("/api/markets/live", response_class=JSONResponse)
 async def api_markets_live():
     assets = await fetch_all("SELECT id, name FROM ecn_assets ORDER BY id ASC LIMIT 200")
@@ -1734,6 +1754,36 @@ async def deals(request: Request):
             "lang": lang,
             "labels": labels,
             "tape": current_tape_items(25),
+            "user": user,
+        },
+    )
+
+
+@app.get("/deals/{deal_id}", response_class=HTMLResponse)
+async def deal_detail(request: Request, deal_id: int):
+    tg_id = await get_current_user_id(request)
+    lang, labels = await get_request_lang_labels(request, tg_id)
+    user = await get_nav_user(tg_id)
+    deal = await fetch_one(
+        """
+        SELECT id, asset_name, direction, amount, currency, is_win, profit, created_at
+        FROM deals
+        WHERE id = ? AND user_tg_id = ?
+        """,
+        (deal_id, tg_id),
+    )
+    if not deal:
+        return RedirectResponse(url="/deals", status_code=302)
+    return templates.TemplateResponse(
+        "deal_detail.html",
+        {
+            "request": request,
+            "page": "deals",
+            "title": f"Deal #{deal_id} | Legend Trading",
+            "deal": deal,
+            "back_href": "/deals",
+            "lang": lang,
+            "labels": labels,
             "user": user,
         },
     )
@@ -2943,8 +2993,7 @@ async def api_market_tape():
     return JSONResponse({"ok": True, "items": current_tape_items(25)})
 
 
-@app.get("/api/market/snapshot", response_class=JSONResponse)
-async def api_market_snapshot(symbol: str = "BTC"):
+async def build_market_snapshot_payload(symbol: str = "BTC") -> dict:
     ticker = ticker_from_symbol_input(symbol)
     requested_name = (symbol or "").strip()
     requested_display_symbol = symbol_from_asset_name(requested_name)
@@ -2966,23 +3015,26 @@ async def api_market_snapshot(symbol: str = "BTC"):
         day_low = float(day_stats["low"])
     tape_head = current_tape_items(1)
     tick = tape_head[0] if tape_head else None
-    return JSONResponse(
-        {
-            "ok": True,
-            "symbol": requested_display_symbol if requested_display_symbol != "UNKN" else ticker_to_symbol(ticker),
-            "asset_name": requested_name or ticker_to_symbol(ticker),
-            "ticker": ticker,
-            "market_mode": "synthetic" if uses_legacy_market else "live",
-            "ts": int(time.time()),
-            "mark": _format_price(mark),
-            "spread": round(float(spread), 5 if mark < 1 else 2),
-            "high": _format_price(day_high),
-            "low": _format_price(day_low),
-            "asks": asks,
-            "bids": bids,
-            "tick": tick,
-        }
-    )
+    return {
+        "ok": True,
+        "symbol": requested_display_symbol if requested_display_symbol != "UNKN" else ticker_to_symbol(ticker),
+        "asset_name": requested_name or ticker_to_symbol(ticker),
+        "ticker": ticker,
+        "market_mode": "synthetic" if uses_legacy_market else "live",
+        "ts": int(time.time()),
+        "mark": _format_price(mark),
+        "spread": round(float(spread), 5 if mark < 1 else 2),
+        "high": _format_price(day_high),
+        "low": _format_price(day_low),
+        "asks": asks,
+        "bids": bids,
+        "tick": tick,
+    }
+
+
+@app.get("/api/market/snapshot", response_class=JSONResponse)
+async def api_market_snapshot(symbol: str = "BTC"):
+    return JSONResponse(await build_market_snapshot_payload(symbol))
 
 
 @app.get("/api/market/candles", response_class=JSONResponse)

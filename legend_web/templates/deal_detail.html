@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Сделка #{{ deal.id }} | Legend Trading{% endblock %}
+{% block content %}
+<section class="card market-detail-card">
+    <div class="section-title">Результат сделки</div>
+    <div class="detail-actions">
+        <a class="detail-link" href="{{ back_href }}">← Назад к сделкам</a>
+    </div>
+    <div class="detail-hero">
+        <div>
+            <strong>#{{ deal.id }}</strong>
+            <small>{{ deal.asset_name }} · {{ "UP / LONG" if deal.direction == "up" else "DOWN / SHORT" }}</small>
+        </div>
+        <span class="detail-badge {{ 'pos' if deal.is_win else 'neg' }}">{{ "PROFIT" if deal.is_win else "LOSS" }}</span>
+    </div>
+    <div class="detail-grid">
+        <div class="detail-cell">
+            <span>Amount</span>
+            <b>{{ "%.2f"|format(deal.amount) }} {{ deal.currency }}</b>
+        </div>
+        <div class="detail-cell">
+            <span>PnL</span>
+            <b class="{{ 'pos' if deal.profit >= 0 else 'neg' }}">{{ "%+.2f"|format(deal.profit) }}</b>
+        </div>
+        <div class="detail-cell">
+            <span>Opened</span>
+            <b>{{ deal.created_at }}</b>
+        </div>
+        <div class="detail-cell">
+            <span>Status</span>
+            <b>{{ "Closed in plus" if deal.is_win else "Closed in minus" }}</b>
+        </div>
+    </div>
+    <div class="detail-note">
+        {% if deal.is_win %}
+        Сделка завершилась в плюс. Финальный результат уже был зачислен на баланс.
+        {% else %}
+        Сделка завершилась в минус по итоговому движению рынка.
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

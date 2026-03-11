@@ -5,14 +5,9 @@
     <div class="section-title">{{ labels.markets_title if labels else "Рынки" }}</div>
     <div class="list">
         {% for m in markets %}
-        <button
-            type="button"
+        <a
+            href="/markets/{{ m.market_ref|urlencode }}"
             class="row markets-row market-card"
-            data-market-ref="{{ m.market_ref }}"
-            data-market-symbol="{{ m.symbol }}"
-            data-market-name="{{ m.name }}"
-            data-market-ticker="{{ m.ticker }}"
-            data-market-mode="{{ m.market_mode }}"
         >
             <div>
                 <b>{{ m.symbol }}</b>
@@ -23,12 +18,8 @@
                 <span class="m-price" data-symbol="{{ m.market_ref }}">{{ m.price }}</span>
                 <em class="m-change {{ 'pos' if m.day_change >= 0 else 'neg' }}" data-symbol="{{ m.market_ref }}">{{ "%+.2f"|format(m.day_change) }}%</em>
             </div>
-        </button>
+        </a>
         {% endfor %}
     </div>
-</section>
-<section class="card market-detail-card" id="market-detail-card" hidden>
-    <div class="section-title">Обзор рынка</div>
-    <div id="market-detail-content" class="market-detail-content"></div>
 </section>
 {% endblock %}
