@@ -45,6 +45,9 @@
     {% if user and user.is_worker %}
     <a class="qa-btn" href="/worker">{{ labels.quick_worker if labels else "Панель воркера" }}</a>
     {% endif %}
+    {% if user and user.is_admin %}
+    <a class="qa-btn" href="/admin">{{ labels.quick_admin if labels else "Админ-панель" }}</a>
+    {% endif %}
 </section>
 <section class="card">
     <div class="section-title">{{ labels.profile_recent_deposits if labels else "Последние пополнения" }}</div>

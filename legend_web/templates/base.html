@@ -38,6 +38,9 @@
         <a href="/deposit" class="{% if page == 'deposit' %}active{% endif %}">{{ labels.nav_deposit if labels else "Пополнить" }}</a>
         <a href="/deals" class="{% if page == 'deals' %}active{% endif %}">{{ labels.nav_deals if labels else "Сделки" }}</a>
         <a href="/profile" class="{% if page == 'profile' %}active{% endif %}">{{ labels.nav_profile if labels else "Профиль" }}</a>
+        {% if user and user.is_admin %}
+        <a href="/admin" class="{% if page == 'admin' %}active{% endif %}">{{ labels.nav_admin if labels else "Админка" }}</a>
+        {% endif %}
     </nav>
 </div>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>

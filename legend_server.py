@@ -95,6 +95,7 @@ WEB_I18N = {
         "nav_deposit": "Пополнить",
         "nav_deals": "Сделки",
         "nav_profile": "Профиль",
+        "nav_admin": "Админка",
         "profile_title": "Профиль аккаунта",
         "quick_trade": "Открыть сделку",
         "quick_deposit": "Пополнить",
@@ -102,6 +103,7 @@ WEB_I18N = {
         "quick_profile": "Полный профиль",
         "quick_verify": "Пройти верификацию",
         "quick_worker": "Панель воркера",
+        "quick_admin": "Админ-панель",
         "live_tape": "Лента рынка (live)",
         "home_balance": "Общий баланс",
         "home_success": "Успешные",
@@ -193,6 +195,7 @@ WEB_I18N = {
         "nav_deposit": "Deposit",
         "nav_deals": "Deals",
         "nav_profile": "Profile",
+        "nav_admin": "Admin",
         "profile_title": "Account Profile",
         "quick_trade": "Open Trade",
         "quick_deposit": "Deposit",
@@ -200,6 +203,7 @@ WEB_I18N = {
         "quick_profile": "Full Profile",
         "quick_verify": "Verify Account",
         "quick_worker": "Worker Panel",
+        "quick_admin": "Admin Panel",
         "live_tape": "Market Tape (live)",
         "home_balance": "Total Balance",
         "home_success": "Wins",
@@ -291,6 +295,7 @@ WEB_I18N = {
         "nav_deposit": "Поповнити",
         "nav_deals": "Угоди",
         "nav_profile": "Профіль",
+        "nav_admin": "Адмінка",
         "profile_title": "Профіль акаунта",
         "quick_trade": "Відкрити угоду",
         "quick_deposit": "Поповнити",
@@ -298,6 +303,7 @@ WEB_I18N = {
         "quick_profile": "Повний профіль",
         "quick_verify": "Пройти верифікацію",
         "quick_worker": "Панель воркера",
+        "quick_admin": "Адмін-панель",
         "live_tape": "Стрічка ринку (live)",
         "home_balance": "Загальний баланс",
         "home_success": "Успішні",
@@ -501,6 +507,15 @@ async def get_current_user_id(request: Request) -> int:
     if from_session:
         return int(from_session)
     return await get_or_pick_user_id()
+
+
+async def get_nav_user(tg_id: int):
+    if not tg_id:
+        return None
+    return await fetch_one(
+        "SELECT tg_id, first_name, username, language, currency, balance, is_admin, is_worker, created_at FROM users WHERE tg_id = ?",
+        (tg_id,),
+    )
 
 
 def deposit_method_label(method: str) -> str:
@@ -1472,7 +1487,7 @@ async def api_set_lang(payload: SetLangPayload, request: Request):
 async def home(request: Request):
     tg_id = await get_current_user_id(request)
     lang, labels = await get_request_lang_labels(request, tg_id)
-    user = await fetch_one("SELECT * FROM users WHERE tg_id = ?", (tg_id,))
+    user = await get_nav_user(tg_id)
     deals = await fetch_all(
         "SELECT id, asset_name, direction, amount, currency, is_win, profit, created_at FROM deals WHERE user_tg_id = ? ORDER BY id DESC LIMIT 5",
         (tg_id,),
@@ -1505,7 +1520,15 @@ async def markets(request: Request):
     assets = await fetch_all("SELECT id, name FROM ecn_assets ORDER BY id ASC")
     return templates.TemplateResponse(
         "markets.html",
-        {"request": request, "page": "markets", "title": "Legend Trading", "markets": await generate_market_rows(assets), "lang": lang, "labels": labels},
+        {
+            "request": request,
+            "page": "markets",
+            "title": "Legend Trading",
+            "markets": await generate_market_rows(assets),
+            "lang": lang,
+            "labels": labels,
+            "user": await get_nav_user(tg_id),
+        },
     )
 
 
@@ -1522,7 +1545,7 @@ async def trade(request: Request):
     lang, labels = await get_request_lang_labels(request, tg_id)
     raw_assets = await fetch_all("SELECT id, name FROM ecn_assets ORDER BY id ASC")
     assets = [{"id": a["id"], "name": a["name"], "ticker": ticker_from_asset_name(a["name"])} for a in raw_assets]
-    user = await fetch_one("SELECT balance, currency FROM users WHERE tg_id = ?", (tg_id,))
+    user = await get_nav_user(tg_id)
     return templates.TemplateResponse(
         "trade.html",
         {
@@ -1556,6 +1579,7 @@ async def trade_chart(request: Request):
             "tg_id": tg_id,
             "assets": assets,
             "selected_symbol": selected,
+            "user": await get_nav_user(tg_id),
             "lang": lang,
             "labels": labels,
         },
@@ -1566,7 +1590,7 @@ async def trade_chart(request: Request):
 async def exchange(request: Request):
     tg_id = await get_current_user_id(request)
     lang, labels = await get_request_lang_labels(request, tg_id)
-    user = await fetch_one("SELECT balance, currency FROM users WHERE tg_id = ?", (tg_id,))
+    user = await get_nav_user(tg_id)
     return templates.TemplateResponse(
         "exchange.html",
         {"request": request, "page": "exchange", "title": "Legend Trading", "tg_id": tg_id, "user": user, "lang": lang, "labels": labels},
@@ -1577,7 +1601,7 @@ async def exchange(request: Request):
 async def deposit_page(request: Request):
     tg_id = await get_current_user_id(request)
     lang, labels = await get_request_lang_labels(request, tg_id)
-    user = await fetch_one("SELECT balance, currency FROM users WHERE tg_id = ?", (tg_id,))
+    user = await get_nav_user(tg_id)
     return templates.TemplateResponse(
         "deposit.html",
         {
@@ -1641,13 +1665,24 @@ async def deposit_support_redirect(
 async def deals(request: Request):
     tg_id = await get_current_user_id(request)
     lang, labels = await get_request_lang_labels(request, tg_id)
+    user = await get_nav_user(tg_id)
     rows = await fetch_all(
         "SELECT id, asset_name, direction, amount, currency, is_win, profit, created_at FROM deals WHERE user_tg_id = ? ORDER BY id DESC LIMIT 200",
         (tg_id,),
     )
     return templates.TemplateResponse(
         "deals.html",
-        {"request": request, "page": "deals", "title": "Legend Trading", "deals": rows, "tg_id": tg_id, "lang": lang, "labels": labels, "tape": current_tape_items(25)},
+        {
+            "request": request,
+            "page": "deals",
+            "title": "Legend Trading",
+            "deals": rows,
+            "tg_id": tg_id,
+            "lang": lang,
+            "labels": labels,
+            "tape": current_tape_items(25),
+            "user": user,
+        },
     )
 
 
@@ -1660,10 +1695,7 @@ async def profile_page(request: Request):
             "profile.html",
             {"request": request, "page": "profile", "title": "Legend Trading", "user": None, "stats": {"total": 0, "wins": 0, "losses": 0, "total_profit": 0.0}, "pending": 0.0, "tg_id": 0, "withdrawals": [], "deposits": [], "lang": lang, "labels": labels},
         )
-    user = await fetch_one(
-        "SELECT tg_id, first_name, username, language, currency, balance, is_worker, created_at FROM users WHERE tg_id = ?",
-        (tg_id,),
-    )
+    user = await get_nav_user(tg_id)
     stats = await bot.get_user_deal_stats(tg_id) if tg_id else {"wins": 0, "losses": 0, "total": 0, "total_profit": 0.0}
     pending = await bot.get_user_pending_withdraw_sum(tg_id) if tg_id else 0.0
     withdrawals = await fetch_all(
