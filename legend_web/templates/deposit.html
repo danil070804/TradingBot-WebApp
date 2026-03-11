@@ -24,21 +24,6 @@
         </label>
         <button class="submit" type="submit">{{ labels.deposit_continue if labels else "Продолжить" }}</button>
     </form>
-
-    <div class="deposit-methods">
-        <div class="method-card" data-method-card="crypto">
-            <b>Crypto bot</b>
-            <small>Быстрое пополнение через криптовалюту с подтверждением в поддержке.</small>
-        </div>
-        <div class="method-card" data-method-card="trc20">
-            <b>TRC20 USDT</b>
-            <small>После выбора метода поддержка отправит актуальный адрес и проверит перевод.</small>
-        </div>
-        <div class="method-card" data-method-card="card">
-            <b>{{ labels.pay_card if labels else "Банковская карта" }}</b>
-            <small>Пополнение картой оформляется только через поддержку, без показа реквизитов на экране.</small>
-        </div>
-    </div>
     <div class="support-banner">
         <div>
             <b>Пополнение через поддержку</b>
