@@ -2345,6 +2345,28 @@ def deposit_support_keyboard(lang: str = "ru"):
     return kb.as_markup()
 
 
+def support_reply_hint_keyboard(lang: str = "ru"):
+    kb = InlineKeyboardBuilder()
+    kb.button(
+        text=tr(
+            lang,
+            "✍️ Ответить поддержке",
+            "✍️ Reply to support",
+            "✍️ Відповісти підтримці",
+        ),
+        callback_data="support_reply_hint",
+    )
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def support_worker_reply_keyboard(client_id: int):
+    kb = InlineKeyboardBuilder()
+    kb.button(text="✍️ Ответить клиенту", callback_data=f"support_reply_start:{client_id}")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
 def card_payment_keyboard():
     kb = InlineKeyboardBuilder()
     if config.card_pay_url:
@@ -4760,7 +4782,8 @@ async def wc_chat_start(callback: CallbackQuery):
     try:
         await bot.send_message(
             client_id,
-            "💬 С вами связалась техническая поддержка. Можете писать свои вопросы в этот чат.",
+            "💬 С вами связалась техническая поддержка.\n\nНажмите кнопку ниже и напишите свой вопрос в этот чат.",
+            reply_markup=support_reply_hint_keyboard("ru"),
         )
     except Exception:
         pass
@@ -4791,6 +4814,56 @@ async def wc_chat_stop(callback: CallbackQuery):
         pass
     await callback.answer()
 
+
+@dp.callback_query(F.data == "support_reply_hint")
+async def support_reply_hint(callback: CallbackQuery):
+    await callback.answer("Напишите сообщение прямо в этот чат. Оно уйдёт технической поддержке.", show_alert=True)
+
+
+@dp.callback_query(F.data.startswith("support_reply_start:"))
+async def support_reply_start(callback: CallbackQuery):
+    client_id = int(callback.data.split(":", 1)[1])
+    actor_id = callback.from_user.id
+    actor = await get_user_by_tg_id(actor_id)
+    if not actor or (not bool(actor["is_worker"]) and not is_admin_id(actor_id)):
+        await callback.answer("⛔ Нет доступа.", show_alert=True)
+        return
+
+    worker_id = actor_id
+    ACTIVE_DIALOGS_CLIENT[client_id] = worker_id
+    ACTIVE_DIALOGS_WORKER[worker_id] = client_id
+
+    ticket = await get_latest_open_support_ticket(client_id)
+    if ticket:
+        await update_support_ticket_status(
+            int(ticket["id"]),
+            "in_progress",
+            assigned_to=str(worker_id),
+            last_message="Диалог продолжен через кнопку ответа в Telegram-боте",
+        )
+    else:
+        await create_support_ticket(
+            client_tg_id=client_id,
+            worker_tg_id=worker_id,
+            source="bot",
+            topic="general",
+            subject="Диалог с поддержкой",
+            status="in_progress",
+            last_message="Диалог начат через кнопку ответа в Telegram-боте",
+        )
+
+    with contextlib.suppress(Exception):
+        await bot.send_message(
+            client_id,
+            "💬 Техническая поддержка снова на связи.\n\nНажмите кнопку ниже и напишите сообщение в этот чат.",
+            reply_markup=support_reply_hint_keyboard("ru"),
+        )
+
+    await callback.message.answer(
+        f"💬 Режим ответа клиенту <code>{client_id}</code> активирован.\nНапишите следующее сообщение в этот чат, и оно уйдёт клиенту."
+    )
+    await callback.answer("Режим ответа активирован")
+
 # ---------- DIALOG ROUTER (must be last message handler) ----------
 
 @dp.message()
@@ -4802,6 +4875,7 @@ async def dialog_router(message: Message):
             await bot.send_message(
                 worker_id,
                 f"💬 Сообщение от клиента <code>{user_id}</code>:\n{message.text}",
+                reply_markup=support_worker_reply_keyboard(user_id),
             )
         except Exception:
             pass
