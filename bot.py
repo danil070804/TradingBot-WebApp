@@ -2136,9 +2136,9 @@ DEFAULT_MIN_DEPOSIT_USDT = 10.0
 LEGACY_DEFAULT_MIN_TRADE_AMOUNT = 100.0
 BOT_SECTION_MEDIA = {
     "portfolio": {"setting": "bot_photo_portfolio", "title": "Портфель"},
-    "open_ecn": {"setting": "bot_photo_open_ecn", "title": "Открыть ECN"},
+    "open_ecn": {"setting": "bot_photo_open_ecn", "title": "Открыть сделку"},
     "support": {"setting": "bot_photo_support", "title": "Тех. поддержка"},
-    "info": {"setting": "bot_photo_info", "title": "Инфо"},
+    "info": {"setting": "bot_photo_info", "title": "О сервисе"},
 }
 CURRENCY_PER_USDT = {
     "USD": 1.0,
