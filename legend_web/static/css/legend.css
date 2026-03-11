@@ -787,6 +787,38 @@ select, input {
     background: rgba(255, 239, 243, 0.96);
 }
 
+.worker-event-row {
+    align-items: start;
+    gap: 12px;
+}
+
+.worker-event-main {
+    display: grid;
+    gap: 4px;
+    flex: 1;
+}
+
+.worker-event-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.worker-event-time {
+    color: #7c96ac;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.worker-event-amount {
+    font-family: "Oxanium", monospace;
+    font-size: 13px;
+    font-weight: 700;
+    color: #2f7db0;
+    white-space: nowrap;
+}
+
 .position-row .chip {
     min-width: 110px;
 }
@@ -884,6 +916,10 @@ select, input {
         width: 100%;
     }
     .worker-head {
+        align-items: start;
+        flex-direction: column;
+    }
+    .worker-event-top {
         align-items: start;
         flex-direction: column;
     }

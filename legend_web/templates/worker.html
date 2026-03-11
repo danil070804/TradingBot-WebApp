@@ -44,4 +44,27 @@
         {% endfor %}
     </div>
 </section>
+
+<section class="card">
+    <div class="section-title">Последние события рефералов</div>
+    <div class="list">
+        {% for item in activity %}
+        <div class="row worker-event-row">
+            <div class="worker-event-main">
+                <div class="worker-event-top">
+                    <b>{{ item.title }}</b>
+                    <span class="worker-event-time">{{ item.created_at }}</span>
+                </div>
+                <small>{{ item.first_name if item.first_name else "Пользователь" }} · ID {{ item.client_tg_id }} · @{{ item.username if item.username else "-" }}</small>
+                <small>{{ item.details if item.details else "Без деталей" }}</small>
+            </div>
+            {% if item.amount is not none %}
+            <div class="worker-event-amount">{{ "%.2f"|format((item.amount or 0)) }} {{ item.currency if item.currency else "" }}</div>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="empty">Событий пока нет.</div>
+        {% endfor %}
+    </div>
+</section>
 {% endblock %}

@@ -1,4 +1,5 @@
 import os
+import json
 from dataclasses import dataclass
 from typing import Optional
 
@@ -481,6 +482,38 @@ async def init_db():
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP
             )"""
     )
+    activity_log_ddl = (
+        """CREATE TABLE IF NOT EXISTS activity_log(
+                id BIGSERIAL PRIMARY KEY,
+                worker_tg_id BIGINT,
+                client_tg_id BIGINT,
+                actor_tg_id BIGINT,
+                actor_source TEXT,
+                event_type TEXT,
+                title TEXT,
+                details TEXT,
+                amount DOUBLE PRECISION,
+                currency TEXT,
+                meta_json TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )"""
+        if is_pg
+        else
+        """CREATE TABLE IF NOT EXISTS activity_log(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                worker_tg_id INTEGER,
+                client_tg_id INTEGER,
+                actor_tg_id INTEGER,
+                actor_source TEXT,
+                event_type TEXT,
+                title TEXT,
+                details TEXT,
+                amount REAL,
+                currency TEXT,
+                meta_json TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )"""
+    )
 
     async with aiosqlite.connect(DB_PATH) as db:
         if not is_pg:
@@ -515,6 +548,7 @@ async def init_db():
         await db.execute(ecn_assets_ddl)
 
         await db.execute(deals_ddl)
+        await db.execute(activity_log_ddl)
 
         # Расширяем список активов ECN (insert-ignore для уже существующих)
         default_assets = [
@@ -739,6 +773,57 @@ async def create_deposit_request(user_tg_id: int, amount: float, currency: str, 
         )
         await db.commit()
         return cur.lastrowid
+
+
+async def create_activity_event(
+    worker_tg_id: int | None,
+    client_tg_id: int | None,
+    actor_tg_id: int | None,
+    actor_source: str,
+    event_type: str,
+    title: str,
+    details: str = "",
+    amount: float | None = None,
+    currency: str | None = None,
+    meta: dict | None = None,
+) -> int:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "INSERT INTO activity_log(worker_tg_id, client_tg_id, actor_tg_id, actor_source, event_type, title, details, amount, currency, meta_json) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                worker_tg_id,
+                client_tg_id,
+                actor_tg_id,
+                actor_source,
+                event_type,
+                title,
+                details,
+                amount,
+                currency,
+                json.dumps(meta or {}, ensure_ascii=True),
+            ),
+        )
+        await db.commit()
+        return int(cur.lastrowid)
+
+
+async def get_worker_activity_events(worker_tg_id: int, limit: int = 30):
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            """
+            SELECT al.id, al.client_tg_id, al.actor_tg_id, al.actor_source, al.event_type, al.title, al.details,
+                   al.amount, al.currency, al.created_at, u.first_name, u.username
+            FROM activity_log al
+            LEFT JOIN users u ON u.tg_id = al.client_tg_id
+            WHERE al.worker_tg_id = ?
+            ORDER BY al.id DESC
+            LIMIT ?
+            """,
+            (worker_tg_id, limit),
+        )
+        return await cur.fetchall()
 
 
 async def get_deposit_request(dep_id: int) -> Optional[aiosqlite.Row]:

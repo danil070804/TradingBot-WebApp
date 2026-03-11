@@ -530,6 +530,18 @@ async def notify_worker_deposit_event(
         f"Статус: <b>{stage_text}</b>"
         f"{deposit_line}"
     )
+    await bot.create_activity_event(
+        worker_tg_id=worker_id,
+        client_tg_id=client_tg_id,
+        actor_tg_id=client_tg_id,
+        actor_source="web",
+        event_type=f"deposit_{stage}",
+        title="Пополнение",
+        details=f"{stage_text}. Метод: {deposit_method_label(method or 'Не указан')}.",
+        amount=amount,
+        currency=currency or "USD",
+        meta={"stage": stage, "deposit_id": deposit_id, "method": method},
+    )
     try:
         await bot.bot.send_message(worker_id, text)
     except Exception:
@@ -545,6 +557,33 @@ def build_support_redirect_url(amount: float | None = None, method: str | None =
     if deposit_id is not None:
         params["deposit_id"] = str(int(deposit_id))
     return f"/deposit/support?{urlencode(params)}" if params else "/deposit/support"
+
+
+async def log_web_activity_for_worker(
+    client_tg_id: int,
+    actor_tg_id: int | None,
+    event_type: str,
+    title: str,
+    details: str = "",
+    amount: float | None = None,
+    currency: str | None = None,
+    meta: dict | None = None,
+):
+    worker_id = await bot.get_worker_for_client(client_tg_id)
+    if not worker_id:
+        return
+    await bot.create_activity_event(
+        worker_tg_id=worker_id,
+        client_tg_id=client_tg_id,
+        actor_tg_id=actor_tg_id,
+        actor_source="web",
+        event_type=event_type,
+        title=title,
+        details=details,
+        amount=amount,
+        currency=currency,
+        meta=meta,
+    )
 
 
 def normalize_lang_code(lang: str | None) -> str:
@@ -1310,6 +1349,7 @@ async def worker_page(request: Request):
         """,
         (tg_id,),
     )
+    activity = await bot.get_worker_activity_events(tg_id, 24)
     return templates.TemplateResponse(
         "worker.html",
         {
@@ -1320,6 +1360,7 @@ async def worker_page(request: Request):
             "labels": labels,
             "worker_id": tg_id,
             "clients": rows,
+            "activity": activity,
         },
     )
 
@@ -1368,38 +1409,77 @@ async def api_worker_client_update(payload: WorkerClientUpdatePayload, request: 
         return JSONResponse({"ok": False, "error": "Client not found"}, status_code=404)
 
     action = payload.action.strip().lower()
+    activity_title = "Изменение реферала"
+    activity_details = ""
+    activity_amount = None
     if action == "toggle_verified":
-        await bot.update_worker_client_field(payload.wc_id, "verified", 0 if wc["verified"] else 1)
+        new_val = 0 if wc["verified"] else 1
+        await bot.update_worker_client_field(payload.wc_id, "verified", new_val)
+        activity_title = "KYC реферала"
+        activity_details = "Верификация включена" if new_val else "Верификация отключена"
     elif action == "toggle_withdraw":
-        await bot.update_worker_client_field(payload.wc_id, "withdraw_enabled", 0 if wc["withdraw_enabled"] else 1)
+        new_val = 0 if wc["withdraw_enabled"] else 1
+        await bot.update_worker_client_field(payload.wc_id, "withdraw_enabled", new_val)
+        activity_title = "Вывод реферала"
+        activity_details = "Вывод разрешён" if new_val else "Вывод отключён"
     elif action == "toggle_trade":
-        await bot.update_worker_client_field(payload.wc_id, "trading_enabled", 0 if wc["trading_enabled"] else 1)
+        new_val = 0 if wc["trading_enabled"] else 1
+        await bot.update_worker_client_field(payload.wc_id, "trading_enabled", new_val)
+        activity_title = "Торговля реферала"
+        activity_details = "Торговля разрешена" if new_val else "Торговля отключена"
     elif action == "toggle_favorite":
-        await bot.update_worker_client_field(payload.wc_id, "favorite", 0 if wc["favorite"] else 1)
+        new_val = 0 if wc["favorite"] else 1
+        await bot.update_worker_client_field(payload.wc_id, "favorite", new_val)
+        activity_title = "Избранное"
+        activity_details = "Реферал добавлен в избранное" if new_val else "Реферал убран из избранного"
     elif action == "toggle_block":
-        await bot.update_worker_client_field(payload.wc_id, "blocked", 0 if wc["blocked"] else 1)
+        new_val = 0 if wc["blocked"] else 1
+        await bot.update_worker_client_field(payload.wc_id, "blocked", new_val)
+        activity_title = "Блокировка реферала"
+        activity_details = "Реферал заблокирован" if new_val else "Реферал разблокирован"
     elif action == "set_min_deposit":
         val = float(payload.value or 0)
         if val < 0:
             return JSONResponse({"ok": False, "error": "Value must be >= 0"}, status_code=400)
         await bot.update_worker_client_field(payload.wc_id, "min_deposit", val)
+        activity_title = "Мин. депозит"
+        activity_details = f"Установлен минимальный депозит {val:.2f}"
+        activity_amount = val
     elif action == "set_min_withdraw":
         val = float(payload.value or 0)
         if val < 0:
             return JSONResponse({"ok": False, "error": "Value must be >= 0"}, status_code=400)
         await bot.update_worker_client_field(payload.wc_id, "min_withdraw", val)
+        activity_title = "Мин. вывод"
+        activity_details = f"Установлен минимальный вывод {val:.2f}"
+        activity_amount = val
     elif action == "set_luck":
         val = float(payload.value or 0)
         if val < 0 or val > 100:
             return JSONResponse({"ok": False, "error": "Luck must be in 0..100"}, status_code=400)
         await bot.set_client_luck(tg_id, int(wc["client_tg_id"]), val)
+        activity_title = "Удача реферала"
+        activity_details = f"Значение удачи изменено на {val:.2f}%"
     elif action == "add_balance":
         val = float(payload.value or 0)
         if val <= 0:
             return JSONResponse({"ok": False, "error": "Amount must be > 0"}, status_code=400)
         await bot.change_balance(int(wc["client_tg_id"]), val)
+        activity_title = "Пополнение баланса"
+        activity_details = f"Воркер добавил баланс {val:.2f}"
+        activity_amount = val
     else:
         return JSONResponse({"ok": False, "error": "Unsupported action"}, status_code=400)
+
+    await log_web_activity_for_worker(
+        client_tg_id=int(wc["client_tg_id"]),
+        actor_tg_id=tg_id,
+        event_type=f"worker_{action}",
+        title=activity_title,
+        details=activity_details,
+        amount=activity_amount,
+        meta={"action": action, "wc_id": int(payload.wc_id)},
+    )
 
     return JSONResponse({"ok": True})
 
@@ -1582,6 +1662,16 @@ async def api_trade_open(
         "risk_percent": risk_percent,
         "close_reason": "time",
     }
+    await log_web_activity_for_worker(
+        client_tg_id=tg_id,
+        actor_tg_id=tg_id,
+        event_type="trade_opened",
+        title="Открыта сделка",
+        details=f"{'ЛОНГ' if direction == 'up' else 'ШОРТ'} по {asset_name}, плечо {int(leverage)}x, экспирация {int(seconds)}с",
+        amount=amount,
+        currency=currency,
+        meta={"asset_name": asset_name, "direction": direction, "leverage": int(leverage), "seconds": int(seconds), "trade_id": trade_id},
+    )
     return JSONResponse(
         {
             "ok": True,
@@ -1649,6 +1739,16 @@ async def api_exchange(
         return JSONResponse({"ok": False, "error": "Сумма должна быть больше 0"}, status_code=400)
     rate = random.uniform(0.8, 1.2)
     received = round(amount * rate, 4)
+    await log_web_activity_for_worker(
+        client_tg_id=tg_id,
+        actor_tg_id=tg_id,
+        event_type="exchange_created",
+        title="Обмен валют",
+        details=f"Обмен {from_currency} -> {to_currency} по курсу {round(rate, 4)}",
+        amount=amount,
+        currency=from_currency,
+        meta={"from": from_currency, "to": to_currency, "received": received, "rate": round(rate, 4)},
+    )
     return JSONResponse({"ok": True, "rate": round(rate, 4), "received": received, "tg_id": tg_id, "from": from_currency, "to": to_currency})
 
 
@@ -1695,6 +1795,16 @@ async def api_trade_close(payload: TradeClosePayload):
     closed = await settle_web_trade(payload.trade_id)
     if not closed:
         return JSONResponse({"ok": False, "error": "Trade not found"}, status_code=404)
+    await log_web_activity_for_worker(
+        client_tg_id=int(tr["tg_id"]),
+        actor_tg_id=int(tr["tg_id"]),
+        event_type="trade_closed_manual",
+        title="Сделка закрыта",
+        details=f"Ручное закрытие {tr['asset_name']}, результат {float(closed['profit']):+.2f}",
+        amount=float(closed["profit"]),
+        currency=tr.get("currency", "USD"),
+        meta={"trade_id": payload.trade_id, "asset_name": tr["asset_name"], "direction": tr["direction"], "reason": "manual"},
+    )
     return JSONResponse(
         {
             "ok": True,
