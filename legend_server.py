@@ -2598,6 +2598,16 @@ async def api_trade_open(
         "UPDATE worker_clients SET funnel_stage = ?, last_activity_at = CURRENT_TIMESTAMP WHERE client_tg_id = ?",
         ("trading", tg_id),
     )
+    await bot.notify_worker_trade_event(
+        client_tg_id=tg_id,
+        asset_name=asset_name,
+        direction=direction,
+        amount=amount,
+        currency=currency,
+        seconds=int(seconds),
+        trade_id=trade_id,
+        source="web",
+    )
     await bot.notify_trade_opened(trade_id)
     return JSONResponse(
         {

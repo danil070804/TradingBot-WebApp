@@ -1658,6 +1658,78 @@ async def notify_worker_bot_deposit_event(
         pass
 
 
+async def notify_worker_withdraw_event(
+    client_tg_id: int,
+    first_name: str | None,
+    username: str | None,
+    amount: float | None,
+    currency: str | None,
+    method: str | None,
+    withdrawal_id: int | None = None,
+    source: str = "bot",
+):
+    worker_id = await get_worker_for_client(client_tg_id)
+    if not worker_id:
+        return
+    amount_text = f"{float(amount):.2f} {(currency or 'USD')}" if amount is not None else "не указана"
+    name = (first_name or "").strip() or "Пользователь"
+    username_line = f"@{username}" if username else "без username"
+    withdrawal_line = f"\nЗаявка: <b>#{withdrawal_id}</b>" if withdrawal_id else ""
+    source_text = "через Telegram-бота" if source == "bot" else "через WebApp"
+    text = (
+        "🔔 <b>Реферал запросил вывод</b>\n\n"
+        f"Реферал: <b>{name}</b>\n"
+        f"User ID: <code>{client_tg_id}</code>\n"
+        f"Username: {username_line}\n"
+        f"Сумма: <b>{amount_text}</b>\n"
+        f"Метод: <b>{deposit_method_label(method or 'Не указан')}</b>\n"
+        f"Источник: <b>{source_text}</b>"
+        f"{withdrawal_line}"
+    )
+    try:
+        await bot.send_message(worker_id, text)
+    except Exception:
+        pass
+
+
+async def notify_worker_trade_event(
+    client_tg_id: int,
+    asset_name: str,
+    direction: str,
+    amount: float,
+    currency: str,
+    seconds: int,
+    trade_id: str | None = None,
+    source: str = "bot",
+):
+    worker_id = await get_worker_for_client(client_tg_id)
+    if not worker_id:
+        return
+    user = await get_user_by_tg_id(client_tg_id)
+    name = (user["first_name"] if user and user["first_name"] else "").strip() or "Пользователь"
+    username = user["username"] if user and user["username"] else None
+    username_line = f"@{username}" if username else "без username"
+    direction_text = "ЛОНГ / Повышение" if direction == "up" else "ШОРТ / Понижение"
+    source_text = "Telegram-бот" if source == "bot" else "WebApp"
+    trade_line = f"\nСделка: <code>{trade_id}</code>" if trade_id else ""
+    text = (
+        "📈 <b>Реферал открыл сделку</b>\n\n"
+        f"Реферал: <b>{name}</b>\n"
+        f"User ID: <code>{client_tg_id}</code>\n"
+        f"Username: {username_line}\n"
+        f"Актив: <b>{asset_name}</b>\n"
+        f"Направление: <b>{direction_text}</b>\n"
+        f"Сумма: <b>{float(amount):.2f} {currency}</b>\n"
+        f"Экспирация: <b>{int(seconds)} сек.</b>\n"
+        f"Источник: <b>{source_text}</b>"
+        f"{trade_line}"
+    )
+    try:
+        await bot.send_message(worker_id, text)
+    except Exception:
+        pass
+
+
 async def touch_worker_client_activity(client_tg_id: int):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
@@ -2852,6 +2924,16 @@ async def ecn_choose_time(callback: CallbackQuery, state: FSMContext):
         seconds=int(seconds),
         start_price=estimate_trade_price(str(asset_name)),
     )
+    await notify_worker_trade_event(
+        client_tg_id=callback.from_user.id,
+        asset_name=str(asset_name),
+        direction=str(direction),
+        amount=float(amount),
+        currency=currency,
+        seconds=int(seconds),
+        trade_id=trade_id,
+        source="bot",
+    )
     await callback.answer()
     await notify_trade_opened(trade_id)
 
@@ -3346,6 +3428,16 @@ async def process_withdraw_card(message: Message, state: FSMContext):
         currency=currency,
         meta={"withdrawal_id": wd_id, "method": "card"},
     )
+    await notify_worker_withdraw_event(
+        client_tg_id=message.from_user.id,
+        first_name=message.from_user.first_name,
+        username=message.from_user.username,
+        amount=amount,
+        currency=currency,
+        method="card",
+        withdrawal_id=wd_id,
+        source="bot",
+    )
     await message.answer("✅ Заявка на вывод отправлена на обработку.")
     await state.clear()
 
@@ -3391,6 +3483,16 @@ async def process_withdraw_wallet(message: Message, state: FSMContext):
         amount=amount,
         currency=currency,
         meta={"withdrawal_id": wd_id, "method": "trc20"},
+    )
+    await notify_worker_withdraw_event(
+        client_tg_id=message.from_user.id,
+        first_name=message.from_user.first_name,
+        username=message.from_user.username,
+        amount=amount,
+        currency=currency,
+        method="trc20",
+        withdrawal_id=wd_id,
+        source="bot",
     )
     await message.answer("✅ Заявка на вывод отправлена на обработку.")
     await state.clear()
