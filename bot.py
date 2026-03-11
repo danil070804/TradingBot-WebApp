@@ -1566,12 +1566,12 @@ def worker_sheeps_keyboard(wc_rows):
 
 def worker_client_profile_keyboard(wc_id: int, flags: dict, balance: float, currency: str, min_dep: float, min_wd: float):
     kb = InlineKeyboardBuilder()
-    kb.button(text="💰 Adj. balance", callback_data=f"wc_adj_balance:{wc_id}")
-    kb.button(text="☘️Удача", callback_data=f"wc_luck:{wc_id}")
-    kb.button(text="📨 Min. deposit", callback_data=f"wc_min_dep:{wc_id}")
-    kb.button(text="📨 Min. withdraw", callback_data=f"wc_min_wd:{wc_id}")
+    kb.button(text="💰 Баланс", callback_data=f"wc_adj_balance:{wc_id}")
+    kb.button(text="☘️ Удача", callback_data=f"wc_luck:{wc_id}")
+    kb.button(text="📥 Мин. депозит", callback_data=f"wc_min_dep:{wc_id}")
+    kb.button(text="📤 Мин. вывод", callback_data=f"wc_min_wd:{wc_id}")
     kb.button(text=("✅ Вериф" if not flags["verified"] else "❌ Вериф"), callback_data=f"wc_toggle_verif:{wc_id}")
-    kb.button(text=("✅ Withdraw" if not flags["withdraw_enabled"] else "❌ Withdraw"), callback_data=f"wc_toggle_withdraw:{wc_id}")
+    kb.button(text=("✅ Вывод" if not flags["withdraw_enabled"] else "❌ Вывод"), callback_data=f"wc_toggle_withdraw:{wc_id}")
     kb.button(text=("✅ Покупка" if not flags["trading_enabled"] else "❌ Покупка"), callback_data=f"wc_toggle_trade:{wc_id}")
     kb.button(text=("⭐ В избранное" if not flags["favorite"] else "⭐ Убрать из избранного"), callback_data=f"wc_toggle_fav:{wc_id}")
     kb.button(text="📤 Передать лохматого", callback_data=f"wc_transfer:{wc_id}")
@@ -1581,7 +1581,7 @@ def worker_client_profile_keyboard(wc_id: int, flags: dict, balance: float, curr
     )
     kb.button(text="💬 Начать диалог", callback_data=f"wc_chat_start:{wc_id}")
     kb.button(text="⬅ Назад", callback_data="worker_sheeps")
-    kb.adjust(1)
+    kb.adjust(2, 2, 2, 2, 2, 1, 1)
     return kb.as_markup()
 
 def is_admin_id(user_id: int) -> bool:
