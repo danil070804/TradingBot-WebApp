@@ -481,6 +481,8 @@ async def get_settings_map() -> dict:
     data.setdefault("card_requisites", bot.config.card_requisites or "")
     data.setdefault("support_url", bot.config.support_url or "")
     data.setdefault("webapp_url", bot.config.webapp_url or "")
+    data.setdefault("global_min_deposit_usdt", str(bot.DEFAULT_MIN_DEPOSIT_USDT))
+    data.setdefault("global_min_trade_usdt", str(bot.DEFAULT_MIN_TRADE_USDT))
     return data
 
 
@@ -2190,6 +2192,8 @@ async def admin_update_setting(payload: AdminSettingPayload, request: Request):
         "card_requisites",
         "support_url",
         "webapp_url",
+        "global_min_deposit_usdt",
+        "global_min_trade_usdt",
     }
     key = payload.key.strip()
     if key not in allowed_keys:
@@ -2492,16 +2496,20 @@ async def api_trade_open(
     balance = float(user["balance"] or 0.0)
     currency = user["currency"] or "USD"
     wc_cfg = await fetch_one(
-        "SELECT min_trade_amount, auto_reject_trades FROM worker_clients WHERE client_tg_id = ? ORDER BY id DESC LIMIT 1",
+        "SELECT min_trade_amount, auto_reject_trades, trading_enabled, blocked FROM worker_clients WHERE client_tg_id = ? ORDER BY id DESC LIMIT 1",
         (tg_id,),
     )
-    min_trade_amount = float(wc_cfg["min_trade_amount"] or 100) if wc_cfg else 100.0
+    min_trade_amount = await bot.get_effective_min_trade_amount(tg_id, currency)
     auto_reject_trades = bool(wc_cfg["auto_reject_trades"]) if wc_cfg else False
 
     risk_percent = float(payload.risk_percent or 0.0)
     if risk_percent > 0:
         amount = round(balance * (risk_percent / 100.0), 2)
 
+    if wc_cfg and bool(wc_cfg["blocked"]):
+        return JSONResponse({"ok": False, "error": "Аккаунт заблокирован для торговли"}, status_code=403)
+    if wc_cfg and not bool(wc_cfg["trading_enabled"]):
+        return JSONResponse({"ok": False, "error": "Торговля для аккаунта отключена"}, status_code=403)
     if amount < min_trade_amount:
         return JSONResponse({"ok": False, "error": f"Минимальная сумма сделки: {min_trade_amount:.2f}"}, status_code=400)
     if auto_reject_trades:
@@ -2531,26 +2539,21 @@ async def api_trade_open(
         else:
             sl_price = start_price * (1 + sl_percent / 100.0)
     now_ts = time.time()
-    trade_id = secrets.token_hex(8)
-    ACTIVE_WEB_TRADES[trade_id] = {
-        "id": trade_id,
-        "status": "open",
-        "tg_id": tg_id,
-        "asset_name": asset_name,
-        "ticker": ticker,
-        "direction": direction,
-        "amount": amount,
-        "seconds": int(seconds),
-        "leverage": int(leverage),
-        "currency": currency,
-        "start_price": start_price,
-        "opened_ts": now_ts,
-        "close_ts": now_ts + seconds,
-        "tp_price": tp_price,
-        "sl_price": sl_price,
-        "risk_percent": risk_percent,
-        "close_reason": "time",
-    }
+    trade_id = await bot.create_active_trade(
+        user_tg_id=tg_id,
+        source="web",
+        asset_name=asset_name,
+        direction=direction,
+        amount=amount,
+        currency=currency,
+        seconds=int(seconds),
+        start_price=float(start_price),
+        ticker=ticker,
+        leverage=int(leverage),
+        tp_price=tp_price,
+        sl_price=sl_price,
+        risk_percent=risk_percent,
+    )
     await log_web_activity_for_worker(
         client_tg_id=tg_id,
         actor_tg_id=tg_id,
@@ -2565,6 +2568,7 @@ async def api_trade_open(
         "UPDATE worker_clients SET funnel_stage = ?, last_activity_at = CURRENT_TIMESTAMP WHERE client_tg_id = ?",
         ("trading", tg_id),
     )
+    await bot.notify_trade_opened(trade_id)
     return JSONResponse(
         {
             "ok": True,
@@ -2580,33 +2584,33 @@ async def api_trade_open(
 
 @app.get("/api/trade/status", response_class=JSONResponse)
 async def api_trade_status(trade_id: str, tg_id: int):
-    trade = ACTIVE_WEB_TRADES.get(trade_id)
+    trade = await bot.get_active_trade(trade_id)
     if not trade:
         return JSONResponse({"ok": False, "error": "Trade not found"}, status_code=404)
-    if int(trade["tg_id"]) != int(tg_id):
+    if int(trade["user_tg_id"]) != int(tg_id):
         return JSONResponse({"ok": False, "error": "Forbidden"}, status_code=403)
 
     trade = await settle_web_trade(trade_id)
     if not trade:
         return JSONResponse({"ok": False, "error": "Trade not found"}, status_code=404)
 
-    remaining = max(0, int(trade["close_ts"] - time.time()))
+    remaining = max(0, int(float(trade["close_ts"] or 0) - time.time()))
     payload = {
         "ok": True,
         "trade_id": trade_id,
         "status": trade["status"],
         "remaining": remaining,
-        "start_price": trade["start_price"],
+        "start_price": float(trade["start_price"] or 0),
     }
     if trade["status"] == "closed":
         payload.update(
             {
                 "is_win": bool(trade["is_win"]),
                 "profit": float(trade["profit"]),
-                "balance": float(trade["balance"]),
+                "balance": float(await bot.get_user_balance(tg_id)),
                 "end_price": float(trade["end_price"]),
                 "change_percent": float(trade["change_percent"]),
-                "close_reason": trade.get("close_reason", "time"),
+                "close_reason": trade["close_reason"] or "time",
             }
         )
     return JSONResponse(payload)
@@ -2650,18 +2654,14 @@ async def api_trade_open_positions(tg_id: int):
     await settle_user_open_trades(int(tg_id))
     items = []
     now = time.time()
-    for tr in ACTIVE_WEB_TRADES.values():
-        if int(tr.get("tg_id", 0)) != int(tg_id):
-            continue
-        if tr.get("status") != "open":
-            continue
+    for tr in await bot.get_open_trades_for_user(int(tg_id)):
         items.append(
             {
-                "trade_id": tr["id"],
+                "trade_id": tr["trade_id"],
                 "asset_name": tr["asset_name"],
                 "direction": tr["direction"],
                 "amount": tr["amount"],
-                "remaining": max(0, int(tr["close_ts"] - now)),
+                "remaining": max(0, int(float(tr["close_ts"] or 0) - now)),
             }
         )
     items.sort(key=lambda x: x["remaining"])
@@ -2675,27 +2675,29 @@ class TradeClosePayload(BaseModel):
 
 @app.post("/api/trade/close", response_class=JSONResponse)
 async def api_trade_close(payload: TradeClosePayload):
-    tr = ACTIVE_WEB_TRADES.get(payload.trade_id)
+    tr = await bot.get_active_trade(payload.trade_id)
     if not tr:
         return JSONResponse({"ok": False, "error": "Trade not found"}, status_code=404)
-    if int(tr.get("tg_id", 0)) != int(payload.tg_id):
+    if int(tr["user_tg_id"]) != int(payload.tg_id):
         return JSONResponse({"ok": False, "error": "Forbidden"}, status_code=403)
-    if tr.get("status") == "closed":
+    if tr["status"] == "closed":
         return JSONResponse({"ok": True, "already_closed": True})
 
-    tr["close_ts"] = time.time()
-    tr["close_reason"] = "manual"
+    await execute_query(
+        "UPDATE active_trades SET close_ts = ?, close_reason = ? WHERE trade_id = ? AND status = 'open'",
+        (time.time(), "manual", payload.trade_id),
+    )
     closed = await settle_web_trade(payload.trade_id)
     if not closed:
         return JSONResponse({"ok": False, "error": "Trade not found"}, status_code=404)
     await log_web_activity_for_worker(
-        client_tg_id=int(tr["tg_id"]),
-        actor_tg_id=int(tr["tg_id"]),
+        client_tg_id=int(tr["user_tg_id"]),
+        actor_tg_id=int(tr["user_tg_id"]),
         event_type="trade_closed_manual",
         title="Сделка закрыта",
         details=f"Ручное закрытие {tr['asset_name']}, результат {float(closed['profit']):+.2f}",
         amount=float(closed["profit"]),
-        currency=tr.get("currency", "USD"),
+        currency=tr["currency"] or "USD",
         meta={"trade_id": payload.trade_id, "asset_name": tr["asset_name"], "direction": tr["direction"], "reason": "manual"},
     )
     return JSONResponse(
@@ -2704,8 +2706,8 @@ async def api_trade_close(payload: TradeClosePayload):
             "trade_id": payload.trade_id,
             "is_win": bool(closed["is_win"]),
             "profit": float(closed["profit"]),
-            "balance": float(closed["balance"]),
-            "close_reason": closed.get("close_reason", "manual"),
+            "balance": float(await bot.get_user_balance(int(payload.tg_id))),
+            "close_reason": closed["close_reason"] or "manual",
         }
     )
 
@@ -2728,6 +2730,16 @@ async def api_deposit_request(payload: DepositRequestPayload):
     method = payload.method.strip().lower()
     if method not in {"crypto", "trc20", "card"}:
         return JSONResponse({"ok": False, "error": "Неподдерживаемый метод"}, status_code=400)
+    effective_min_deposit = await bot.get_effective_min_deposit_amount(payload.tg_id, currency)
+    global_min_deposit_usdt = await bot.get_global_min_deposit_usdt()
+    if float(payload.amount) < effective_min_deposit:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": f"Минимальное пополнение: {effective_min_deposit:.2f} {currency} (эквивалент {global_min_deposit_usdt:.2f} USDT)",
+            },
+            status_code=400,
+        )
 
     await notify_worker_deposit_event(
         client_tg_id=payload.tg_id,
@@ -2944,99 +2956,37 @@ async def ws_market(websocket: WebSocket):
 
 
 async def settle_web_trade(trade_id: str) -> dict | None:
-    trade = ACTIVE_WEB_TRADES.get(trade_id)
+    trade = await bot.get_active_trade(trade_id)
     if not trade:
         return None
     if trade["status"] == "closed":
         return trade
-    tg_id = trade["tg_id"]
-    direction = trade["direction"]
-    amount = trade["amount"]
-    leverage = trade["leverage"]
-    start_price = trade["start_price"]
-    asset_name = trade["asset_name"]
-    seconds = trade["seconds"]
-    ticker = trade.get("ticker") or ticker_from_asset_name(asset_name)
+    ticker = trade["ticker"] or ticker_from_asset_name(trade["asset_name"])
     live_mark = await fetch_live_mark_or_none(ticker)
     if live_mark is None or live_mark <= 0:
-        live_mark = next_symbol_price(symbol_from_asset_name(asset_name))
-
+        live_mark = next_symbol_price(symbol_from_asset_name(trade["asset_name"]))
     now_ts = time.time()
-
-    if trade.get("close_reason") != "manual" and trade.get("tp_price"):
-        if (direction == "up" and live_mark >= trade["tp_price"]) or (direction == "down" and live_mark <= trade["tp_price"]):
-            trade["close_ts"] = now_ts
-            trade["close_reason"] = "tp"
-    if trade.get("close_reason") != "manual" and trade.get("sl_price"):
-        if (direction == "up" and live_mark <= trade["sl_price"]) or (direction == "down" and live_mark >= trade["sl_price"]):
-            trade["close_ts"] = now_ts
-            trade["close_reason"] = "sl"
-    if now_ts < float(trade.get("close_ts", now_ts)):
+    direction = trade["direction"]
+    close_reason = trade["close_reason"] or "time"
+    if close_reason != "manual" and trade["tp_price"] is not None:
+        tp_price = float(trade["tp_price"])
+        if (direction == "up" and live_mark >= tp_price) or (direction == "down" and live_mark <= tp_price):
+            await execute_query("UPDATE active_trades SET close_ts = ?, close_reason = ? WHERE trade_id = ?", (now_ts, "tp", trade_id))
+            close_reason = "tp"
+    if close_reason != "manual" and trade["sl_price"] is not None:
+        sl_price = float(trade["sl_price"])
+        if (direction == "up" and live_mark <= sl_price) or (direction == "down" and live_mark >= sl_price):
+            await execute_query("UPDATE active_trades SET close_ts = ?, close_reason = ? WHERE trade_id = ?", (now_ts, "sl", trade_id))
+            close_reason = "sl"
+    trade = await bot.get_active_trade(trade_id)
+    if now_ts < float(trade["close_ts"] or now_ts):
         return trade
-
-    if trade.get("close_reason") == "tp":
-        end_price = float(trade["tp_price"])
-    elif trade.get("close_reason") == "sl":
-        end_price = float(trade["sl_price"])
-    else:
-        end_price = float(live_mark)
-
-    profit = calculate_trade_profit(
-        amount=float(amount),
-        leverage=int(leverage),
-        direction=direction,
-        start_price=float(start_price),
-        end_price=float(end_price),
-    )
-    client_trade_cfg = await fetch_one(
-        "SELECT trade_coefficient FROM worker_clients WHERE client_tg_id = ? ORDER BY id DESC LIMIT 1",
-        (tg_id,),
-    )
-    trade_coefficient = float(client_trade_cfg["trade_coefficient"] or 1) if client_trade_cfg else 1.0
-    if profit > 0 and trade_coefficient != 1.0:
-        profit = round(profit * trade_coefficient, 2)
-    is_win = profit > 0
-    credit = max(0.0, amount + profit)
-    if credit > 0:
-        await bot.change_balance(tg_id, credit)
-    change_percent = abs((end_price - start_price) / max(start_price, 0.00001)) * 100.0
-
-    await bot.save_deal(
-        user_tg_id=tg_id,
-        asset_name=asset_name,
-        direction=direction,
-        amount=amount,
-        currency=trade["currency"],
-        start_price=start_price,
-        end_price=end_price,
-        change_percent=change_percent,
-        is_win=is_win,
-        profit=profit,
-        expires_in_sec=seconds,
-    )
-    new_balance = await bot.get_user_balance(tg_id)
-
-    trade.update(
-        {
-            "status": "closed",
-            "is_win": is_win,
-            "profit": round(profit, 2),
-            "balance": round(new_balance, 2),
-            "end_price": round(end_price, 2),
-            "change_percent": round(change_percent, 3),
-        }
-    )
-    return trade
+    return await bot.settle_active_trade(trade_id, live_end_price=float(live_mark), close_reason=close_reason)
 
 
 async def settle_user_open_trades(tg_id: int):
-    to_check = [
-        tr["id"]
-        for tr in ACTIVE_WEB_TRADES.values()
-        if int(tr.get("tg_id", 0)) == int(tg_id) and tr.get("status") == "open"
-    ]
-    for trade_id in to_check:
-        await settle_web_trade(trade_id)
+    for trade in await bot.get_open_trades_for_user(int(tg_id)):
+        await settle_web_trade(str(trade["trade_id"]))
 
 
 @app.websocket("/ws/user")
@@ -3061,16 +3011,14 @@ async def ws_user(websocket: WebSocket):
             user = await fetch_one("SELECT balance, currency FROM users WHERE tg_id = ?", (tg_id,))
             now = time.time()
             open_positions = []
-            for tr in ACTIVE_WEB_TRADES.values():
-                if tr.get("tg_id") != tg_id or tr.get("status") != "open":
-                    continue
+            for tr in await bot.get_open_trades_for_user(tg_id):
                 open_positions.append(
                     {
-                        "trade_id": tr["id"],
+                        "trade_id": tr["trade_id"],
                         "asset_name": tr["asset_name"],
                         "direction": tr["direction"],
                         "amount": tr["amount"],
-                        "remaining": max(0, int(tr["close_ts"] - now)),
+                        "remaining": max(0, int(float(tr["close_ts"] or 0) - now)),
                     }
                 )
             open_positions.sort(key=lambda x: x["remaining"])

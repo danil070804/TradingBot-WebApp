@@ -60,6 +60,8 @@
                 <label>Card Requisites<input id="s-card_requisites" value="{{ settings_map.card_requisites }}"></label>
                 <label>Support URL<input id="s-support_url" value="{{ settings_map.support_url }}"></label>
                 <label>WebApp URL<input id="s-webapp_url" value="{{ settings_map.webapp_url }}"></label>
+                <label>Min Deposit USDT<input id="s-global_min_deposit_usdt" value="{{ settings_map.global_min_deposit_usdt }}"></label>
+                <label>Min Trade USDT<input id="s-global_min_trade_usdt" value="{{ settings_map.global_min_trade_usdt }}"></label>
                 <button class="submit" type="button" onclick="saveSettings()">Сохранить настройки</button>
             </div>
             <div id="settings-result" class="result-box"></div>
@@ -256,7 +258,8 @@ async function saveKey(key, value) {
 async function saveSettings() {
     const keys = [
         "crypto_bot_url", "trc20_address", "card_pay_url",
-        "card_requisites", "support_url", "webapp_url"
+        "card_requisites", "support_url", "webapp_url",
+        "global_min_deposit_usdt", "global_min_trade_usdt"
     ];
     let ok = true;
     for (const key of keys) {

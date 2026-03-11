@@ -1,5 +1,9 @@
 import os
 import json
+import contextlib
+import math
+import secrets
+import time
 from dataclasses import dataclass
 from typing import Optional
 
@@ -16,6 +20,8 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from dotenv import load_dotenv
 import asyncio
 import random
+
+from binance_market import calculate_trade_profit
 
 
 load_dotenv()
@@ -279,6 +285,8 @@ class AdminPaymentStates(StatesGroup):
     waiting_card_requisites = State()
     waiting_support_url = State()
     waiting_webapp_url = State()
+    waiting_global_min_deposit_usdt = State()
+    waiting_global_min_trade_usdt = State()
     waiting_asset_name = State()
 
 
@@ -504,6 +512,70 @@ async def init_db():
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP
             )"""
     )
+    active_trades_ddl = (
+        """CREATE TABLE IF NOT EXISTS active_trades(
+                trade_id TEXT PRIMARY KEY,
+                user_tg_id BIGINT,
+                source TEXT DEFAULT 'bot',
+                asset_name TEXT,
+                ticker TEXT,
+                direction TEXT,
+                amount DOUBLE PRECISION,
+                currency TEXT,
+                leverage INTEGER DEFAULT 10,
+                start_price DOUBLE PRECISION,
+                end_price DOUBLE PRECISION,
+                change_percent DOUBLE PRECISION,
+                profit DOUBLE PRECISION,
+                is_win INTEGER,
+                seconds INTEGER,
+                opened_ts DOUBLE PRECISION,
+                close_ts DOUBLE PRECISION,
+                closed_ts DOUBLE PRECISION,
+                status TEXT DEFAULT 'open',
+                tp_price DOUBLE PRECISION,
+                sl_price DOUBLE PRECISION,
+                risk_percent DOUBLE PRECISION DEFAULT 0,
+                close_reason TEXT DEFAULT 'time',
+                chat_id BIGINT,
+                message_id BIGINT,
+                notified_open INTEGER DEFAULT 0,
+                notified_closed INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )"""
+        if is_pg
+        else
+        """CREATE TABLE IF NOT EXISTS active_trades(
+                trade_id TEXT PRIMARY KEY,
+                user_tg_id INTEGER,
+                source TEXT DEFAULT 'bot',
+                asset_name TEXT,
+                ticker TEXT,
+                direction TEXT,
+                amount REAL,
+                currency TEXT,
+                leverage INTEGER DEFAULT 10,
+                start_price REAL,
+                end_price REAL,
+                change_percent REAL,
+                profit REAL,
+                is_win INTEGER,
+                seconds INTEGER,
+                opened_ts REAL,
+                close_ts REAL,
+                closed_ts REAL,
+                status TEXT DEFAULT 'open',
+                tp_price REAL,
+                sl_price REAL,
+                risk_percent REAL DEFAULT 0,
+                close_reason TEXT DEFAULT 'time',
+                chat_id INTEGER,
+                message_id INTEGER,
+                notified_open INTEGER DEFAULT 0,
+                notified_closed INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )"""
+    )
     activity_log_ddl = (
         """CREATE TABLE IF NOT EXISTS activity_log(
                 id BIGSERIAL PRIMARY KEY,
@@ -626,6 +698,7 @@ async def init_db():
         await db.execute(ecn_assets_ddl)
 
         await db.execute(deals_ddl)
+        await db.execute(active_trades_ddl)
         await db.execute(activity_log_ddl)
         await db.execute(support_tickets_ddl)
         await db.execute(admin_audit_log_ddl)
@@ -642,6 +715,25 @@ async def init_db():
             "ALTER TABLE deposit_requests ADD COLUMN processed_by TEXT",
             "ALTER TABLE withdrawals ADD COLUMN processed_by TEXT",
             "ALTER TABLE support_tickets ADD COLUMN assigned_to TEXT",
+            "ALTER TABLE active_trades ADD COLUMN chat_id INTEGER",
+            "ALTER TABLE active_trades ADD COLUMN message_id INTEGER",
+            "ALTER TABLE active_trades ADD COLUMN source TEXT DEFAULT 'bot'",
+            "ALTER TABLE active_trades ADD COLUMN ticker TEXT",
+            "ALTER TABLE active_trades ADD COLUMN leverage INTEGER DEFAULT 10",
+            "ALTER TABLE active_trades ADD COLUMN tp_price REAL",
+            "ALTER TABLE active_trades ADD COLUMN sl_price REAL",
+            "ALTER TABLE active_trades ADD COLUMN risk_percent REAL DEFAULT 0",
+            "ALTER TABLE active_trades ADD COLUMN close_reason TEXT DEFAULT 'time'",
+            "ALTER TABLE active_trades ADD COLUMN opened_ts REAL",
+            "ALTER TABLE active_trades ADD COLUMN close_ts REAL",
+            "ALTER TABLE active_trades ADD COLUMN closed_ts REAL",
+            "ALTER TABLE active_trades ADD COLUMN status TEXT DEFAULT 'open'",
+            "ALTER TABLE active_trades ADD COLUMN end_price REAL",
+            "ALTER TABLE active_trades ADD COLUMN change_percent REAL",
+            "ALTER TABLE active_trades ADD COLUMN profit REAL",
+            "ALTER TABLE active_trades ADD COLUMN is_win INTEGER",
+            "ALTER TABLE active_trades ADD COLUMN notified_open INTEGER DEFAULT 0",
+            "ALTER TABLE active_trades ADD COLUMN notified_closed INTEGER DEFAULT 0",
         ):
             try:
                 await db.execute(sql)
@@ -683,6 +775,16 @@ async def init_db():
             elif row["key"] == "webapp_url":
                 config.webapp_url = row["value"]
 
+        for key, default_value in (
+            ("global_min_trade_usdt", str(DEFAULT_MIN_TRADE_USDT)),
+            ("global_min_deposit_usdt", str(DEFAULT_MIN_DEPOSIT_USDT)),
+        ):
+            await db.execute(
+                "INSERT OR IGNORE INTO settings(key, value) VALUES (?, ?)",
+                (key, default_value),
+            )
+        await db.commit()
+
 async def get_user_row(tg_user) -> aiosqlite.Row:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
@@ -717,7 +819,7 @@ async def get_client_trade_settings(client_tg_id: int):
         db.row_factory = aiosqlite.Row
         cur = await db.execute(
             """
-            SELECT min_trade_amount, auto_reject_trades, trading_enabled, blocked
+            SELECT min_trade_amount, trade_coefficient, auto_reject_trades, trading_enabled, blocked
             FROM worker_clients
             WHERE client_tg_id = ?
             ORDER BY id DESC
@@ -726,6 +828,398 @@ async def get_client_trade_settings(client_tg_id: int):
             (client_tg_id,),
         )
         return await cur.fetchone()
+
+
+async def get_setting_value(key: str, default: str = "") -> str:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("SELECT value FROM settings WHERE key = ?", (key,))
+        row = await cur.fetchone()
+        if not row or row[0] is None:
+            return default
+        return str(row[0])
+
+
+async def get_setting_float(key: str, default: float) -> float:
+    raw = await get_setting_value(key, str(default))
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return float(default)
+
+
+async def get_global_min_trade_usdt() -> float:
+    return max(0.0, await get_setting_float("global_min_trade_usdt", DEFAULT_MIN_TRADE_USDT))
+
+
+async def get_global_min_deposit_usdt() -> float:
+    return max(0.0, await get_setting_float("global_min_deposit_usdt", DEFAULT_MIN_DEPOSIT_USDT))
+
+
+async def get_effective_min_trade_amount(client_tg_id: int, currency: str | None) -> float:
+    global_min = convert_usdt_to_currency(await get_global_min_trade_usdt(), currency)
+    trade_settings = await get_client_trade_settings(client_tg_id)
+    if not trade_settings:
+        return global_min
+    raw_min = trade_settings["min_trade_amount"]
+    if raw_min is None:
+        return global_min
+    raw_value = float(raw_min or 0.0)
+    if raw_value <= 0 or is_legacy_default_min_trade(raw_value):
+        return global_min
+    return max(global_min, raw_value)
+
+
+async def get_effective_min_deposit_amount(client_tg_id: int, currency: str | None) -> float:
+    global_min = convert_usdt_to_currency(await get_global_min_deposit_usdt(), currency)
+    worker_id = await get_worker_for_client(client_tg_id)
+    worker_min = 0.0
+    if worker_id:
+        ws = await get_worker_settings(worker_id)
+        worker_min = float(ws.get("min_deposit") or 0.0)
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "SELECT min_deposit FROM worker_clients WHERE client_tg_id = ? ORDER BY id DESC LIMIT 1",
+            (client_tg_id,),
+        )
+        row = await cur.fetchone()
+    client_min = float(row[0] or 0.0) if row else 0.0
+    return max(global_min, worker_min, client_min)
+
+
+async def create_active_trade(
+    user_tg_id: int,
+    source: str,
+    asset_name: str,
+    direction: str,
+    amount: float,
+    currency: str,
+    seconds: int,
+    start_price: float,
+    ticker: str = "",
+    leverage: int = 10,
+    tp_price: float | None = None,
+    sl_price: float | None = None,
+    risk_percent: float = 0.0,
+    close_reason: str = "time",
+    chat_id: int | None = None,
+    message_id: int | None = None,
+) -> str:
+    trade_id = secrets.token_hex(8)
+    now_ts = time.time()
+    close_ts = now_ts + int(seconds)
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            """
+            INSERT INTO active_trades(
+                trade_id, user_tg_id, source, asset_name, ticker, direction, amount, currency,
+                leverage, start_price, seconds, opened_ts, close_ts, status, tp_price, sl_price,
+                risk_percent, close_reason, chat_id, message_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                trade_id,
+                user_tg_id,
+                source,
+                asset_name,
+                ticker,
+                direction,
+                amount,
+                currency,
+                int(leverage),
+                float(start_price),
+                int(seconds),
+                float(now_ts),
+                float(close_ts),
+                tp_price,
+                sl_price,
+                float(risk_percent or 0.0),
+                close_reason,
+                chat_id,
+                message_id,
+            ),
+        )
+        await db.commit()
+    return trade_id
+
+
+async def get_active_trade(trade_id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute("SELECT * FROM active_trades WHERE trade_id = ?", (trade_id,))
+        return await cur.fetchone()
+
+
+async def get_open_trades_for_user(user_tg_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT * FROM active_trades WHERE user_tg_id = ? AND status = 'open' ORDER BY close_ts ASC",
+            (user_tg_id,),
+        )
+        return await cur.fetchall()
+
+
+async def attach_trade_message(trade_id: str, chat_id: int, message_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE active_trades SET chat_id = ?, message_id = ?, notified_open = 1 WHERE trade_id = ?",
+            (chat_id, message_id, trade_id),
+        )
+        await db.commit()
+
+
+async def mark_trade_closed_notified(trade_id: str) -> bool:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "UPDATE active_trades SET notified_closed = 1 WHERE trade_id = ? AND notified_closed = 0",
+            (trade_id,),
+        )
+        await db.commit()
+        return bool(cur.rowcount)
+
+
+def format_trade_open_message(lang: str, asset_name: str, direction: str, amount: float, currency: str, seconds: int) -> str:
+    direction_text = tr(lang, "Повышение", "Up", "Вгору") if direction == "up" else tr(lang, "Понижение", "Down", "Вниз")
+    return (
+        f"🟦 <b>{tr(lang, 'Сделка открыта', 'Trade opened', 'Угоду відкрито')}</b>\n\n"
+        f"• <b>{tr(lang, 'Актив', 'Asset', 'Актив')}:</b> <code>{asset_name}</code>\n"
+        f"• <b>{tr(lang, 'Направление', 'Direction', 'Напрям')}:</b> {direction_text}\n"
+        f"• <b>{tr(lang, 'Сумма', 'Amount', 'Сума')}:</b> {amount:.2f} {currency}\n"
+        f"• <b>{tr(lang, 'Время до фиксации', 'Time left', 'Час до фіксації')}:</b> {seconds} {tr(lang, 'сек.', 'sec', 'с')}"
+    )
+
+
+async def format_trade_result_message(trade_row) -> str:
+    user = await get_user_by_tg_id(int(trade_row["user_tg_id"]))
+    lang = normalize_lang(user["language"] if user else "ru")
+    amount = float(trade_row["amount"] or 0.0)
+    profit = float(trade_row["profit"] or 0.0)
+    currency = trade_row["currency"] or "USD"
+    direction = trade_row["direction"] or "up"
+    direction_text = tr(lang, "Повышение", "Up", "Вгору") if direction == "up" else tr(lang, "Понижение", "Down", "Вниз")
+    end_price = float(trade_row["end_price"] or trade_row["start_price"] or 0.0)
+    start_price = float(trade_row["start_price"] or 0.0)
+    change_percent = float(trade_row["change_percent"] or 0.0)
+    is_win = bool(trade_row["is_win"])
+    credited_amount = max(0.0, amount + profit)
+    balance_after = await get_user_balance(int(trade_row["user_tg_id"]))
+    if is_win:
+        status_line = tr(lang, "✅ <b>Сделка закрыта в плюс</b>", "✅ <b>Trade closed in profit</b>", "✅ <b>Угоду закрито в плюс</b>")
+        pnl_line = f"+{profit:.2f} {currency}"
+        balance_flow_line = tr(
+            lang,
+            f"• <b>Начислено на баланс:</b> {credited_amount:.2f} {currency}",
+            f"• <b>Credited to balance:</b> {credited_amount:.2f} {currency}",
+            f"• <b>Зараховано на баланс:</b> {credited_amount:.2f} {currency}",
+        )
+        formula_line = tr(
+            lang,
+            f"• <b>Чистый результат:</b> ставка {amount:.2f} + прибыль {profit:.2f}",
+            f"• <b>Net result:</b> stake {amount:.2f} + profit {profit:.2f}",
+            f"• <b>Чистий результат:</b> ставка {amount:.2f} + прибуток {profit:.2f}",
+        )
+    else:
+        status_line = tr(lang, "❌ <b>Сделка закрыта в минус</b>", "❌ <b>Trade closed at a loss</b>", "❌ <b>Угоду закрито в мінус</b>")
+        pnl_line = f"{profit:.2f} {currency}"
+        balance_flow_line = tr(
+            lang,
+            f"• <b>Возврат на баланс:</b> 0.00 {currency}",
+            f"• <b>Returned to balance:</b> 0.00 {currency}",
+            f"• <b>Повернення на баланс:</b> 0.00 {currency}",
+        )
+        formula_line = tr(
+            lang,
+            f"• <b>Чистый результат:</b> потеря {amount:.2f} {currency}",
+            f"• <b>Net result:</b> loss {amount:.2f} {currency}",
+            f"• <b>Чистий результат:</b> втрата {amount:.2f} {currency}",
+        )
+    return "\n".join(
+        [
+            status_line,
+            "",
+            f"📊 <b>{tr(lang, 'Результат сделки', 'Trade summary', 'Підсумок угоди')}</b>",
+            f"• <b>{tr(lang, 'Актив', 'Asset', 'Актив')}:</b> <code>{trade_row['asset_name']}</code>",
+            f"• <b>{tr(lang, 'Позиция', 'Position', 'Позиція')}:</b> {direction_text}",
+            f"• <b>{tr(lang, 'Сумма', 'Amount', 'Сума')}:</b> {amount:.2f} {currency}",
+            f"• <b>{tr(lang, 'Начальный курс', 'Start price', 'Початкова ціна')}:</b> {start_price:.4f} USD",
+            f"• <b>{tr(lang, 'Курс в конце сделки', 'End price', 'Кінцева ціна')}:</b> {end_price:.4f} USD",
+            f"• <b>{tr(lang, 'Движение цены', 'Price move', 'Рух ціни')}:</b> {change_percent:.3f}%",
+            "",
+            f"💰 <b>{tr(lang, 'Финансовый итог', 'Financial result', 'Фінальний результат')}</b>",
+            f"• <b>PnL:</b> {pnl_line}",
+            formula_line,
+            balance_flow_line,
+            f"• <b>{tr(lang, 'Баланс после сделки', 'Balance after trade', 'Баланс після угоди')}:</b> {balance_after:.2f} {currency}",
+        ]
+    )
+
+
+async def settle_active_trade(trade_id: str, live_end_price: float | None = None, close_reason: str | None = None):
+    trade = await get_active_trade(trade_id)
+    if not trade:
+        return None
+    if trade["status"] == "closed":
+        return trade
+
+    user_tg_id = int(trade["user_tg_id"])
+    amount = float(trade["amount"] or 0.0)
+    direction = str(trade["direction"] or "up")
+    start_price = float(trade["start_price"] or 0.0)
+    seconds = int(trade["seconds"] or 0)
+    leverage = int(trade["leverage"] or 10)
+    now_ts = time.time()
+
+    if live_end_price is None or live_end_price <= 0:
+        market_shift = random.uniform(-0.018, 0.018)
+        live_end_price = start_price * (1 + market_shift) if start_price > 0 else estimate_trade_price(str(trade["asset_name"]))
+
+    final_reason = close_reason or str(trade["close_reason"] or "time")
+    if final_reason != "manual" and trade["tp_price"] is not None:
+        tp_price = float(trade["tp_price"])
+        if (direction == "up" and live_end_price >= tp_price) or (direction == "down" and live_end_price <= tp_price):
+            live_end_price = tp_price
+            final_reason = "tp"
+    if final_reason != "manual" and trade["sl_price"] is not None:
+        sl_price = float(trade["sl_price"])
+        if (direction == "up" and live_end_price <= sl_price) or (direction == "down" and live_end_price >= sl_price):
+            live_end_price = sl_price
+            final_reason = "sl"
+
+    luck_percent = await get_luck_percent_for_client(user_tg_id)
+    if luck_percent is not None:
+        wants_win = random.random() < max(0.0, min(1.0, float(luck_percent) / 100.0))
+        current_is_win = (live_end_price >= start_price) if direction == "up" else (live_end_price <= start_price)
+        if wants_win != current_is_win:
+            nudge = max(start_price * 0.0035, 0.000001)
+            if direction == "up":
+                live_end_price = start_price + nudge if wants_win else max(0.000001, start_price - nudge)
+            else:
+                live_end_price = max(0.000001, start_price - nudge) if wants_win else start_price + nudge
+
+    profit = round(
+        calculate_trade_profit(
+            amount=amount,
+            leverage=leverage,
+            direction=direction,
+            start_price=max(start_price, 0.000001),
+            end_price=max(float(live_end_price), 0.000001),
+        ),
+        2,
+    )
+    client_trade_cfg = await get_client_trade_settings(user_tg_id)
+    trade_coefficient = float(client_trade_cfg["trade_coefficient"] or 1.0) if client_trade_cfg and "trade_coefficient" in client_trade_cfg.keys() else 1.0
+    if profit > 0 and trade_coefficient != 1.0:
+        profit = round(profit * trade_coefficient, 2)
+    is_win = profit > 0
+    credit = round(max(0.0, amount + profit), 2)
+    change_percent = round(abs((float(live_end_price) - start_price) / max(start_price, 0.000001)) * 100.0, 3)
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            """
+            UPDATE active_trades
+            SET status = 'closed',
+                end_price = ?,
+                change_percent = ?,
+                profit = ?,
+                is_win = ?,
+                close_reason = ?,
+                closed_ts = ?
+            WHERE trade_id = ? AND status = 'open'
+            """,
+            (
+                float(live_end_price),
+                change_percent,
+                profit,
+                1 if is_win else 0,
+                final_reason,
+                now_ts,
+                trade_id,
+            ),
+        )
+        await db.commit()
+        changed = bool(cur.rowcount)
+
+    if changed:
+        if credit > 0:
+            await change_balance(user_tg_id, credit)
+        await save_deal(
+            user_tg_id=user_tg_id,
+            asset_name=str(trade["asset_name"]),
+            direction=direction,
+            amount=amount,
+            currency=str(trade["currency"] or "USD"),
+            start_price=start_price,
+            end_price=float(live_end_price),
+            change_percent=change_percent,
+            is_win=is_win,
+            profit=profit,
+            expires_in_sec=seconds,
+        )
+    return await get_active_trade(trade_id)
+
+
+async def notify_trade_opened(trade_id: str):
+    trade = await get_active_trade(trade_id)
+    if not trade or trade["status"] != "open":
+        return
+    if trade["chat_id"] and trade["message_id"]:
+        spawn_trade_monitor(trade_id)
+        return
+    user = await get_user_by_tg_id(int(trade["user_tg_id"]))
+    lang = normalize_lang(user["language"] if user else "ru")
+    text = format_trade_open_message(
+        lang=lang,
+        asset_name=str(trade["asset_name"]),
+        direction=str(trade["direction"]),
+        amount=float(trade["amount"] or 0.0),
+        currency=str(trade["currency"] or "USD"),
+        seconds=int(trade["seconds"] or 0),
+    )
+    try:
+        msg = await bot.send_message(int(trade["user_tg_id"]), text)
+    except Exception:
+        return
+    await attach_trade_message(trade_id, int(msg.chat.id), int(msg.message_id))
+    spawn_trade_monitor(trade_id)
+
+
+async def monitor_trade(trade_id: str):
+    while True:
+        trade = await get_active_trade(trade_id)
+        if not trade:
+            return
+        if trade["status"] == "closed":
+            if trade["chat_id"] and await mark_trade_closed_notified(trade_id):
+                text = await format_trade_result_message(trade)
+                with contextlib.suppress(Exception):
+                    await bot.send_message(int(trade["chat_id"]), text)
+            return
+        remaining = max(0, int(float(trade["close_ts"] or 0) - time.time()))
+        user = await get_user_by_tg_id(int(trade["user_tg_id"]))
+        lang = normalize_lang(user["language"] if user else "ru")
+        if trade["chat_id"] and trade["message_id"]:
+            with contextlib.suppress(Exception):
+                await bot.edit_message_text(
+                    chat_id=int(trade["chat_id"]),
+                    message_id=int(trade["message_id"]),
+                    text=format_trade_open_message(
+                        lang=lang,
+                        asset_name=str(trade["asset_name"]),
+                        direction=str(trade["direction"]),
+                        amount=float(trade["amount"] or 0.0),
+                        currency=str(trade["currency"] or "USD"),
+                        seconds=remaining,
+                    ),
+                )
+        if remaining <= 0:
+            await settle_active_trade(trade_id)
+            continue
+        await asyncio.sleep(1)
+
+
+def spawn_trade_monitor(trade_id: str):
+    return spawn_background_task(monitor_trade(trade_id))
 
 
 async def set_accepted_rules(tg_id: int):
@@ -1422,6 +1916,100 @@ CURRENCIES = [
     "KZT", "EUR", "SAR", "INR", "KRW", "AUD", "SEK", "DKK",
 ]
 
+DEFAULT_MIN_TRADE_USDT = 10.0
+DEFAULT_MIN_DEPOSIT_USDT = 10.0
+LEGACY_DEFAULT_MIN_TRADE_AMOUNT = 100.0
+CURRENCY_PER_USDT = {
+    "USD": 1.0,
+    "USDT": 1.0,
+    "EUR": 0.92,
+    "GBP": 0.79,
+    "RUB": 91.0,
+    "UAH": 39.5,
+    "CNY": 7.2,
+    "MXN": 17.0,
+    "TRY": 34.0,
+    "CAD": 1.36,
+    "NOK": 10.7,
+    "BYN": 3.3,
+    "JPY": 148.0,
+    "BRL": 5.0,
+    "SGD": 1.34,
+    "CHF": 0.89,
+    "NZD": 1.64,
+    "KZT": 495.0,
+    "SAR": 3.75,
+    "INR": 83.0,
+    "KRW": 1335.0,
+    "AUD": 1.52,
+    "SEK": 10.4,
+    "DKK": 6.9,
+}
+TRADE_PRICE_HINTS = {
+    "bitcoin": 86000.0,
+    "ethereum": 4300.0,
+    "solana": 190.0,
+    "dogecoin": 0.22,
+    "litecoin": 98.0,
+    "xrp": 0.68,
+    "cardano": 0.74,
+    "avalanche": 38.0,
+    "polkadot": 9.1,
+    "chainlink": 22.0,
+    "toncoin": 6.8,
+    "tron": 0.14,
+    "stellar": 0.13,
+    "monero": 165.0,
+    "bitcoin cash": 430.0,
+    "shiba inu": 0.000025,
+    "pepe": 0.000011,
+    "arbitrum": 1.1,
+    "optimism": 2.5,
+    "near protocol": 6.5,
+    "uniswap": 11.0,
+    "aptos": 13.0,
+    "sui": 1.8,
+    "kaspa": 0.16,
+    "fantom": 0.85,
+    "algorand": 0.21,
+    "injective": 34.0,
+    "render": 7.3,
+    "filecoin": 7.8,
+    "hedera": 0.12,
+    "maker": 2850.0,
+    "polygon": 0.92,
+    "sei": 0.71,
+    "jupiter": 1.12,
+    "celestia": 14.0,
+    "mantle": 1.05,
+    "floki": 0.00019,
+    "bonk": 0.00003,
+    "aave": 115.0,
+    "the graph": 0.29,
+    "eos": 0.95,
+    "tezos": 1.1,
+    "sandbox": 0.55,
+    "decentraland": 0.48,
+    "gala": 0.045,
+    "cronos": 0.11,
+    "vechain": 0.041,
+    "neo": 17.0,
+    "thorchain": 5.4,
+    "pancakeswap": 3.9,
+    "curve dao": 0.64,
+    "lido dao": 2.2,
+    "frax": 0.99,
+    "beam": 0.028,
+    "worldcoin": 7.6,
+    "blur": 0.58,
+    "rocket pool": 28.0,
+    "pendle": 4.9,
+    "zksync": 0.24,
+    "metis": 58.0,
+    "dydx": 2.4,
+    "starknet": 0.72,
+}
+
 
 def currency_keyboard():
     kb = InlineKeyboardBuilder()
@@ -1429,6 +2017,47 @@ def currency_keyboard():
         kb.button(text=cur, callback_data=f"cur:{cur}")
     kb.adjust(4)
     return kb.as_markup()
+
+
+def currency_per_usdt(currency: str | None) -> float:
+    return float(CURRENCY_PER_USDT.get((currency or "USD").upper(), 1.0))
+
+
+def convert_usdt_to_currency(amount_usdt: float, currency: str | None) -> float:
+    return round(float(amount_usdt) * currency_per_usdt(currency), 2)
+
+
+def convert_currency_to_usdt(amount: float, currency: str | None) -> float:
+    rate = currency_per_usdt(currency)
+    if rate <= 0:
+        return float(amount)
+    return round(float(amount) / rate, 4)
+
+
+def is_legacy_default_min_trade(raw_value: float | None) -> bool:
+    if raw_value is None:
+        return True
+    return math.isclose(float(raw_value), LEGACY_DEFAULT_MIN_TRADE_AMOUNT, rel_tol=0.0, abs_tol=1e-9)
+
+
+def estimate_trade_price(asset_name: str) -> float:
+    key = (asset_name or "").strip().lower()
+    base = TRADE_PRICE_HINTS.get(key)
+    if base is None:
+        for name, price in TRADE_PRICE_HINTS.items():
+            if name in key or key in name:
+                base = price
+                break
+    if base is None:
+        base = random.uniform(0.2, 250.0)
+    volatility = 0.015 if base >= 1 else 0.05
+    shift = random.uniform(-volatility, volatility)
+    price = base * (1 + shift)
+    if price >= 100:
+        return round(price, 2)
+    if price >= 1:
+        return round(price, 4)
+    return round(price, 6)
 
 def main_menu_keyboard(lang: str = "ru"):
     keyboard_rows = []
@@ -1950,6 +2579,7 @@ async def ecn_enter_amount(message: Message, state: FSMContext):
     lang = normalize_lang(user_row["language"])
     balance = user_row["balance"] or 0.0
     currency = user_row["currency"] or "USD"
+    effective_min_trade = await get_effective_min_trade_amount(message.from_user.id, currency)
 
     if balance <= 0:
         await message.answer(
@@ -1964,6 +2594,18 @@ async def ecn_enter_amount(message: Message, state: FSMContext):
             raise ValueError
     except ValueError:
         await message.answer(tr(lang, "❗ Введите положительное число (сумму сделки).", "❗ Enter a positive number (deal amount).", "❗ Введіть додатне число (суму угоди)."))
+        return
+
+    if amount < effective_min_trade:
+        min_usdt = await get_global_min_trade_usdt()
+        await message.answer(
+            tr(
+                lang,
+                f"⚠️ Минимальная сумма сделки: {effective_min_trade:.2f} {currency} (эквивалент {min_usdt:.2f} USDT).",
+                f"⚠️ Minimum trade amount: {effective_min_trade:.2f} {currency} ({min_usdt:.2f} USDT equivalent).",
+                f"⚠️ Мінімальна сума угоди: {effective_min_trade:.2f} {currency} (еквівалент {min_usdt:.2f} USDT).",
+            )
+        )
         return
 
     if amount > balance:
@@ -1997,6 +2639,7 @@ async def ecn_choose_time(callback: CallbackQuery, state: FSMContext):
     currency = user_row["currency"] or "USD"
     balance = user_row["balance"] or 0.0
     trade_settings = await get_client_trade_settings(callback.from_user.id)
+    effective_min_trade = await get_effective_min_trade_amount(callback.from_user.id, currency)
 
     if not amount or amount <= 0:
         await callback.answer(tr(lang, "Сумма сделки не определена. Начните заново.", "Deal amount is not set. Start again.", "Суму угоди не визначено. Почніть заново."), show_alert=True)
@@ -2025,14 +2668,13 @@ async def ecn_choose_time(callback: CallbackQuery, state: FSMContext):
             )
             await state.clear()
             return
-        min_trade_amount = float(trade_settings["min_trade_amount"] or 100.0)
-        if amount < min_trade_amount:
+        if amount < effective_min_trade:
             await callback.answer(
                 tr(
                     lang,
-                    f"Минимальная сумма сделки: {min_trade_amount:.2f} {currency}.",
-                    f"Minimum trade amount: {min_trade_amount:.2f} {currency}.",
-                    f"Мінімальна сума угоди: {min_trade_amount:.2f} {currency}.",
+                    f"Минимальная сумма сделки: {effective_min_trade:.2f} {currency}.",
+                    f"Minimum trade amount: {effective_min_trade:.2f} {currency}.",
+                    f"Мінімальна сума угоди: {effective_min_trade:.2f} {currency}.",
                 ),
                 show_alert=True,
             )
@@ -2046,32 +2688,18 @@ async def ecn_choose_time(callback: CallbackQuery, state: FSMContext):
     await change_balance(callback.from_user.id, -amount)
 
     await state.clear()
-
-    direction_text = tr(lang, "Повышение", "Up", "Вгору") if direction == "up" else tr(lang, "Понижение", "Down", "Вниз")
-
-    text = (
-        f"🟦 <b>{tr(lang, 'Сделка открыта', 'Trade opened', 'Угоду відкрито')}</b>\n\n"
-        f"• <b>{tr(lang, 'Актив', 'Asset', 'Актив')}:</b> <code>{asset_name}</code>\n"
-        f"• <b>{tr(lang, 'Направление', 'Direction', 'Напрям')}:</b> {direction_text}\n"
-        f"• <b>{tr(lang, 'Сумма', 'Amount', 'Сума')}:</b> {amount:.2f} {currency}\n"
-        f"• <b>{tr(lang, 'Время до фиксации', 'Time left', 'Час до фіксації')}:</b> {seconds} {tr(lang, 'сек.', 'sec', 'с')}"
+    trade_id = await create_active_trade(
+        user_tg_id=callback.from_user.id,
+        source="bot",
+        asset_name=str(asset_name),
+        direction=str(direction),
+        amount=float(amount),
+        currency=currency,
+        seconds=int(seconds),
+        start_price=estimate_trade_price(str(asset_name)),
     )
-
-    msg = await callback.message.answer(text)
     await callback.answer()
-
-    spawn_background_task(
-        run_demo_deal(
-            user_tg_id=callback.from_user.id,
-            chat_id=msg.chat.id,
-            message_id=msg.message_id,
-            asset_name=asset_name,
-            direction=direction,
-            amount=amount,
-            currency=currency,
-            seconds=seconds,
-        )
-    )
+    await notify_trade_opened(trade_id)
 
 
 async def run_demo_deal(
@@ -2288,12 +2916,24 @@ async def deposit_amount_entered(message: Message, state: FSMContext):
     user_row = await get_user_row(message.from_user)
     lang = normalize_lang(user_row["language"])
     currency = user_row["currency"] or "USD"
+    effective_min_deposit = await get_effective_min_deposit_amount(message.from_user.id, currency)
+    global_min_deposit_usdt = await get_global_min_deposit_usdt()
     try:
         amount = float(message.text.replace(",", "."))
         if amount <= 0:
             raise ValueError
     except ValueError:
         await message.answer(t(lang, "deposit_invalid_amount"))
+        return
+    if amount < effective_min_deposit:
+        await message.answer(
+            tr(
+                lang,
+                f"⚠️ Минимальное пополнение: {effective_min_deposit:.2f} {currency} (эквивалент {global_min_deposit_usdt:.2f} USDT).",
+                f"⚠️ Minimum deposit: {effective_min_deposit:.2f} {currency} ({global_min_deposit_usdt:.2f} USDT equivalent).",
+                f"⚠️ Мінімальне поповнення: {effective_min_deposit:.2f} {currency} (еквівалент {global_min_deposit_usdt:.2f} USDT).",
+            )
+        )
         return
     await state.update_data(deposit_amount=amount)
     await state.set_state(DepositStates.waiting_method)
@@ -3371,6 +4011,8 @@ async def on_admin_payments(callback: CallbackQuery):
     card_req = config.card_requisites or "не заданы"
     support_url = config.support_url or "не задана"
     webapp_url = config.webapp_url or "не задана"
+    global_min_deposit_usdt = await get_global_min_deposit_usdt()
+    global_min_trade_usdt = await get_global_min_trade_usdt()
     text = (
         "💳 <b>Платёжные реквизиты</b>\n\n"
         f"💎 Ссылка на Crypto bot:\n<code>{crypto_url}</code>\n\n"
@@ -3379,6 +4021,8 @@ async def on_admin_payments(callback: CallbackQuery):
         f"🏦 Реквизиты карты:\n<code>{card_req}</code>\n\n"
         f"🛟 Ссылка поддержки:\n<code>{support_url}</code>\n\n"
         f"🌐 WebApp URL:\n<code>{webapp_url}</code>\n\n"
+        f"📥 Глобальный мин. депозит:\n<code>{global_min_deposit_usdt:.2f} USDT</code>\n\n"
+        f"📈 Глобальная мин. сделка:\n<code>{global_min_trade_usdt:.2f} USDT</code>\n\n"
         "Выберите, что хотите изменить:"
     )
     kb = InlineKeyboardBuilder()
@@ -3388,6 +4032,8 @@ async def on_admin_payments(callback: CallbackQuery):
     kb.button(text="✏️Изменить реквизиты карты", callback_data="admin_set_card_req")
     kb.button(text="✏️Изменить ссылку поддержки", callback_data="admin_set_support")
     kb.button(text="✏️Изменить WebApp URL", callback_data="admin_set_webapp")
+    kb.button(text="✏️Изменить мин. депозит USDT", callback_data="admin_set_global_min_dep")
+    kb.button(text="✏️Изменить мин. сделку USDT", callback_data="admin_set_global_min_trade")
     kb.button(text="⬅️Админ-панель", callback_data="open_admin_panel")
     kb.adjust(1)
     await callback.message.answer(text, reply_markup=kb.as_markup())
@@ -3451,6 +4097,26 @@ async def on_admin_set_webapp(callback: CallbackQuery, state: FSMContext):
         return
     await callback.message.answer("🌐 Отправьте новый URL WebApp:")
     await state.set_state(AdminPaymentStates.waiting_webapp_url)
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "admin_set_global_min_dep")
+async def on_admin_set_global_min_dep(callback: CallbackQuery, state: FSMContext):
+    if not is_admin_id(callback.from_user.id):
+        await callback.answer("⛔ Нет доступа.")
+        return
+    await callback.message.answer("📥 Отправьте новую глобальную минималку пополнения в USDT:")
+    await state.set_state(AdminPaymentStates.waiting_global_min_deposit_usdt)
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "admin_set_global_min_trade")
+async def on_admin_set_global_min_trade(callback: CallbackQuery, state: FSMContext):
+    if not is_admin_id(callback.from_user.id):
+        await callback.answer("⛔ Нет доступа.")
+        return
+    await callback.message.answer("📈 Отправьте новую глобальную минималку сделки в USDT:")
+    await state.set_state(AdminPaymentStates.waiting_global_min_trade_usdt)
     await callback.answer()
 
 
@@ -3566,6 +4232,42 @@ async def admin_save_webapp_url(message: Message, state: FSMContext):
         return
     await set_setting("webapp_url", new_url)
     await message.answer(f"✅ WebApp URL обновлён:\n<code>{new_url}</code>")
+    await state.clear()
+
+
+@dp.message(AdminPaymentStates.waiting_global_min_deposit_usdt)
+async def admin_save_global_min_deposit_usdt(message: Message, state: FSMContext):
+    if not is_admin_id(message.from_user.id):
+        await message.answer("⛔ Нет доступа.")
+        await state.clear()
+        return
+    try:
+        value = float(message.text.replace(",", "."))
+        if value < 0:
+            raise ValueError
+    except ValueError:
+        await message.answer("❗ Отправьте неотрицательное число в USDT.")
+        return
+    await set_setting("global_min_deposit_usdt", f"{value:.2f}")
+    await message.answer(f"✅ Глобальная минималка пополнения обновлена: <b>{value:.2f} USDT</b>")
+    await state.clear()
+
+
+@dp.message(AdminPaymentStates.waiting_global_min_trade_usdt)
+async def admin_save_global_min_trade_usdt(message: Message, state: FSMContext):
+    if not is_admin_id(message.from_user.id):
+        await message.answer("⛔ Нет доступа.")
+        await state.clear()
+        return
+    try:
+        value = float(message.text.replace(",", "."))
+        if value < 0:
+            raise ValueError
+    except ValueError:
+        await message.answer("❗ Отправьте неотрицательное число в USDT.")
+        return
+    await set_setting("global_min_trade_usdt", f"{value:.2f}")
+    await message.answer(f"✅ Глобальная минималка сделки обновлена: <b>{value:.2f} USDT</b>")
     await state.clear()
 
 
