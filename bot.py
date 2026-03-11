@@ -2050,11 +2050,11 @@ async def ecn_choose_time(callback: CallbackQuery, state: FSMContext):
     direction_text = tr(lang, "Повышение", "Up", "Вгору") if direction == "up" else tr(lang, "Понижение", "Down", "Вниз")
 
     text = (
-        f"{tr(lang, 'Зарегистрирована заявка на сделку', 'Deal request created', 'Зареєстровано запит на угоду')}\n"
-        f"└ {tr(lang, 'Актив', 'Asset', 'Актив')}: {asset_name}\n"
-        f"└ {tr(lang, 'Направление', 'Direction', 'Напрям')}: {direction_text}\n"
-        f"└ {tr(lang, 'Сумма', 'Amount', 'Сума')}: {amount:.2f} {currency}\n"
-        f"└ {tr(lang, 'Время до фиксации', 'Time left', 'Час до фіксації')}: {seconds} {tr(lang, 'сек.', 'sec', 'с')}"
+        f"🟦 <b>{tr(lang, 'Сделка открыта', 'Trade opened', 'Угоду відкрито')}</b>\n\n"
+        f"• <b>{tr(lang, 'Актив', 'Asset', 'Актив')}:</b> <code>{asset_name}</code>\n"
+        f"• <b>{tr(lang, 'Направление', 'Direction', 'Напрям')}:</b> {direction_text}\n"
+        f"• <b>{tr(lang, 'Сумма', 'Amount', 'Сума')}:</b> {amount:.2f} {currency}\n"
+        f"• <b>{tr(lang, 'Время до фиксации', 'Time left', 'Час до фіксації')}:</b> {seconds} {tr(lang, 'сек.', 'sec', 'с')}"
     )
 
     msg = await callback.message.answer(text)
@@ -2092,11 +2092,13 @@ async def run_demo_deal(
     while remaining > 0:
         try:
             text = (
-                f"{tr(lang, 'Зарегистрирована заявка на сделку', 'Deal request created', 'Зареєстровано запит на угоду')}\n"
-                f"└ {tr(lang, 'Актив', 'Asset', 'Актив')}: {asset_name}\n"
-                f"└ {tr(lang, 'Направление', 'Direction', 'Напрям')}: {tr(lang, 'Повышение', 'Up', 'Вгору') if direction == 'up' else tr(lang, 'Понижение', 'Down', 'Вниз')}\n"
-                f"└ {tr(lang, 'Сумма', 'Amount', 'Сума')}: {amount:.2f} {currency}\n"
-                f"└ {tr(lang, 'Время до фиксации', 'Time left', 'Час до фіксації')}: {remaining} {tr(lang, 'сек.', 'sec', 'с')}"
+                f"🟦 <b>{tr(lang, 'Сделка открыта', 'Trade opened', 'Угоду відкрито')}</b>\n\n"
+                f"• <b>{tr(lang, 'Актив', 'Asset', 'Актив')}:</b> <code>{asset_name}</code>\n"
+                f"• <b>{tr(lang, 'Направление', 'Direction', 'Напрям')}:</b> "
+                f"{tr(lang, 'Повышение', 'Up', 'Вгору') if direction == 'up' else tr(lang, 'Понижение', 'Down', 'Вниз')}\n"
+                f"• <b>{tr(lang, 'Сумма', 'Amount', 'Сума')}:</b> {amount:.2f} {currency}\n"
+                f"• <b>{tr(lang, 'Время до фиксации', 'Time left', 'Час до фіксації')}:</b> "
+                f"{remaining} {tr(lang, 'сек.', 'sec', 'с')}"
             )
             await bot.edit_message_text(
                 chat_id=chat_id,
@@ -2135,23 +2137,11 @@ async def run_demo_deal(
 
     payout_rate = random.choice([0.55, 0.6, 0.62, 0.65])
     profit = amount * payout_rate if is_win else -amount
+    payout_percent = payout_rate * 100
+    credited_amount = amount + profit if is_win else 0.0
 
     if is_win:
-        await change_balance(user_tg_id, amount + (amount * payout_rate))
-
-    header = f"{tr(lang, 'Завершенная сделка', 'Completed deal', 'Завершена угода')} [{asset_name}]"
-    result_lines = [
-        header,
-        f"{tr(lang, 'Позиция', 'Position', 'Позиція')}: {tr(lang, 'Повышение', 'Up', 'Вгору') if direction == 'up' else tr(lang, 'Понижение', 'Down', 'Вниз')}",
-        f"{tr(lang, 'Сумма', 'Amount', 'Сума')}: {amount:.2f} {currency}",
-        f"{tr(lang, 'Начальный курс', 'Start price', 'Початкова ціна')}: {start_price:.2f} USD",
-        f"{tr(lang, 'Курс в конце сделки', 'End price', 'Кінцева ціна')}: {end_price:.2f} USD ({change_percent:.3f}%)",
-    ]
-
-    if is_win:
-        result_lines.append(tr(lang, f"✅ Успешная сделка. Вы получили {profit:.2f} {currency}", f"✅ Winning deal. You received {profit:.2f} {currency}", f"✅ Успішна угода. Ви отримали {profit:.2f} {currency}"))
-    else:
-        result_lines.append(tr(lang, f"❌ Сделка неуспешная. -{amount:.2f} {currency}", f"❌ Losing deal. -{amount:.2f} {currency}", f"❌ Неуспішна угода. -{amount:.2f} {currency}"))
+        await change_balance(user_tg_id, credited_amount)
 
     await save_deal(
         user_tg_id=user_tg_id,
@@ -2167,7 +2157,72 @@ async def run_demo_deal(
         expires_in_sec=seconds,
     )
 
-    await bot.send_message(chat_id, "\n".join(result_lines))
+    balance_after = await get_user_balance(user_tg_id)
+    direction_text = tr(lang, "Повышение", "Up", "Вгору") if direction == "up" else tr(lang, "Понижение", "Down", "Вниз")
+    market_move_text = f"{change_percent:.3f}%"
+
+    if is_win:
+        status_line = tr(
+            lang,
+            "✅ <b>Сделка закрыта в плюс</b>",
+            "✅ <b>Trade closed in profit</b>",
+            "✅ <b>Угоду закрито в плюс</b>",
+        )
+        pnl_line = f"+{profit:.2f} {currency}"
+        balance_flow_line = tr(
+            lang,
+            f"• <b>Начислено на баланс:</b> {credited_amount:.2f} {currency}",
+            f"• <b>Credited to balance:</b> {credited_amount:.2f} {currency}",
+            f"• <b>Зараховано на баланс:</b> {credited_amount:.2f} {currency}",
+        )
+        formula_line = tr(
+            lang,
+            f"• <b>Расчёт:</b> {amount:.2f} + {payout_percent:.0f}% = +{profit:.2f} {currency}",
+            f"• <b>Calculation:</b> {amount:.2f} + {payout_percent:.0f}% = +{profit:.2f} {currency}",
+            f"• <b>Розрахунок:</b> {amount:.2f} + {payout_percent:.0f}% = +{profit:.2f} {currency}",
+        )
+    else:
+        status_line = tr(
+            lang,
+            "❌ <b>Сделка закрыта в минус</b>",
+            "❌ <b>Trade closed at a loss</b>",
+            "❌ <b>Угоду закрито в мінус</b>",
+        )
+        pnl_line = f"-{amount:.2f} {currency}"
+        balance_flow_line = tr(
+            lang,
+            f"• <b>Возврат на баланс:</b> 0.00 {currency}",
+            f"• <b>Returned to balance:</b> 0.00 {currency}",
+            f"• <b>Повернення на баланс:</b> 0.00 {currency}",
+        )
+        formula_line = tr(
+            lang,
+            f"• <b>Расчёт:</b> ставка {amount:.2f} {currency} сгорела",
+            f"• <b>Calculation:</b> stake {amount:.2f} {currency} was lost",
+            f"• <b>Розрахунок:</b> ставка {amount:.2f} {currency} згоріла",
+        )
+
+    result_text = "\n".join(
+        [
+            status_line,
+            "",
+            f"📊 <b>{tr(lang, 'Результат сделки', 'Trade summary', 'Підсумок угоди')}</b>",
+            f"• <b>{tr(lang, 'Актив', 'Asset', 'Актив')}:</b> <code>{asset_name}</code>",
+            f"• <b>{tr(lang, 'Позиция', 'Position', 'Позиція')}:</b> {direction_text}",
+            f"• <b>{tr(lang, 'Сумма', 'Amount', 'Сума')}:</b> {amount:.2f} {currency}",
+            f"• <b>{tr(lang, 'Начальный курс', 'Start price', 'Початкова ціна')}:</b> {start_price:.2f} USD",
+            f"• <b>{tr(lang, 'Курс в конце сделки', 'End price', 'Кінцева ціна')}:</b> {end_price:.2f} USD",
+            f"• <b>{tr(lang, 'Движение цены', 'Price move', 'Рух ціни')}:</b> {market_move_text}",
+            "",
+            f"💰 <b>{tr(lang, 'Финансовый итог', 'Financial result', 'Фінальний результат')}</b>",
+            f"• <b>PnL:</b> {pnl_line}",
+            formula_line,
+            balance_flow_line,
+            f"• <b>{tr(lang, 'Баланс после сделки', 'Balance after trade', 'Баланс після угоди')}:</b> {balance_after:.2f} {currency}",
+        ]
+    )
+
+    await bot.send_message(chat_id, result_text)
 
 # ---------- PROFILE ----------
 
