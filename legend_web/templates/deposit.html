@@ -9,6 +9,7 @@
 
 <section class="card">
     <div class="section-title">{{ labels.deposit_method if labels else "Метод оплаты" }}</div>
+    <p class="deposit-lead">Выберите удобный способ оплаты. После отправки заявки откроется поддержка, где вам передадут актуальные инструкции для пополнения.</p>
     <form id="deposit-form" class="form-grid">
         <input type="hidden" name="tg_id" value="{{ tg_id }}">
         <label>{{ labels.deposit_amount if labels else "Сумма" }}
@@ -27,22 +28,24 @@
     <div class="deposit-methods">
         <div class="method-card" data-method-card="crypto">
             <b>Crypto bot</b>
-            <small>{{ labels.deposit_crypto_hint if labels else "Оплата по ссылке, затем заявка верификации админу." }}</small>
-            {% if crypto_url %}<a class="qa-btn" href="{{ crypto_url }}" target="_blank">{{ labels.deposit_open_crypto if labels else "Открыть Crypto Bot" }}</a>{% endif %}
+            <small>Быстрое пополнение через криптовалюту с подтверждением в поддержке.</small>
         </div>
         <div class="method-card" data-method-card="trc20">
             <b>TRC20 USDT</b>
-            <small>{{ labels.deposit_trc20_hint if labels else "Адрес для перевода:" }}</small>
-            <code>{{ trc20_address if trc20_address else (labels.deposit_not_set if labels else "Не задан админом") }}</code>
+            <small>После выбора метода поддержка отправит актуальный адрес и проверит перевод.</small>
         </div>
         <div class="method-card" data-method-card="card">
             <b>{{ labels.pay_card if labels else "Банковская карта" }}</b>
-            <small>{{ labels.deposit_card_hint if labels else "Для карты подтверждение только через поддержку." }}</small>
-            <small>Support: {{ support_contact }}</small>
-            {% if card_requisites %}<code>{{ card_requisites }}</code>{% endif %}
-            {% if card_pay_url %}<a class="qa-btn" href="{{ card_pay_url }}" target="_blank">{{ labels.deposit_open_card if labels else "Открыть оплату картой" }}</a>{% endif %}
-            {% if support_url %}<a class="qa-btn" href="{{ support_url }}" target="_blank">{{ labels.js_support_btn if labels else "Перейти в поддержку" }}</a>{% endif %}
+            <small>Пополнение картой оформляется только через поддержку, без показа реквизитов на экране.</small>
         </div>
+    </div>
+    <div class="support-banner">
+        <div>
+            <b>Пополнение через поддержку</b>
+            <small>Менеджер отправит реквизиты или ссылку на оплату после выбора способа.</small>
+        </div>
+        <small>{{ support_contact }}</small>
+        {% if support_url %}<a class="qa-btn" href="{{ support_url }}" target="_blank">{{ labels.js_support_btn if labels else "Перейти в поддержку" }}</a>{% endif %}
     </div>
     <div id="deposit-result" class="result-box"></div>
 </section>

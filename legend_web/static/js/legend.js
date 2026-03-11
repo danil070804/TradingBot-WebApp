@@ -245,9 +245,14 @@ function bindDepositForm() {
             }
             if (data.requires_support) {
                 const button = data.support_url
-                    ? `<div style="margin-top:8px"><a class="qa-btn" href="${data.support_url}" target="_blank">${L("js_support_btn", "Open Support")}</a></div>`
+                    ? `<div class="result-action"><a class="qa-btn" href="${data.support_url}" target="_blank">${L("js_support_btn", "Open Support")}</a></div>`
                     : "";
                 result.innerHTML = `<span class="pos">${data.message || L("js_card_support_msg", "For bank card payment, contact support.")}</span>${button}`;
+                if (data.redirect_to_support && data.support_url) {
+                    window.setTimeout(() => {
+                        window.location.href = data.support_url;
+                    }, 900);
+                }
                 return;
             }
             result.innerHTML = `<span class="pos">${L("js_deposit_sent", "Request #{id} sent to admin").replace("{id}", data.deposit_id)}</span>`;

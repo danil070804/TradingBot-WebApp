@@ -1651,6 +1651,7 @@ async def api_deposit_request(payload: DepositRequestPayload):
             {
                 "ok": True,
                 "requires_support": True,
+                "redirect_to_support": True,
                 "support_url": bot.config.support_url,
                 "support_contact": support_contact,
                 "message": f"Для оплаты картой свяжитесь с поддержкой: {support_contact}",
@@ -1680,7 +1681,19 @@ async def api_deposit_request(payload: DepositRequestPayload):
         except Exception:
             pass
 
-    return JSONResponse({"ok": True, "deposit_id": dep_id})
+    support_contact = bot.support_contact_text()
+    method_label = {"crypto": "Crypto bot", "trc20": "TRC20 USDT", "card": "Банковская карта"}[method]
+    return JSONResponse(
+        {
+            "ok": True,
+            "deposit_id": dep_id,
+            "requires_support": True,
+            "redirect_to_support": True,
+            "support_url": bot.config.support_url,
+            "support_contact": support_contact,
+            "message": f"Заявка #{dep_id} создана. Для пополнения через {method_label} перейдите в поддержку: {support_contact}",
+        }
+    )
 
 
 @app.get("/api/overview", response_class=JSONResponse)
