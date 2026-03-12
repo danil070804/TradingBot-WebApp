@@ -2768,6 +2768,7 @@ function initOnboardingTour() {
     const next = document.getElementById("onboarding-next");
     if (!overlay || !title || !text || !dots || !skip || !next) return;
     const key = "legend_onboarding_v2_done";
+    const lang = uiLang();
     try {
         if (localStorage.getItem(key) === "1") return;
     } catch (_) {
@@ -2775,11 +2776,37 @@ function initOnboardingTour() {
     }
     const page = document.body?.dataset?.page || "";
     if (!["home", "markets", "trade"].includes(page)) return;
-    const steps = [
-        { t: "Welcome", d: "Use bottom navigation to switch between dashboard, markets and trade terminal." },
-        { t: "Live Metrics", d: "Watch balance, exposure and feed status in real time. Values update without reload." },
-        { t: "Trade Actions", d: "Open position, then use Close / 50% / Reverse controls directly from open positions." },
-    ];
+    const copy = {
+        en: {
+            steps: [
+                { t: "Welcome", d: "Use bottom navigation to switch between dashboard, markets and trade terminal." },
+                { t: "Live Metrics", d: "Watch balance, exposure and feed status in real time. Values update without reload." },
+                { t: "Trade Actions", d: "Open position, then use Close / 50% / Reverse controls directly from open positions." },
+            ],
+            btnNext: "Next",
+            btnStart: "Start",
+        },
+        ru: {
+            steps: [
+                { t: "Добро пожаловать", d: "Используйте нижнюю навигацию для перехода между кабинетом, рынками и торговлей." },
+                { t: "Живые метрики", d: "Следите за балансом, экспозицией и статусом потока в реальном времени без перезагрузки." },
+                { t: "Действия по сделке", d: "Откройте позицию и управляйте ею через кнопки Закрыть / 50% / Реверс в списке открытых сделок." },
+            ],
+            btnNext: "Далее",
+            btnStart: "Начать",
+        },
+        uk: {
+            steps: [
+                { t: "Ласкаво просимо", d: "Використовуйте нижню навігацію для переходу між кабінетом, ринками та торгівлею." },
+                { t: "Живі метрики", d: "Слідкуйте за балансом, експозицією та статусом потоку в реальному часі без перезавантаження." },
+                { t: "Дії по угоді", d: "Відкрийте позицію та керуйте нею через кнопки Закрити / 50% / Реверс у списку відкритих угод." },
+            ],
+            btnNext: "Далі",
+            btnStart: "Почати",
+        },
+    };
+    const src = copy[lang] || copy.en;
+    const steps = src.steps.slice();
     if (page === "markets") {
         steps[1] = {
             t: lang === "ru" ? "Сканер рынка" : lang === "uk" ? "Сканер ринку" : "Market Scanner",
@@ -2798,7 +2825,7 @@ function initOnboardingTour() {
         title.textContent = s.t;
         text.textContent = s.d;
         dots.innerHTML = steps.map((_, i) => `<span class="${i === idx ? "active" : ""}"></span>`).join("");
-        next.textContent = idx === steps.length - 1 ? "Start" : "Next";
+        next.textContent = idx === steps.length - 1 ? src.btnStart : src.btnNext;
         overlay.hidden = false;
         requestAnimationFrame(() => overlay.classList.add("show"));
     };

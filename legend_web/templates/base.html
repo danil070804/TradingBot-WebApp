@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Oxanium:wght@500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/legend.css?v=20260312v6">
+    <link rel="stylesheet" href="/static/css/legend.css?v=20260312v7">
 </head>
 <body data-lang="{{ lang if lang else 'en' }}" data-page="{{ page if page else '' }}" data-authenticated="{{ '1' if tg_id else '0' }}">
 <script>
@@ -25,13 +25,13 @@ try {
 <div id="onboarding-overlay" class="onboarding-overlay" hidden>
     <div class="onboarding-card">
         <div class="onboarding-head">
-            <strong id="onboarding-title">Quick Start</strong>
-            <button type="button" id="onboarding-skip" class="chip">Skip</button>
+            <strong id="onboarding-title">{% if lang == "ru" %}Быстрый старт{% elif lang == "uk" %}Швидкий старт{% else %}Quick Start{% endif %}</strong>
+            <button type="button" id="onboarding-skip" class="chip">{% if lang == "ru" %}Пропустить{% elif lang == "uk" %}Пропустити{% else %}Skip{% endif %}</button>
         </div>
-        <p id="onboarding-text">Navigate key sections and open your first trade.</p>
+        <p id="onboarding-text">{% if lang == "ru" %}Откройте ключевые разделы и сделайте первую сделку.{% elif lang == "uk" %}Відкрийте ключові розділи та зробіть першу угоду.{% else %}Navigate key sections and open your first trade.{% endif %}</p>
         <div id="onboarding-dots" class="onboarding-dots"></div>
         <div class="onboarding-actions">
-            <button type="button" id="onboarding-next" class="submit">Next</button>
+            <button type="button" id="onboarding-next" class="submit">{% if lang == "ru" %}Далее{% elif lang == "uk" %}Далі{% else %}Next{% endif %}</button>
         </div>
     </div>
 </div>
@@ -110,6 +110,6 @@ try {
 window.LEGEND_LABELS = {{ labels|tojson if labels else '{}' }};
 </script>
 {% block extra_scripts %}{% endblock %}
-<script src="/static/js/legend.js?v=20260312v6"></script>
+<script src="/static/js/legend.js?v=20260312v7"></script>
 </body>
 </html>
