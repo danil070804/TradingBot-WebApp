@@ -62,6 +62,21 @@ try {
                 <div class="brand-sub">Bot WebApp</div>
             </div>
         </div>
+        <div class="topbar-center">
+            <span class="topbar-pill">
+                {% if page == 'trade' %}
+                    {% if lang == 'ru' %}Execution Desk{% elif lang == 'uk' %}Execution Desk{% else %}Execution Desk{% endif %}
+                {% elif page == 'markets' %}
+                    {% if lang == 'ru' %}Market Scanner{% elif lang == 'uk' %}Market Scanner{% else %}Market Scanner{% endif %}
+                {% elif page == 'deposit' %}
+                    {% if lang == 'ru' %}Funding Route{% elif lang == 'uk' %}Funding Route{% else %}Funding Route{% endif %}
+                {% elif page == 'profile' %}
+                    {% if lang == 'ru' %}Account Center{% elif lang == 'uk' %}Account Center{% else %}Account Center{% endif %}
+                {% else %}
+                    {% if lang == 'ru' %}Legend Flow{% elif lang == 'uk' %}Legend Flow{% else %}Legend Flow{% endif %}
+                {% endif %}
+            </span>
+        </div>
         <div class="lang-switch">
             <button type="button" class="lang-btn {% if lang == 'ru' %}active{% endif %}" data-lang="ru">RU</button>
             <button type="button" class="lang-btn {% if lang == 'en' %}active{% endif %}" data-lang="en">EN</button>
@@ -77,14 +92,14 @@ try {
 
     <nav class="bottom-nav">
         <span id="nav-active-pill" class="nav-active-pill" aria-hidden="true"></span>
-        <a href="/" class="{% if page == 'home' %}active{% endif %}">{{ labels.nav_home if labels else "Главная" }}</a>
-        <a href="/markets" class="{% if page == 'markets' %}active{% endif %}">{{ labels.nav_markets if labels else "Рынки" }}</a>
-        <a href="/trade" class="{% if page == 'trade' %}active{% endif %}">{{ labels.nav_trade if labels else "Торговля" }}</a>
-        <a href="/deposit" class="{% if page == 'deposit' %}active{% endif %}">{{ labels.nav_deposit if labels else "Пополнить" }}</a>
-        <a href="/deals" class="{% if page == 'deals' %}active{% endif %}">{{ labels.nav_deals if labels else "Сделки" }}</a>
-        <a href="/profile" class="{% if page == 'profile' %}active{% endif %}">{{ labels.nav_profile if labels else "Профиль" }}</a>
+        <a href="/" class="{% if page == 'home' %}active{% endif %}"><span class="nav-icon">◌</span><span>{{ labels.nav_home if labels else "Главная" }}</span></a>
+        <a href="/markets" class="{% if page == 'markets' %}active{% endif %}"><span class="nav-icon">⌁</span><span>{{ labels.nav_markets if labels else "Рынки" }}</span></a>
+        <a href="/trade" class="{% if page == 'trade' %}active{% endif %}"><span class="nav-icon">▲</span><span>{{ labels.nav_trade if labels else "Торговля" }}</span></a>
+        <a href="/deposit" class="{% if page == 'deposit' %}active{% endif %}"><span class="nav-icon">＋</span><span>{{ labels.nav_deposit if labels else "Пополнить" }}</span></a>
+        <a href="/deals" class="{% if page == 'deals' %}active{% endif %}"><span class="nav-icon">◫</span><span>{{ labels.nav_deals if labels else "Сделки" }}</span></a>
+        <a href="/profile" class="{% if page == 'profile' %}active{% endif %}"><span class="nav-icon">◎</span><span>{{ labels.nav_profile if labels else "Профиль" }}</span></a>
         {% if user and user.is_admin %}
-        <a href="/admin" class="{% if page == 'admin' %}active{% endif %}">{{ labels.nav_admin if labels else "Админка" }}</a>
+        <a href="/admin" class="{% if page == 'admin' %}active{% endif %}"><span class="nav-icon">✦</span><span>{{ labels.nav_admin if labels else "Админка" }}</span></a>
         {% endif %}
     </nav>
 </div>

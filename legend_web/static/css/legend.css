@@ -177,6 +177,29 @@ body.perf-lite .card:hover {
     box-shadow: 0 16px 36px rgba(119, 160, 190, 0.18);
 }
 
+.topbar-center {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    padding: 0 12px;
+}
+
+.topbar-pill {
+    max-width: 100%;
+    padding: 8px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(116, 200, 244, 0.22);
+    background: rgba(255, 255, 255, 0.58);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: #5f84a2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 body[data-page="trade"] .topbar {
     background:
         linear-gradient(120deg, rgba(245, 252, 255, 0.88), rgba(223, 242, 253, 0.9)),
@@ -1102,23 +1125,36 @@ body[data-page="trade"] .hint {
     background: rgba(248, 252, 255, 0.9);
 }
 
-.list { display: grid; gap: 6px; }
+.list { display: grid; gap: 8px; }
 .row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
-    padding: 10px;
-    border-radius: 14px;
-    background: rgba(248, 252, 255, 0.92);
-    border: 1px solid rgba(116, 200, 244, 0.14);
+    gap: 10px;
+    padding: 12px 13px;
+    border-radius: 18px;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(236, 247, 253, 0.92)),
+        radial-gradient(220px 80px at 0% 0%, rgba(116, 200, 244, 0.1), transparent 70%);
+    border: 1px solid rgba(116, 200, 244, 0.16);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.88),
+        0 12px 26px rgba(107, 149, 179, 0.1);
+    transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+.row:hover {
+    transform: translateY(-1px);
+    border-color: rgba(116, 200, 244, 0.3);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.92),
+        0 16px 30px rgba(107, 149, 179, 0.14);
 }
 .row small { display: block; color: var(--muted); margin-top: 2px; font-size: 11px; }
 .row.mono {
     font-family: "Oxanium", monospace;
     letter-spacing: 0.02em;
 }
-.markets-row .price-block { display: grid; justify-items: end; gap: 4px; }
+.markets-row .price-block { display: grid; justify-items: end; gap: 6px; }
 
 .markets-toolbar {
     display: grid;
@@ -1226,11 +1262,43 @@ body[data-page="trade"] .hint {
     cursor: pointer;
     transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
 }
+.market-card {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    border-radius: 20px;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(236, 247, 253, 0.93)),
+        radial-gradient(220px 80px at 0% 0%, rgba(116, 200, 244, 0.12), transparent 72%);
+    border: 1px solid rgba(116, 200, 244, 0.16);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.92),
+        0 12px 24px rgba(112, 151, 181, 0.1);
+}
 .market-card:hover,
 .deal-history-row:hover {
     transform: translateY(-1px);
     border-color: rgba(116, 200, 244, 0.28);
     box-shadow: 0 14px 26px rgba(112, 151, 181, 0.12);
+}
+.market-card b {
+    font-size: 16px;
+    color: #163b58;
+}
+.market-card small {
+    color: #6a879d;
+}
+.market-card .m-price {
+    font-family: "Oxanium", monospace;
+    font-size: 18px;
+    color: #1c567b;
+}
+.market-card .m-change {
+    font-size: 12px;
+    font-weight: 800;
 }
 .deal-history-row {
     position: relative;
@@ -2108,11 +2176,14 @@ select, input {
     position: relative;
     text-align: left;
     border: 1px solid rgba(116, 200, 244, 0.2);
-    border-radius: 14px;
-    padding: 11px 12px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(236, 247, 253, 0.92));
+    border-radius: 18px;
+    padding: 13px 13px 12px;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(236, 247, 253, 0.92)),
+        radial-gradient(220px 80px at 0% 0%, rgba(255, 204, 126, 0.1), transparent 70%);
     color: #345a75;
     cursor: pointer;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86);
     transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
 }
 
@@ -2164,8 +2235,12 @@ select, input {
 
 .deposit-method-card.active {
     border-color: rgba(116, 200, 244, 0.46);
-    background: linear-gradient(180deg, rgba(212, 239, 255, 0.92), rgba(186, 226, 249, 0.7));
-    box-shadow: inset 0 0 0 1px rgba(116, 200, 244, 0.16);
+    background:
+        linear-gradient(180deg, rgba(212, 239, 255, 0.96), rgba(186, 226, 249, 0.76)),
+        radial-gradient(240px 90px at 100% 0%, rgba(116, 200, 244, 0.18), transparent 72%);
+    box-shadow:
+        inset 0 0 0 1px rgba(116, 200, 244, 0.16),
+        0 14px 28px rgba(104, 154, 187, 0.14);
 }
 
 .deposit-method-details {
@@ -2951,8 +3026,8 @@ select, input {
     max-width: 480px;
     display: grid;
     grid-template-columns: repeat(6, minmax(0, 1fr));
-    gap: 4px;
-    padding: 8px;
+    gap: 6px;
+    padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
     border-top: 1px solid var(--line);
     background:
         linear-gradient(90deg, rgba(248, 252, 255, 0.84), rgba(231, 244, 252, 0.88)),
@@ -3290,10 +3365,14 @@ body[data-preloader="skip"] .app-preloader {
     color: var(--muted);
     font-size: 11px;
     padding: 8px 4px;
-    border-radius: 14px;
+    border-radius: 16px;
     position: relative;
     z-index: 2;
-    transition: color .22s ease;
+    transition: color .22s ease, transform .18s ease;
+    display: grid;
+    justify-items: center;
+    gap: 3px;
+    font-weight: 700;
 }
 .bottom-nav a.active {
     background: transparent;
@@ -3301,6 +3380,24 @@ body[data-preloader="skip"] .app-preloader {
     font-weight: 700;
     box-shadow: none;
     animation: none;
+}
+
+.nav-icon {
+    width: 24px;
+    height: 24px;
+    display: inline-grid;
+    place-items: center;
+    border-radius: 999px;
+    border: 1px solid rgba(116, 200, 244, 0.16);
+    background: rgba(255, 255, 255, 0.54);
+    font-size: 12px;
+    line-height: 1;
+}
+
+.bottom-nav a.active .nav-icon {
+    background: linear-gradient(180deg, rgba(204, 235, 251, 0.94), rgba(177, 220, 243, 0.9));
+    border-color: rgba(116, 200, 244, 0.34);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
 .nav-active-pill {
