@@ -1116,6 +1116,23 @@ function bindDepositMethodCards() {
     sync(methodSelect.value || cards[0].dataset.method || "crypto");
 }
 
+function bindDepositSupportAccordion() {
+    const banner = document.getElementById("deposit-support-banner");
+    const toggle = document.getElementById("deposit-support-toggle");
+    const body = document.getElementById("deposit-support-body");
+    if (!banner || !toggle || !body) return;
+    let open = false;
+    const sync = () => {
+        banner.classList.toggle("expanded", open);
+        body.hidden = !open;
+    };
+    toggle.addEventListener("click", () => {
+        open = !open;
+        sync();
+    });
+    sync();
+}
+
 function buildCandleState() {
     return { tf: 60, candles: [], lastSmoothMark: null };
 }
@@ -3437,6 +3454,7 @@ bindTradeForm();
 bindExchangeForm();
 bindDepositForm();
 bindDepositMethodCards();
+bindDepositSupportAccordion();
 bindLangSwitch();
 bindWorkerPanel();
 bindWorkerClientPage();

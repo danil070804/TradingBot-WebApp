@@ -1919,6 +1919,39 @@ select, input {
         linear-gradient(135deg, rgba(255, 255, 255, 0.22), transparent 42%);
 }
 
+.support-banner-toggle {
+    width: 100%;
+    border: 1px solid rgba(116, 200, 244, 0.22);
+    border-radius: 12px;
+    padding: 9px 11px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.78);
+    color: #3f6783;
+    font-size: 13px;
+    font-weight: 700;
+    text-align: left;
+    cursor: pointer;
+}
+
+.support-banner-toggle i {
+    font-style: normal;
+    font-size: 14px;
+    color: #5d85a4;
+    transition: transform .18s ease;
+}
+
+.support-banner.expanded .support-banner-toggle i {
+    transform: rotate(180deg);
+}
+
+.support-banner-body {
+    display: grid;
+    gap: 8px;
+}
+
 .result-action {
     margin-top: 10px;
 }
