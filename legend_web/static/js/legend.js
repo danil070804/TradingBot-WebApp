@@ -5,6 +5,21 @@ let LIVE_TRADE_PANEL_ID = null;
 let LIVE_TRADE_STATUS_SYNC = { tradeId: null, requestedAt: 0 };
 const INITIAL_OPEN_POSITIONS = Array.isArray(window.LEGEND_INITIAL_OPEN_POSITIONS) ? window.LEGEND_INITIAL_OPEN_POSITIONS : [];
 const INITIAL_TRADE_STATUS = window.LEGEND_INITIAL_TRADE_STATUS || null;
+const APP_RUNTIME = {
+    page: String(document.body?.dataset?.page || ""),
+    userFeed: {
+        socket: null,
+        reconnectTimer: null,
+        reconnectDelayMs: 1200,
+        lastMessageAt: 0,
+        connected: false,
+        bootstrapDone: false,
+    },
+    trade: {
+        hydrated: false,
+        pendingStatusTradeId: null,
+    },
+};
 const LIVE_STATE = {
     mark: null,
     spread: null,
@@ -517,15 +532,24 @@ function syncTradePanelFromPositions(items, tgId) {
     const tradeId = LIVE_TRADE_PANEL_ID || (items[0] && items[0].trade_id) || null;
     if (!tradeId) {
         LIVE_TRADE_PANEL_ID = null;
+        APP_RUNTIME.trade.pendingStatusTradeId = null;
         return;
     }
     const selected = items.find((item) => item.trade_id === tradeId) || null;
     if (selected) {
         LIVE_TRADE_PANEL_ID = selected.trade_id;
+        APP_RUNTIME.trade.pendingStatusTradeId = null;
         updateTradePanelFromPosition(selected);
         return;
     }
-    syncTradePanel(tradeId, tgId);
+    if (items.length) {
+        LIVE_TRADE_PANEL_ID = items[0].trade_id;
+        updateTradePanelFromPosition(items[0]);
+    }
+    if (APP_RUNTIME.trade.pendingStatusTradeId !== tradeId) {
+        APP_RUNTIME.trade.pendingStatusTradeId = tradeId;
+        syncTradePanel(tradeId, tgId);
+    }
 }
 
 function initInteractiveFeedback() {
@@ -891,7 +915,18 @@ function bindTradeForm() {
             };
             updateTimerUi(total);
             LIVE_TRADE_PANEL_ID = data.trade_id;
-            await syncTradePanel(data.trade_id, body.tg_id);
+            updateTradePanelFromStatus({
+                ok: true,
+                trade_id: data.trade_id,
+                status: data.status || "open",
+                remaining: total,
+                seconds: total,
+                start_price: Number(data.start_price || mark || 0),
+                asset_name: body.asset_name,
+                direction: body.direction,
+                amount: Number(body.amount || 0),
+                currency,
+            });
             busy = false;
             if (submitBtn) submitBtn.disabled = false;
         } catch (_) {
@@ -1870,6 +1905,7 @@ function bindUserSocket() {
     if (!tg) return;
     const tgId = Number(tg.value || 0);
     if (!tgId) return;
+    const runtime = APP_RUNTIME.userFeed;
     const balEl = document.getElementById("live-balance");
     const curEl = document.getElementById("live-currency");
     const openEl = document.getElementById("live-open-trades");
@@ -1877,18 +1913,10 @@ function bindUserSocket() {
     const positionsWrap = document.getElementById("open-positions-list");
 
     const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-    const ws = new WebSocket(`${protocol}://${window.location.host}/ws/user`);
-    ws.addEventListener("open", () => {
-        ws.send(JSON.stringify({ tg_id: tgId }));
-    });
-    ws.addEventListener("message", (event) => {
-        let data = null;
-        try {
-            data = JSON.parse(event.data);
-        } catch (_) {
-            return;
-        }
-        if (!data || data.type !== "user") return;
+    const applyUserPayload = (data) => {
+        runtime.lastMessageAt = Date.now();
+        runtime.connected = true;
+        runtime.bootstrapDone = true;
         if (balEl) animateNumericText(balEl, Number(data.balance || 0), { decimals: 2 });
         if (curEl) curEl.textContent = data.currency || "USD";
         if (openEl) animateNumericText(openEl, Number(data.open_trades || 0), { decimals: 0, duration: 260 });
@@ -1910,7 +1938,49 @@ function bindUserSocket() {
                 mountEmptyState(activityWrap, "activity");
             }
         }
-    });
+    };
+
+    const scheduleReconnect = () => {
+        if (runtime.reconnectTimer) return;
+        runtime.reconnectTimer = window.setTimeout(() => {
+            runtime.reconnectTimer = null;
+            connect();
+        }, runtime.reconnectDelayMs);
+        runtime.reconnectDelayMs = Math.min(8000, Math.round(runtime.reconnectDelayMs * 1.4));
+    };
+
+    const connect = () => {
+        if (runtime.socket && (runtime.socket.readyState === WebSocket.OPEN || runtime.socket.readyState === WebSocket.CONNECTING)) {
+            return;
+        }
+        const ws = new WebSocket(`${protocol}://${window.location.host}/ws/user`);
+        runtime.socket = ws;
+        ws.addEventListener("open", () => {
+            runtime.connected = true;
+            runtime.reconnectDelayMs = 1200;
+            ws.send(JSON.stringify({ tg_id: tgId }));
+        });
+        ws.addEventListener("message", (event) => {
+            let data = null;
+            try {
+                data = JSON.parse(event.data);
+            } catch (_) {
+                return;
+            }
+            if (!data || data.type !== "user") return;
+            applyUserPayload(data);
+        });
+        ws.addEventListener("close", () => {
+            if (runtime.socket === ws) runtime.socket = null;
+            runtime.connected = false;
+            scheduleReconnect();
+        });
+        ws.addEventListener("error", () => {
+            runtime.connected = false;
+        });
+    };
+
+    connect();
 }
 
 function renderOpenPositions(items, tgId) {
@@ -1998,10 +2068,14 @@ function bindOpenPositionsActions() {
                 return;
             }
             showToast(L("js_trade_done", "Deal completed"), "success", 1500);
-            await refreshOpenPositions();
+            if (!APP_RUNTIME.userFeed.connected) {
+                await refreshOpenPositions();
+            }
             if (data.new_trade_id) {
                 LIVE_TRADE_PANEL_ID = data.new_trade_id;
-                await syncTradePanel(data.new_trade_id, tgId);
+                if (!APP_RUNTIME.userFeed.connected) {
+                    await syncTradePanel(data.new_trade_id, tgId);
+                }
             }
         } catch (_) {
             showToast(L("js_network_error", "Network error"), "error");
@@ -2014,6 +2088,7 @@ function hydrateInitialTradeState() {
     const tg = document.querySelector('input[name="tg_id"]');
     const positionsWrap = document.getElementById("open-positions-list");
     const openEl = document.getElementById("live-open-trades");
+    if (APP_RUNTIME.trade.hydrated) return;
     if (tg && positionsWrap && INITIAL_OPEN_POSITIONS.length) {
         renderOpenPositions(INITIAL_OPEN_POSITIONS, Number(tg.value || 0));
         updateExposureWidgets(INITIAL_OPEN_POSITIONS, currentUiCurrency());
@@ -2024,7 +2099,11 @@ function hydrateInitialTradeState() {
     if (INITIAL_TRADE_STATUS && INITIAL_TRADE_STATUS.ok) {
         LIVE_TRADE_PANEL_ID = INITIAL_TRADE_STATUS.trade_id || null;
         updateTradePanelFromStatus(INITIAL_TRADE_STATUS);
+    } else if (INITIAL_OPEN_POSITIONS.length) {
+        LIVE_TRADE_PANEL_ID = INITIAL_OPEN_POSITIONS[0].trade_id || null;
+        updateTradePanelFromPosition(INITIAL_OPEN_POSITIONS[0]);
     }
+    APP_RUNTIME.trade.hydrated = true;
 }
 
 function bindTradeQuickActions() {
@@ -3500,7 +3579,9 @@ if (tapeWrap) {
 
 const openPosWrap = document.getElementById("open-positions-list");
 if (openPosWrap) {
-    refreshOpenPositions();
+    if (!INITIAL_OPEN_POSITIONS.length) {
+        refreshOpenPositions();
+    }
 }
 
 const hasMarketRows = document.querySelector(".m-price[data-symbol], .m-change[data-symbol]");
