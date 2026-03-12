@@ -907,11 +907,17 @@ async function showTradeConfirmSheet(payload) {
     startTradeScenarioAnimation(payload);
 
     overlay.hidden = false;
+    document.body.classList.add("trade-confirm-open");
     requestAnimationFrame(() => overlay.classList.add("show"));
     try {
         window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.("medium");
     } catch (_) {
         // no-op
+    }
+
+    const card = overlay.querySelector(".trade-confirm-card");
+    if (card) {
+        card.scrollTop = 0;
     }
 
     return new Promise((resolve) => {
@@ -925,6 +931,7 @@ async function showTradeConfirmSheet(payload) {
             TRADE_SCENARIO_ANIM = null;
             overlay.classList.remove("show");
             overlay.classList.remove("compact");
+            document.body.classList.remove("trade-confirm-open");
             if (detailsWrap) detailsWrap.hidden = true;
             window.setTimeout(() => {
                 overlay.hidden = true;
@@ -953,6 +960,7 @@ async function showTradeConfirmSheet(payload) {
         cancelTopBtn?.addEventListener("click", onCancel, { once: true });
         detailsToggle?.addEventListener("click", onToggleDetails);
         overlay.addEventListener("click", onOverlay);
+        window.setTimeout(() => confirmBtn?.focus(), 30);
     });
 }
 

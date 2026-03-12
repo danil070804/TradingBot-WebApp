@@ -1877,9 +1877,10 @@ async def monitor_trade(trade_id: str):
         lang = normalize_lang(user["language"] if user else "ru")
         if trade["chat_id"] and trade["message_id"]:
             with contextlib.suppress(Exception):
-                await bot.edit_message_text(
+                await edit_section_message(
                     chat_id=int(trade["chat_id"]),
                     message_id=int(trade["message_id"]),
+                    section_key="open_ecn",
                     text=format_trade_open_message(
                         lang=lang,
                         asset_name=str(trade["asset_name"]),

@@ -1961,6 +1961,15 @@ select, input {
         max(16px, calc(env(safe-area-inset-bottom, 0px) + 8px));
 }
 
+body.trade-confirm-open {
+    overflow: hidden;
+}
+
+body.trade-confirm-open .bottom-nav {
+    opacity: .12;
+    pointer-events: none;
+}
+
 .trade-confirm-overlay.show {
     opacity: 1;
     pointer-events: auto;
@@ -1998,7 +2007,7 @@ select, input {
 
 .trade-confirm-overlay.compact .trade-confirm-card {
     width: min(430px, calc(100vw - 16px));
-    max-height: min(88vh, 680px);
+    max-height: min(90vh, 760px);
     padding: 12px;
 }
 
@@ -2227,6 +2236,9 @@ select, input {
 
 .trade-confirm-overlay.compact .trade-confirm-actions {
     margin-top: 10px;
+    position: sticky;
+    bottom: -12px;
+    z-index: 2;
 }
 
 .trade-preset-note {
@@ -3852,11 +3864,13 @@ body[data-preloader="skip"] .app-preloader {
         grid-template-columns: 1fr;
     }
     .trade-confirm-overlay {
-        align-items: flex-start;
+        align-items: flex-end;
+        padding: 8px 8px max(10px, calc(env(safe-area-inset-bottom, 0px) + 6px));
     }
     .trade-confirm-card {
-        margin-top: max(8px, env(safe-area-inset-top, 0px));
-        max-height: min(78vh, 700px);
+        margin-top: 0;
+        max-height: min(88vh, 760px);
+        border-radius: 18px;
     }
     .trade-confirm-overlay.compact .trade-confirm-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
