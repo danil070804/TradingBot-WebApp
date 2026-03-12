@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Пополнение | Legend Trading{% endblock %}
+{% block title %}{{ labels.deposit_title if labels else "Deposit" }} | Legend Trading{% endblock %}
 {% block content %}
 <section class="card hero">
     <h1>{{ labels.deposit_title if labels else "Пополнение баланса" }}</h1>
@@ -9,7 +9,7 @@
 
 <section class="card">
     <div class="section-title">{{ labels.deposit_method if labels else "Метод оплаты" }}</div>
-    <p class="deposit-lead">Выберите удобный способ оплаты. После отправки заявки откроется поддержка, где вам передадут актуальные инструкции для пополнения.</p>
+    <p class="deposit-lead">{{ labels.get('deposit_lead', 'Choose a payment method. After you submit a request, support will provide the latest payment instructions.') if labels else "Choose a payment method. After you submit a request, support will provide the latest payment instructions." }}</p>
     <form id="deposit-form" class="form-grid">
         <input type="hidden" name="tg_id" value="{{ tg_id }}">
         <label>{{ labels.deposit_amount if labels else "Сумма" }}
@@ -26,8 +26,8 @@
     </form>
     <div class="support-banner">
         <div>
-            <b>Пополнение через поддержку</b>
-            <small>Менеджер отправит реквизиты или ссылку на оплату после выбора способа.</small>
+            <b>{{ labels.get('deposit_support_title', 'Deposit via support') if labels else "Deposit via support" }}</b>
+            <small>{{ labels.get('deposit_support_desc', 'A manager will send payment details or a payment link after you select a method.') if labels else "A manager will send payment details or a payment link after you select a method." }}</small>
         </div>
         <small>{{ support_contact }}</small>
         {% if support_url %}<a class="qa-btn" href="{{ support_entry_url }}">{{ labels.js_support_btn if labels else "Перейти в поддержку" }}</a>{% endif %}

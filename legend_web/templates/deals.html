@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Сделки | Legend Trading{% endblock %}
+{% block title %}{{ labels.deals_title if labels else "Deals" }} | Legend Trading{% endblock %}
 {% block content %}
 <section class="card">
     <div class="section-title">{{ labels.deals_title if labels else "История сделок" }}</div>
