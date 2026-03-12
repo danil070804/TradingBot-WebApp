@@ -12,6 +12,7 @@ const LIVE_STATE = {
     mode: null,
 };
 const PROFILE_ACTIVITY_SEEN = new Set();
+let TRADE_SCENARIO_ANIM = null;
 
 function uiLang() {
     return String(document.body?.dataset?.lang || "en").toLowerCase();
@@ -533,7 +534,7 @@ function formatExpiration(seconds) {
     return `${sec}s`;
 }
 
-function drawTradeScenarioPreview(payload) {
+function drawTradeScenarioPreview(payload, progress = 1) {
     const canvas = document.getElementById("tc-scenario-canvas");
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -601,11 +602,14 @@ function drawTradeScenarioPreview(payload) {
     const sec = Math.max(10, Number(payload.seconds || 30));
     const baseAmp = Math.max(0.18, Math.min(0.8, sec / 120));
     const driftTo = side > 0 ? Math.max(tpPct * 0.6, 0.3) : -Math.max(tpPct * 0.6, 0.3);
+    const showCount = Math.max(2, Math.floor(points * Math.max(0.06, Math.min(1, progress))));
     let prevPct = 0;
+    let prevX = padX;
+    let prevY = midY;
     ctx.strokeStyle = "#3f7fa9";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    for (let i = 0; i < points; i += 1) {
+    for (let i = 0; i < showCount; i += 1) {
         const t = i / (points - 1);
         const wobble = (Math.sin(t * 9.2) * 0.22 + Math.sin(t * 4.8 + 0.7) * 0.14) * baseAmp;
         const drift = driftTo * (t * t);
@@ -613,18 +617,51 @@ function drawTradeScenarioPreview(payload) {
         prevPct = pct;
         const x = padX + t * plotW;
         const y = toY(pct);
+        prevX = x;
+        prevY = y;
         if (i === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
     }
     ctx.stroke();
 
     // End marker
-    const endX = w - padX;
-    const endY = toY(prevPct);
+    const endX = prevX;
+    const endY = prevY;
     ctx.fillStyle = "#3f7fa9";
     ctx.beginPath();
     ctx.arc(endX, endY, 3.2, 0, Math.PI * 2);
     ctx.fill();
+    ctx.fillStyle = "rgba(63, 127, 169, 0.2)";
+    ctx.beginPath();
+    ctx.arc(endX, endY, 7.2, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+function startTradeScenarioAnimation(payload) {
+    if (TRADE_SCENARIO_ANIM && TRADE_SCENARIO_ANIM.raf) {
+        window.cancelAnimationFrame(TRADE_SCENARIO_ANIM.raf);
+    }
+    const reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced) {
+        drawTradeScenarioPreview(payload, 1);
+        TRADE_SCENARIO_ANIM = null;
+        return;
+    }
+    const started = performance.now();
+    const duration = 920;
+    const anim = { raf: 0 };
+    const tick = (now) => {
+        const t = Math.min(1, (now - started) / duration);
+        const eased = 1 - Math.pow(1 - t, 2.4);
+        drawTradeScenarioPreview(payload, eased);
+        if (t < 1) {
+            anim.raf = window.requestAnimationFrame(tick);
+        } else {
+            anim.raf = 0;
+        }
+    };
+    anim.raf = window.requestAnimationFrame(tick);
+    TRADE_SCENARIO_ANIM = anim;
 }
 
 async function showTradeConfirmSheet(payload) {
@@ -674,7 +711,7 @@ async function showTradeConfirmSheet(payload) {
     set("tc-entry-label", mapText.entry);
     set("tc-tp-label", mapText.tpZone);
     set("tc-sl-label", mapText.slZone);
-    drawTradeScenarioPreview(payload);
+    startTradeScenarioAnimation(payload);
 
     overlay.hidden = false;
     requestAnimationFrame(() => overlay.classList.add("show"));
@@ -689,6 +726,10 @@ async function showTradeConfirmSheet(payload) {
         const finish = (ok) => {
             if (settled) return;
             settled = true;
+            if (TRADE_SCENARIO_ANIM && TRADE_SCENARIO_ANIM.raf) {
+                window.cancelAnimationFrame(TRADE_SCENARIO_ANIM.raf);
+            }
+            TRADE_SCENARIO_ANIM = null;
             overlay.classList.remove("show");
             window.setTimeout(() => {
                 overlay.hidden = true;
