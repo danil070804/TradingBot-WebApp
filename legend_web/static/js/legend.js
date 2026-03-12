@@ -1505,6 +1505,49 @@ function bindLangSwitch() {
     });
 }
 
+function bindPageTransitions() {
+    const isSamePage = (url) => {
+        const current = `${window.location.pathname}${window.location.search}`;
+        const next = `${url.pathname}${url.search}`;
+        return current === next;
+    };
+
+    const haptic = () => {
+        try {
+            window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.("light");
+        } catch (_) {
+            // no-op
+        }
+    };
+
+    document.querySelectorAll('a[href]').forEach((anchor) => {
+        anchor.addEventListener("click", (event) => {
+            if (event.defaultPrevented) return;
+            if (event.button !== 0) return;
+            if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+            const href = anchor.getAttribute("href");
+            if (!href || href.startsWith("#") || href.startsWith("javascript:")) return;
+            if (anchor.target && anchor.target !== "_self") return;
+            if (anchor.hasAttribute("download")) return;
+            let url;
+            try {
+                url = new URL(href, window.location.origin);
+            } catch (_) {
+                return;
+            }
+            if (url.origin !== window.location.origin) return;
+            if (isSamePage(url)) return;
+
+            event.preventDefault();
+            haptic();
+            document.body.classList.add("page-leaving");
+            window.setTimeout(() => {
+                window.location.href = url.href;
+            }, 180);
+        });
+    });
+}
+
 function bindWorkerPanel() {
     const wrap = document.getElementById("worker-list");
     if (!wrap) return;
@@ -2091,6 +2134,7 @@ bindMarketMiniCharts();
 hydrateInitialTradeState();
 bindTradeQuickActions();
 initInteractiveFeedback();
+bindPageTransitions();
 
 const tapeWrap = document.getElementById("market-tape-list");
 if (tapeWrap) {

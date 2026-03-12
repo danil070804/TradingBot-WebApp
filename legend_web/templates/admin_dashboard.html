@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Legend Trading Admin</title>
-    <link rel="stylesheet" href="/static/css/legend.css">
+    <link rel="stylesheet" href="/static/css/legend.css?v=20260312d">
 </head>
 <body class="app-ready">
 <div class="page-bg"></div>
@@ -15,6 +15,13 @@
             <div class="hint">Управление реквизитами, монетами и параметрами платформы</div>
             <div class="hint" id="admin-live-status">Admin feed: online</div>
             <div id="admin-live-meta" data-scope="admin"></div>
+        </section>
+
+        <section class="quick-actions">
+            <a class="qa-btn" href="/">🏠 На главную</a>
+            <a class="qa-btn" href="/profile">👤 Профиль</a>
+            <a class="qa-btn" href="/markets">📊 Рынки</a>
+            <a class="qa-btn" href="/trade">📈 Торговля</a>
         </section>
 
         <section class="card admin-command-deck">
@@ -246,6 +253,7 @@
     </main>
 </div>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script>window.LEGEND_LABELS = {};</script>
 <script>
 async function initTelegramAdminAuth() {
     if (!window.Telegram || !window.Telegram.WebApp) return;
@@ -618,5 +626,6 @@ adminWs.addEventListener("error", () => {
 });
 initTelegramAdminAuth();
 </script>
+<script src="/static/js/legend.js?v=20260312d"></script>
 </body>
 </html>

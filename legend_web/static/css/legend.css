@@ -58,6 +58,19 @@ body.app-ready .content {
     transition: opacity .24s ease, transform .24s ease;
 }
 
+body.page-leaving .topbar,
+body.page-leaving .bottom-nav {
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: opacity .2s ease, transform .2s ease;
+}
+
+body.page-leaving .content {
+    opacity: 0;
+    transform: translateY(10px) scale(.992);
+    transition: opacity .2s ease, transform .2s ease;
+}
+
 body.perf-lite .page-bg,
 body.perf-lite .hero::after,
 body.perf-lite .pulse-track,
@@ -1654,6 +1667,7 @@ select, input {
 
 .admin-tab-panel.active {
     display: block;
+    animation: panelFade .22s ease;
 }
 
 .detail-stack {
@@ -1858,6 +1872,49 @@ body[data-preloader="skip"] .app-preloader {
     background: linear-gradient(145deg, #84d8ff, #3f9dd3);
     box-shadow: 0 14px 28px rgba(80, 156, 199, 0.28);
     animation: markPulse 2.6s ease-in-out infinite;
+    position: relative;
+    overflow: hidden;
+}
+
+.logo-monogram {
+    position: absolute;
+    left: 8px;
+    top: 8px;
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: .06em;
+}
+
+.logo-bars {
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    display: inline-flex;
+    align-items: end;
+    gap: 2px;
+}
+
+.logo-bars i {
+    width: 3px;
+    border-radius: 2px;
+    display: block;
+    background: rgba(255, 255, 255, 0.88);
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+}
+
+.logo-bars i:nth-child(1) {
+    height: 8px;
+    animation: logoBars 1.2s ease-in-out infinite;
+}
+
+.logo-bars i:nth-child(2) {
+    height: 13px;
+    animation: logoBars 1.2s ease-in-out .18s infinite;
+}
+
+.logo-bars i:nth-child(3) {
+    height: 10px;
+    animation: logoBars 1.2s ease-in-out .34s infinite;
 }
 
 .preloader-title {
@@ -1979,6 +2036,16 @@ body[data-preloader="skip"] .app-preloader {
 @keyframes preloaderSpin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+@keyframes logoBars {
+    0%, 100% { transform: scaleY(.86); opacity: .8; }
+    50% { transform: scaleY(1.18); opacity: 1; }
+}
+
+@keyframes panelFade {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes ticker {
