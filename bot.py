@@ -2441,6 +2441,8 @@ LEGACY_DEFAULT_MIN_TRADE_AMOUNT = 100.0
 BOT_SECTION_MEDIA = {
     "portfolio": {"setting": "bot_photo_portfolio", "title": "Портфель"},
     "settings": {"setting": "bot_photo_settings", "title": "Настройки профиля"},
+    "verification": {"setting": "bot_photo_verification", "title": "Верификация"},
+    "my_deals": {"setting": "bot_photo_my_deals", "title": "Мои сделки"},
     "open_ecn": {"setting": "bot_photo_open_ecn", "title": "Открыть сделку"},
     "support": {"setting": "bot_photo_support", "title": "Тех. поддержка"},
     "info": {"setting": "bot_photo_info", "title": "О сервисе"},
@@ -4115,7 +4117,7 @@ async def on_verify(callback: CallbackQuery, state: FSMContext):
         "🔐 <b>Верификация ещё не пройдена</b>\n\n"
         "Чтобы пройти проверку, откройте поддержку, сообщите свой ID и следуйте инструкциям менеджера."
     )
-    await callback.message.answer(text, reply_markup=verification_keyboard())
+    await send_section_message(callback.message, "verification", text, reply_markup=verification_keyboard())
     await callback.answer()
 
 
@@ -4153,11 +4155,11 @@ async def on_my_deals(callback: CallbackQuery, state: FSMContext):
     lang = normalize_lang(user_row["language"])
     rows = await get_user_deals(callback.from_user.id, limit=10)
     if not rows:
-        await callback.message.answer(t(lang, "my_deals_empty"), reply_markup=profile_back_keyboard(lang))
+        await send_section_message(callback.message, "my_deals", t(lang, "my_deals_empty"), reply_markup=profile_back_keyboard(lang))
         await callback.answer()
         return
     text = f"{t(lang, 'my_deals_title')}\n\n{t(lang, 'my_deals_hint')}"
-    await callback.message.answer(text, reply_markup=my_deals_history_keyboard(rows, lang))
+    await send_section_message(callback.message, "my_deals", text, reply_markup=my_deals_history_keyboard(rows, lang))
     await callback.answer()
 
 
