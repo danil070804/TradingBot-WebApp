@@ -5508,8 +5508,11 @@ async def support_reply_start(callback: CallbackQuery):
 # ---------- DIALOG ROUTER (must be last message handler) ----------
 
 @dp.message()
-async def dialog_router(message: Message):
+async def dialog_router(message: Message, state: FSMContext):
     user_id = message.from_user.id
+    current_state = await state.get_state()
+    if current_state:
+        return
     if user_id in ACTIVE_DIALOGS_CLIENT:
         worker_id = ACTIVE_DIALOGS_CLIENT[user_id]
         try:
