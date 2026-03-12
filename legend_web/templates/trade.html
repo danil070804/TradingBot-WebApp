@@ -274,6 +274,8 @@
             <div><small>{{ labels.trade_potential_sl if labels else "Потенциал SL" }}</small><b class="neg" id="tc-sl">--</b></div>
             <div><small>{{ labels.trade_risk_load if labels else "Риск нагрузки" }}</small><b id="tc-risk-load">--</b></div>
         </div>
+        <button type="button" class="chip trade-confirm-toggle" id="tc-toggle-details">Показать детали</button>
+        <div class="trade-confirm-details" id="tc-details" hidden>
         <div class="trade-scenario-wrap">
             <div class="trade-scenario-head">
                 <small id="tc-scenario-title">{{ labels.trade_scenario_title if labels else "Сценарий" }}</small>
@@ -287,6 +289,7 @@
             </div>
         </div>
         <div class="trade-confirm-note" id="tc-note">{{ labels.trade_confirm_note if labels else "Оценка, не гарантия. Финальный результат зависит от движения рынка." }}</div>
+        </div>
         <div class="trade-confirm-actions">
             <button type="button" class="chip" id="tc-cancel">{{ labels.trade_cancel if labels else "Отмена" }}</button>
             <button type="button" class="submit" id="tc-confirm">{{ labels.trade_confirm_open if labels else "Подтвердить и открыть" }}</button>

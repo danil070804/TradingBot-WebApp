@@ -2118,6 +2118,27 @@ select, input {
     display: none;
 }
 
+.trade-confirm-details[hidden] {
+    display: none;
+}
+
+.trade-confirm-toggle {
+    width: 100%;
+    margin-top: 10px;
+    justify-content: center;
+    border-color: rgba(116, 200, 244, 0.24);
+    color: #315f7f;
+    background: rgba(245, 251, 255, 0.92);
+}
+
+.trade-confirm-details {
+    margin-top: 10px;
+}
+
+.trade-confirm-overlay.compact .trade-confirm-toggle {
+    margin-top: 8px;
+}
+
 .trade-scenario-wrap {
     margin-top: 10px;
     border-radius: 14px;

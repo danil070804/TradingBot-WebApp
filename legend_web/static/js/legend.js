@@ -763,7 +763,10 @@ async function showTradeConfirmSheet(payload) {
         if (el) el.textContent = value;
     };
     const compactConfirm = window.matchMedia("(max-width: 560px), (max-height: 820px)").matches;
+    const detailsWrap = document.getElementById("tc-details");
+    const detailsToggle = document.getElementById("tc-toggle-details");
     overlay.classList.toggle("compact", compactConfirm);
+    if (detailsWrap) detailsWrap.hidden = true;
     const sideLabel = payload.direction === "up" ? mapText.sideUp : mapText.sideDown;
     set("tc-title", mapText.title);
     set("tc-asset", payload.asset);
@@ -781,6 +784,11 @@ async function showTradeConfirmSheet(payload) {
     const cancelTopBtn = document.getElementById("tc-cancel-top");
     if (confirmBtn) confirmBtn.textContent = mapText.confirm;
     if (cancelBtn) cancelBtn.textContent = mapText.cancel;
+    if (detailsToggle) {
+        detailsToggle.textContent = compactConfirm
+            ? (isRu ? "Показать детали" : isUk ? "Показати деталі" : "Show details")
+            : (isRu ? "Скрыть детали" : isUk ? "Сховати деталі" : "Hide details");
+    }
     set("tc-scenario-title", mapText.scenario);
     set("tc-scenario-exp", formatExpiration(payload.seconds));
     set("tc-entry-label", mapText.entry);
@@ -807,23 +815,33 @@ async function showTradeConfirmSheet(payload) {
             TRADE_SCENARIO_ANIM = null;
             overlay.classList.remove("show");
             overlay.classList.remove("compact");
+            if (detailsWrap) detailsWrap.hidden = true;
             window.setTimeout(() => {
                 overlay.hidden = true;
             }, 220);
             confirmBtn?.removeEventListener("click", onConfirm);
             cancelBtn?.removeEventListener("click", onCancel);
             cancelTopBtn?.removeEventListener("click", onCancel);
+            detailsToggle?.removeEventListener("click", onToggleDetails);
             overlay.removeEventListener("click", onOverlay);
             resolve(ok);
         };
         const onConfirm = () => finish(true);
         const onCancel = () => finish(false);
+        const onToggleDetails = () => {
+            if (!detailsWrap || !detailsToggle) return;
+            detailsWrap.hidden = !detailsWrap.hidden;
+            detailsToggle.textContent = detailsWrap.hidden
+                ? (isRu ? "Показать детали" : isUk ? "Показати деталі" : "Show details")
+                : (isRu ? "Скрыть детали" : isUk ? "Сховати деталі" : "Hide details");
+        };
         const onOverlay = (event) => {
             if (event.target === overlay) finish(false);
         };
         confirmBtn?.addEventListener("click", onConfirm, { once: true });
         cancelBtn?.addEventListener("click", onCancel, { once: true });
         cancelTopBtn?.addEventListener("click", onCancel, { once: true });
+        detailsToggle?.addEventListener("click", onToggleDetails);
         overlay.addEventListener("click", onOverlay);
     });
 }
