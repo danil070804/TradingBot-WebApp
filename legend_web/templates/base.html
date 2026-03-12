@@ -65,13 +65,13 @@ try {
         <div class="topbar-center">
             <span class="topbar-pill">
                 {% if page == 'trade' %}
-                    {% if lang == 'ru' %}Execution Desk{% elif lang == 'uk' %}Execution Desk{% else %}Execution Desk{% endif %}
+                    {% if lang == 'ru' %}Торговый стол{% elif lang == 'uk' %}Торговий стіл{% else %}Execution Desk{% endif %}
                 {% elif page == 'markets' %}
-                    {% if lang == 'ru' %}Market Scanner{% elif lang == 'uk' %}Market Scanner{% else %}Market Scanner{% endif %}
+                    {% if lang == 'ru' %}Сканер рынка{% elif lang == 'uk' %}Сканер ринку{% else %}Market Scanner{% endif %}
                 {% elif page == 'deposit' %}
-                    {% if lang == 'ru' %}Funding Route{% elif lang == 'uk' %}Funding Route{% else %}Funding Route{% endif %}
+                    {% if lang == 'ru' %}Маршрут пополнения{% elif lang == 'uk' %}Маршрут поповнення{% else %}Funding Route{% endif %}
                 {% elif page == 'profile' %}
-                    {% if lang == 'ru' %}Account Center{% elif lang == 'uk' %}Account Center{% else %}Account Center{% endif %}
+                    {% if lang == 'ru' %}Центр аккаунта{% elif lang == 'uk' %}Центр акаунта{% else %}Account Center{% endif %}
                 {% else %}
                     {% if lang == 'ru' %}Legend Flow{% elif lang == 'uk' %}Legend Flow{% else %}Legend Flow{% endif %}
                 {% endif %}

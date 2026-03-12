@@ -123,14 +123,14 @@ function initPageIntroRibbon() {
             profile: { title: "Control Center", text: "Track account health, open risk and latest activity in one panel.", cta: "Go To Markets", href: "/markets" },
         },
         ru: {
-            trade: { title: "Торговый стол готов", text: "Лента, график и риск-панель синхронизированы. Сделку можно открыть в один поток.", cta: "Открыть полный график", href: "/trade/chart" },
-            markets: { title: "Сканер рынков в онлайне", text: "Используйте watchlist, фильтры и сортировку для своего торгового пула.", cta: "Открыть терминал", href: "/trade" },
-            profile: { title: "Центр управления", text: "Следите за состоянием счета, риском позиций и активностью в одном окне.", cta: "Перейти к рынкам", href: "/markets" },
+            trade: { title: "Торговый стол готов", text: "Лента, график и риск-панель синхронизированы. Сделку можно открыть в одном потоке.", cta: "Открыть полный график", href: "/trade/chart" },
+            markets: { title: "Сканер рынков в онлайне", text: "Используйте избранное, фильтры и сортировку для своего торгового пула.", cta: "Открыть терминал", href: "/trade" },
+            profile: { title: "Центр управления", text: "Следите за состоянием счета, риском позиций и активностью в одной панели.", cta: "Перейти к рынкам", href: "/markets" },
         },
         uk: {
-            trade: { title: "Торговий стіл готовий", text: "Стрічка, графік і панель ризику синхронізовані. Угоду можна відкрити в один потік.", cta: "Відкрити повний графік", href: "/trade/chart" },
-            markets: { title: "Сканер ринків онлайн", text: "Використовуйте watchlist, фільтри та сортування для власного торгового пулу.", cta: "Відкрити термінал", href: "/trade" },
-            profile: { title: "Центр керування", text: "Відстежуйте стан рахунку, ризик позицій і активність в одному вікні.", cta: "Перейти до ринків", href: "/markets" },
+            trade: { title: "Торговий стіл готовий", text: "Стрічка, графік і панель ризику синхронізовані. Угоду можна відкрити в одному потоці.", cta: "Відкрити повний графік", href: "/trade/chart" },
+            markets: { title: "Сканер ринків онлайн", text: "Використовуйте обране, фільтри та сортування для власного торгового пулу.", cta: "Відкрити термінал", href: "/trade" },
+            profile: { title: "Центр керування", text: "Відстежуйте стан рахунку, ризик позицій і активність в одній панелі.", cta: "Перейти до ринків", href: "/markets" },
         },
     };
     const src = copy[lang] || copy.en;
@@ -2496,7 +2496,14 @@ function initOnboardingTour() {
         { t: "Trade Actions", d: "Open position, then use Close / 50% / Reverse controls directly from open positions." },
     ];
     if (page === "markets") {
-        steps[1] = { t: "Market Scanner", d: "Use filters, sorting and watchlist stars to build your fast access universe." };
+        steps[1] = {
+            t: lang === "ru" ? "Сканер рынка" : lang === "uk" ? "Сканер ринку" : "Market Scanner",
+            d: lang === "ru"
+                ? "Используйте фильтры, сортировку и избранное, чтобы собрать быстрый торговый набор."
+                : lang === "uk"
+                    ? "Використовуйте фільтри, сортування та обране, щоб зібрати швидкий торговий набір."
+                    : "Use filters, sorting and watchlist stars to build your fast access universe."
+        };
     } else if (page === "trade") {
         steps[1] = { t: "Execution Deck", d: "Use risk templates, leverage and insight block for faster and safer entries." };
     }

@@ -46,12 +46,12 @@
 <section class="trade-command-bar">
     <article class="card trade-command-card">
         <span>{% if lang == "ru" %}Активный режим{% elif lang == "uk" %}Активний режим{% else %}Active mode{% endif %}</span>
-        <strong>{% if lang == "ru" %}Turbo Futures{% elif lang == "uk" %}Turbo Futures{% else %}Turbo Futures{% endif %}</strong>
+        <strong>{% if lang == "ru" %}Турбо-фьючерсы{% elif lang == "uk" %}Турбо-ф'ючерси{% else %}Turbo Futures{% endif %}</strong>
         <small>{% if lang == "ru" %}Быстрый вход с таймером и live-панелью{% elif lang == "uk" %}Швидкий вхід з таймером і live-панеллю{% else %}Fast execution with timer and live panel{% endif %}</small>
     </article>
     <article class="card trade-command-card">
-        <span>Market</span>
-        <strong id="command-mark">Live mark via desk</strong>
+        <span>{% if lang == "ru" %}Рынок{% elif lang == "uk" %}Ринок{% else %}Market{% endif %}</span>
+        <strong id="command-mark">{% if lang == "ru" %}Текущий mark в столе{% elif lang == "uk" %}Поточний mark у столі{% else %}Live mark via desk{% endif %}</strong>
         <small>{% if lang == "ru" %}Книга цен, лента и chart preview синхронизированы{% elif lang == "uk" %}Книга цін, стрічка та chart preview синхронізовані{% else %}Order book, tape and chart preview stay in sync{% endif %}</small>
     </article>
     <article class="card trade-command-actions">
@@ -125,10 +125,10 @@
     <div class="trade-left trade-form-panel">
         <div class="trade-panel-head">
             <div>
-                <div class="section-title">{% if lang == "ru" %}Execution desk{% elif lang == "uk" %}Execution desk{% else %}Execution desk{% endif %}</div>
+                <div class="section-title">{% if lang == "ru" %}Торговый стол{% elif lang == "uk" %}Торговий стіл{% else %}Execution desk{% endif %}</div>
                 <strong class="trade-panel-title">{% if lang == "ru" %}Собери параметры сделки{% elif lang == "uk" %}Збери параметри угоди{% else %}Build your trade setup{% endif %}</strong>
             </div>
-            <div class="trade-panel-badge">{% if lang == "ru" %}ready{% elif lang == "uk" %}ready{% else %}ready{% endif %}</div>
+            <div class="trade-panel-badge">{% if lang == "ru" %}готово{% elif lang == "uk" %}готово{% else %}ready{% endif %}</div>
         </div>
         <form id="trade-form" class="form-grid trade-form-grid">
             <input type="hidden" name="tg_id" value="{{ tg_id }}">
