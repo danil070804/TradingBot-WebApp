@@ -762,6 +762,8 @@ async function showTradeConfirmSheet(payload) {
         const el = document.getElementById(id);
         if (el) el.textContent = value;
     };
+    const compactConfirm = window.matchMedia("(max-width: 560px), (max-height: 820px)").matches;
+    overlay.classList.toggle("compact", compactConfirm);
     const sideLabel = payload.direction === "up" ? mapText.sideUp : mapText.sideDown;
     set("tc-title", mapText.title);
     set("tc-asset", payload.asset);
@@ -804,6 +806,7 @@ async function showTradeConfirmSheet(payload) {
             }
             TRADE_SCENARIO_ANIM = null;
             overlay.classList.remove("show");
+            overlay.classList.remove("compact");
             window.setTimeout(() => {
                 overlay.hidden = true;
             }, 220);
