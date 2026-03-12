@@ -158,7 +158,7 @@ body.perf-lite .card:hover {
     max-width: 500px;
     margin: 0 auto;
     min-height: 100vh;
-    padding-bottom: 88px;
+    padding-bottom: 96px;
 }
 
 .topbar {
@@ -344,6 +344,10 @@ body[data-page="trade"] .lang-switch {
     text-align: center;
     font-size: 13px;
     font-weight: 700;
+    min-height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
 }
 
@@ -1818,6 +1822,7 @@ select, input {
     font-weight: 800;
     letter-spacing: .02em;
     padding: 13px 14px;
+    min-height: 46px;
     box-shadow: 0 18px 28px rgba(85, 167, 214, 0.28);
 }
 .submit.alt { background: linear-gradient(180deg, #9fdcf8, #6bbbe8); }
@@ -1869,10 +1874,15 @@ select, input {
     gap: 6px;
     flex-wrap: wrap;
     justify-content: flex-end;
+    margin-top: 8px;
 }
 
 .position-actions .chip {
     min-width: 68px;
+    min-height: 36px;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 700;
 }
 
 .onboarding-overlay {
@@ -3182,7 +3192,7 @@ body.trade-confirm-open .bottom-nav {
         radial-gradient(460px 120px at 50% -40%, rgba(116, 200, 244, 0.18), transparent 75%);
     backdrop-filter: blur(18px);
     box-shadow: 0 -12px 36px rgba(112, 151, 181, 0.18);
-    overflow: visible;
+    overflow: hidden;
 }
 
 body[data-page="trade"] .bottom-nav {
@@ -3512,7 +3522,8 @@ body[data-preloader="skip"] .app-preloader {
     text-align: center;
     color: var(--muted);
     font-size: 11px;
-    padding: 8px 4px;
+    padding: 10px 6px;
+    min-height: 52px;
     border-radius: 16px;
     position: relative;
     z-index: 2;
@@ -3894,6 +3905,43 @@ body[data-preloader="skip"] .app-preloader {
 }
 
 @media (max-width: 520px) {
+    .app-shell {
+        padding-bottom: 108px;
+    }
+    .bottom-nav {
+        left: 0;
+        right: 0;
+        max-width: none;
+        width: 100%;
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        white-space: nowrap;
+        padding: 8px 10px calc(10px + env(safe-area-inset-bottom, 0px));
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+    }
+    .bottom-nav::-webkit-scrollbar {
+        display: none;
+    }
+    .bottom-nav a {
+        flex: 0 0 68px;
+        min-width: 68px;
+        border-radius: 14px;
+    }
+    .position-actions {
+        justify-content: stretch;
+        gap: 8px;
+    }
+    .position-actions .chip {
+        flex: 1 1 calc(50% - 8px);
+        min-width: 0;
+        font-size: 13px;
+    }
+    .position-actions .pos-close-btn {
+        flex-basis: 100%;
+    }
     .topbar-center {
         display: none;
     }
