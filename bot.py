@@ -84,6 +84,9 @@ def spawn_background_task(coro):
         ACTIVE_DEAL_TASKS.discard(done_task)
         try:
             done_task.result()
+        except asyncio.CancelledError:
+            # Normal during app shutdown and monitor replacement.
+            return
         except Exception as exc:
             print(f"[deal-task] {exc}")
 
