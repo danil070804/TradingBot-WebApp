@@ -1237,7 +1237,7 @@ function bindTradeQuickActions() {
         if (!el) return;
         const card = el.closest(".stat-card");
         if (!card) return;
-        card.title = "Открыть график выбранного актива";
+        card.title = L("js_open_chart_asset", "Open selected asset chart");
         card.style.cursor = "pointer";
         card.addEventListener("click", openChart);
     });
@@ -1245,7 +1245,7 @@ function bindTradeQuickActions() {
     if (statSpread) {
         const card = statSpread.closest(".stat-card");
         if (card && tfSelect) {
-            card.title = "Сменить таймфрейм";
+            card.title = L("js_change_timeframe", "Change timeframe");
             card.style.cursor = "pointer";
             card.addEventListener("click", () => {
                 const order = ["60", "300", "900", "3600"];
@@ -1259,7 +1259,7 @@ function bindTradeQuickActions() {
 
     if (openChartBtn) {
         openChartBtn.addEventListener("mouseenter", () => {
-            openChartBtn.textContent = L("trade_open_chart", "Открыть график");
+            openChartBtn.textContent = L("trade_open_chart", "Open Chart");
         });
     }
 }
@@ -1618,12 +1618,12 @@ function bindWorkerPanel() {
             btn.onclick = async () => {
                 const row = btn.closest(".worker-row");
                 if (!row) return;
-                const label = btn.dataset.label || "Значение";
+                const label = btn.dataset.label || "Value";
                 const valRaw = prompt(`${label}:`);
                 if (valRaw === null) return;
                 const val = Number(valRaw);
                 if (Number.isNaN(val)) {
-                    alert("Введите корректное число");
+                    alert("Enter a valid number");
                     return;
                 }
                 await doUpdate(row.dataset.wcId, btn.dataset.action, val);
@@ -1634,7 +1634,7 @@ function bindWorkerPanel() {
             btn.onclick = async () => {
                 const row = btn.closest(".worker-row");
                 if (!row) return;
-                const label = btn.dataset.label || "Значение";
+                const label = btn.dataset.label || "Value";
                 const val = prompt(`${label}:`);
                 if (val === null) return;
                 await doUpdate(row.dataset.wcId, btn.dataset.action, val);
@@ -1647,7 +1647,7 @@ function bindWorkerPanel() {
                 if (!row) return;
                 const target = transferTarget ? transferTarget.value : "";
                 if (!target) {
-                    alert("Сначала выбери воркера в верхнем списке");
+                    alert("Select a worker in the top list first");
                     return;
                 }
                 await doUpdate(row.dataset.wcId, "transfer_worker", Number(target));
@@ -1681,7 +1681,7 @@ function bindWorkerPanel() {
         });
         const data = await resp.json();
         if (!resp.ok || !data.ok) {
-            alert(data.error || "Не удалось обновить данные");
+            alert(data.error || "Failed to update data");
             return false;
         }
         patchRowState(wrap.querySelector(`.worker-row[data-wc-id="${wcId}"]`), action, value);
@@ -1692,14 +1692,14 @@ function bindWorkerPanel() {
     const renderClients = (items) => {
         wrap.innerHTML = "";
         if (!items || !items.length) {
-            wrap.innerHTML = '<div class="empty">У вас пока нет рефералов.</div>';
+            wrap.innerHTML = '<div class="empty">No referrals yet.</div>';
             return;
         }
         items.forEach((c) => {
             const row = document.createElement("div");
             row.className = "row worker-row";
             row.dataset.wcId = c.id;
-            row.dataset.search = `#${c.id} ${c.first_name || "Пользователь"} ${c.client_tg_id} ${c.username || ""}`;
+            row.dataset.search = `#${c.id} ${c.first_name || "User"} ${c.client_tg_id} ${c.username || ""}`;
             row.dataset.favorite = c.favorite ? "1" : "0";
             row.dataset.blocked = c.blocked ? "1" : "0";
             row.dataset.verified = c.verified ? "1" : "0";
@@ -1711,43 +1711,43 @@ function bindWorkerPanel() {
             row.innerHTML = `
                 <a class="worker-card-link worker-card-main" href="/worker/client/${c.id}">
                     <div class="worker-head">
-                        <b>#${c.id} ${c.first_name || "Пользователь"}</b>
-                        <span class="worker-badge ${c.blocked ? "blocked" : c.favorite ? "favorite" : "active"}">${c.blocked ? "Заблокирован" : c.favorite ? "Избранный" : "Активный"}</span>
+                        <b>#${c.id} ${c.first_name || "User"}</b>
+                        <span class="worker-badge ${c.blocked ? "blocked" : c.favorite ? "favorite" : "active"}">${c.blocked ? "Blocked" : c.favorite ? "Favorite" : "Active"}</span>
                     </div>
                     <small>ID ${c.client_tg_id} · @${c.username || "-"}</small>
-                    <small>Баланс: ${Number(c.balance || 0).toFixed(2)} ${c.currency || "USD"}</small>
+                    <small>Balance: ${Number(c.balance || 0).toFixed(2)} ${c.currency || "USD"}</small>
                     <div class="worker-meta">
-                        <span>Мин. депозит: ${Number(c.min_deposit || 0).toFixed(2)}</span>
-                        <span>Мин. вывод: ${Number(c.min_withdraw || 0).toFixed(2)}</span>
-                        <span>Мин. сделка: ${Number(c.min_trade_amount || 100).toFixed(2)}</span>
-                        <span>Коэфф: ${Number(c.trade_coefficient || 1).toFixed(2)}</span>
-                        <span>${c.auto_reject_trades ? "Авто-откл: ВКЛ" : "Авто-откл: ВЫКЛ"}</span>
-                        <span>Удача: ${Number(c.luck_percent || 0).toFixed(2)}%</span>
-                        <span>Этап: ${c.funnel_stage || "new"}</span>
-                        ${c.tags ? `<span>Теги: ${c.tags}</span>` : ""}
+                        <span>Min deposit: ${Number(c.min_deposit || 0).toFixed(2)}</span>
+                        <span>Min withdraw: ${Number(c.min_withdraw || 0).toFixed(2)}</span>
+                        <span>Min trade: ${Number(c.min_trade_amount || 100).toFixed(2)}</span>
+                        <span>Coeff: ${Number(c.trade_coefficient || 1).toFixed(2)}</span>
+                        <span>${c.auto_reject_trades ? "Auto-reject: ON" : "Auto-reject: OFF"}</span>
+                        <span>Luck: ${Number(c.luck_percent || 0).toFixed(2)}%</span>
+                        <span>Stage: ${c.funnel_stage || "new"}</span>
+                        ${c.tags ? `<span>Tags: ${c.tags}</span>` : ""}
                     </div>
                     ${c.crm_note ? `<div class="crm-note-preview">${c.crm_note}</div>` : ""}
                 </a>
                 <div class="worker-actions">
-                    <button class="chip worker-act ${c.trading_enabled ? "state-on" : "state-off"}" data-action="toggle_trade">Покупка</button>
-                    <button class="chip worker-act ${c.withdraw_enabled ? "state-on" : "state-off"}" data-action="toggle_withdraw">Вывод</button>
-                    <button class="chip worker-act ${c.verified ? "state-on" : "state-off"}" data-action="toggle_verified">Вериф</button>
-                    <button class="chip worker-act ${c.favorite ? "state-fav" : "state-off"}" data-action="toggle_favorite">Избранное</button>
-                    <button class="chip worker-act ${c.blocked ? "state-block" : "state-on"}" data-action="toggle_block">${c.blocked ? "Разблок" : "Блок"}</button>
-                    <button class="chip worker-prompt" data-action="set_luck" data-label="Удача 0-100">Удача</button>
-                    <button class="chip worker-prompt" data-action="set_min_deposit" data-label="Минимальный депозит">Мин. деп</button>
-                    <button class="chip worker-prompt" data-action="set_min_withdraw" data-label="Минимальный вывод">Мин. вывод</button>
-                    <button class="chip worker-prompt" data-action="add_balance" data-label="Пополнение баланса">Баланс+</button>
-                    <button class="chip worker-prompt" data-action="subtract_balance" data-label="Списание баланса">Баланс-</button>
-                    <button class="chip worker-prompt" data-action="set_balance" data-label="Установить баланс">Set баланс</button>
-                    <button class="chip worker-prompt" data-action="set_min_trade_amount" data-label="Минимальная сумма сделки">Мин. сделка</button>
-                    <button class="chip worker-prompt" data-action="set_trade_coefficient" data-label="Коэффициент сделки">Коэфф</button>
-                    <button class="chip worker-act ${c.auto_reject_trades ? "state-block" : "state-on"}" data-action="toggle_auto_reject_trades">Авто-откл</button>
-                    <button class="chip worker-text" data-action="set_funnel_stage" data-label="Этап воронки">Этап</button>
-                    <button class="chip worker-text" data-action="set_tags" data-label="Теги через запятую">Теги</button>
-                    <button class="chip worker-text" data-action="set_note" data-label="Заметка по рефералу">Заметка</button>
-                    <button class="chip worker-transfer">Передать</button>
-                    <a class="chip worker-open" href="/worker/client/${c.id}">Карточка</a>
+                    <button class="chip worker-act ${c.trading_enabled ? "state-on" : "state-off"}" data-action="toggle_trade">Trade</button>
+                    <button class="chip worker-act ${c.withdraw_enabled ? "state-on" : "state-off"}" data-action="toggle_withdraw">Withdraw</button>
+                    <button class="chip worker-act ${c.verified ? "state-on" : "state-off"}" data-action="toggle_verified">KYC</button>
+                    <button class="chip worker-act ${c.favorite ? "state-fav" : "state-off"}" data-action="toggle_favorite">Favorite</button>
+                    <button class="chip worker-act ${c.blocked ? "state-block" : "state-on"}" data-action="toggle_block">${c.blocked ? "Unblock" : "Block"}</button>
+                    <button class="chip worker-prompt" data-action="set_luck" data-label="Luck 0-100">Luck</button>
+                    <button class="chip worker-prompt" data-action="set_min_deposit" data-label="Minimum deposit">Min dep</button>
+                    <button class="chip worker-prompt" data-action="set_min_withdraw" data-label="Minimum withdraw">Min wd</button>
+                    <button class="chip worker-prompt" data-action="add_balance" data-label="Add balance">Balance+</button>
+                    <button class="chip worker-prompt" data-action="subtract_balance" data-label="Subtract balance">Balance-</button>
+                    <button class="chip worker-prompt" data-action="set_balance" data-label="Set balance">Set bal</button>
+                    <button class="chip worker-prompt" data-action="set_min_trade_amount" data-label="Minimum trade amount">Min trade</button>
+                    <button class="chip worker-prompt" data-action="set_trade_coefficient" data-label="Trade coefficient">Coeff</button>
+                    <button class="chip worker-act ${c.auto_reject_trades ? "state-block" : "state-on"}" data-action="toggle_auto_reject_trades">Auto-reject</button>
+                    <button class="chip worker-text" data-action="set_funnel_stage" data-label="Funnel stage">Stage</button>
+                    <button class="chip worker-text" data-action="set_tags" data-label="Tags comma-separated">Tags</button>
+                    <button class="chip worker-text" data-action="set_note" data-label="Client note">Note</button>
+                    <button class="chip worker-transfer">Transfer</button>
+                    <a class="chip worker-open" href="/worker/client/${c.id}">Card</a>
                 </div>
             `;
             wrap.appendChild(row);
@@ -1771,7 +1771,7 @@ function bindWorkerPanel() {
         if (!box) return;
         box.innerHTML = "";
         if (!items || !items.length) {
-            box.innerHTML = '<div class="empty">Событий пока нет.</div>';
+            box.innerHTML = '<div class="empty">No events yet.</div>';
             return;
         }
         items.forEach((item) => {
@@ -1780,11 +1780,11 @@ function bindWorkerPanel() {
             row.innerHTML = `
                 <div class="worker-event-main">
                     <div class="worker-event-top">
-                        <b>${item.title || "Событие"}</b>
+                        <b>${item.title || "Event"}</b>
                         <span class="worker-event-time">${item.created_at || ""}</span>
                     </div>
-                    <small>${item.first_name || "Пользователь"} · ID ${item.client_tg_id || "-"} · @${item.username || "-"}</small>
-                    <small>${item.details || "Без деталей"}</small>
+                    <small>${item.first_name || "User"} · ID ${item.client_tg_id || "-"} · @${item.username || "-"}</small>
+                    <small>${item.details || "No details"}</small>
                 </div>
                 ${item.amount !== null && item.amount !== undefined ? `<div class="worker-event-amount">${Number(item.amount).toFixed(2)} ${item.currency || ""}</div>` : ""}
             `;
@@ -1797,7 +1797,7 @@ function bindWorkerPanel() {
         if (!box) return;
         box.innerHTML = "";
         if (!items || !items.length) {
-            box.innerHTML = '<div class="empty">Открытых тикетов пока нет.</div>';
+            box.innerHTML = '<div class="empty">No open tickets yet.</div>';
             return;
         }
         items.forEach((item) => {
@@ -1807,11 +1807,11 @@ function bindWorkerPanel() {
             row.innerHTML = `
                 <div class="worker-event-main">
                     <div class="worker-event-top">
-                        <b>#${item.id} ${item.subject || "Тикет"}</b>
+                        <b>#${item.id} ${item.subject || "Ticket"}</b>
                         <span class="worker-event-time">${item.updated_at || ""}</span>
                     </div>
-                    <small>${item.first_name || "Пользователь"} · ID ${item.client_tg_id || "-"} · @${item.username || "-"}</small>
-                    <small>${item.last_message || "Без комментария"}</small>
+                    <small>${item.first_name || "User"} · ID ${item.client_tg_id || "-"} · @${item.username || "-"}</small>
+                    <small>${item.last_message || "No comment"}</small>
                 </div>
                 <div class="worker-badge ${badgeClass}">${item.status || "new"}</div>
             `;
@@ -1899,8 +1899,8 @@ function bindWorkerClientPage() {
         const data = await resp.json();
         if (resultBox) {
             resultBox.innerHTML = resp.ok && data.ok
-                ? `<span class="pos">${data.details || "Сохранено"}</span>`
-                : `<span class="neg">${data.error || "Ошибка"}</span>`;
+                ? `<span class="pos">${data.details || "Saved"}</span>`
+                : `<span class="neg">${data.error || "Error"}</span>`;
         }
         if (!resp.ok || !data.ok) return false;
         await pollSnapshot();
@@ -1916,11 +1916,11 @@ function bindWorkerClientPage() {
         });
         controls.querySelectorAll(".worker-client-prompt").forEach((btn) => {
             btn.onclick = async () => {
-                const raw = prompt(`${btn.dataset.label || "Значение"}:`);
+                const raw = prompt(`${btn.dataset.label || "Value"}:`);
                 if (raw === null) return;
                 const value = Number(raw);
                 if (Number.isNaN(value)) {
-                    if (resultBox) resultBox.innerHTML = '<span class="neg">Введите корректное число</span>';
+                    if (resultBox) resultBox.innerHTML = '<span class="neg">Enter a valid number</span>';
                     return;
                 }
                 await doClientUpdate(btn.dataset.action, value);
@@ -1928,7 +1928,7 @@ function bindWorkerClientPage() {
         });
         controls.querySelectorAll(".worker-client-text").forEach((btn) => {
             btn.onclick = async () => {
-                const value = prompt(`${btn.dataset.label || "Значение"}:`);
+                const value = prompt(`${btn.dataset.label || "Value"}:`);
                 if (value === null) return;
                 await doClientUpdate(btn.dataset.action, value);
             };
@@ -1951,33 +1951,33 @@ function bindWorkerClientPage() {
             if (!resp.ok) throw new Error("snapshot");
             const data = await resp.json();
             if (!data.ok) throw new Error(data.error || "snapshot");
-            renderItems(activityBox, data.activity, "Событий пока нет.", (item) => {
+            renderItems(activityBox, data.activity, "No events yet.", (item) => {
                 const row = document.createElement("div");
                 row.className = "row worker-event-row";
                 row.innerHTML = `
                     <div class="worker-event-main">
                         <div class="worker-event-top">
-                            <b>${item.title || "Событие"}</b>
+                            <b>${item.title || "Event"}</b>
                             <span class="worker-event-time">${item.created_at || ""}</span>
                         </div>
-                        <small>${item.details || "Без деталей"}</small>
-                        <small>Источник: ${item.actor_source || "-"} · Тип: ${item.event_type || "-"}</small>
+                        <small>${item.details || "No details"}</small>
+                        <small>Source: ${item.actor_source || "-"} · Type: ${item.event_type || "-"}</small>
                     </div>
                     ${item.amount !== null && item.amount !== undefined ? `<div class="worker-event-amount">${Number(item.amount).toFixed(2)} ${item.currency || ""}</div>` : ""}
                 `;
                 return row;
             });
-            renderItems(document.getElementById("worker-client-support"), data.tickets, "Тикетов пока нет.", (item) => {
+            renderItems(document.getElementById("worker-client-support"), data.tickets, "No tickets yet.", (item) => {
                 const row = document.createElement("div");
                 row.className = "row support-row";
                 row.innerHTML = `
                     <div class="worker-event-main">
                         <div class="worker-event-top">
-                            <b>#${item.id} ${item.subject || "Тикет"}</b>
+                            <b>#${item.id} ${item.subject || "Ticket"}</b>
                             <span class="worker-event-time">${item.updated_at || ""}</span>
                         </div>
                         <small>${item.topic || "-"} · ${item.status || "new"}</small>
-                        <small>${item.last_message || "Без комментария"}</small>
+                        <small>${item.last_message || "No comment"}</small>
                     </div>
                 `;
                 return row;
@@ -1988,27 +1988,27 @@ function bindWorkerClientPage() {
             const balanceBox = document.getElementById("worker-client-balance");
             if (balanceBox) balanceBox.textContent = `${Number(client.balance || 0).toFixed(2)} ${client.currency || "USD"}`;
             const minDepBox = document.getElementById("worker-client-min-deposit");
-            if (minDepBox) minDepBox.textContent = `Мин. депозит: ${Number(client.min_deposit || 0).toFixed(2)}`;
+            if (minDepBox) minDepBox.textContent = `Min deposit: ${Number(client.min_deposit || 0).toFixed(2)}`;
             const minWdBox = document.getElementById("worker-client-min-withdraw");
-            if (minWdBox) minWdBox.textContent = `Мин. вывод: ${Number(client.min_withdraw || 0).toFixed(2)}`;
+            if (minWdBox) minWdBox.textContent = `Min withdraw: ${Number(client.min_withdraw || 0).toFixed(2)}`;
             const minTradeBox = document.getElementById("worker-client-min-trade");
-            if (minTradeBox) minTradeBox.textContent = `Мин. сделка: ${Number(client.min_trade_amount || 100).toFixed(2)}`;
+            if (minTradeBox) minTradeBox.textContent = `Min trade: ${Number(client.min_trade_amount || 100).toFixed(2)}`;
             const tradeCoefficientBox = document.getElementById("worker-client-trade-coefficient");
-            if (tradeCoefficientBox) tradeCoefficientBox.textContent = `Коэфф: ${Number(client.trade_coefficient || 1).toFixed(2)}`;
+            if (tradeCoefficientBox) tradeCoefficientBox.textContent = `Coeff: ${Number(client.trade_coefficient || 1).toFixed(2)}`;
             const autoRejectBox = document.getElementById("worker-client-auto-reject");
-            if (autoRejectBox) autoRejectBox.textContent = `Авто-откл: ${client.auto_reject_trades ? "ВКЛ" : "ВЫКЛ"}`;
+            if (autoRejectBox) autoRejectBox.textContent = `Auto-reject: ${client.auto_reject_trades ? "ON" : "OFF"}`;
             const stageBox = document.getElementById("worker-client-stage");
-            if (stageBox) stageBox.textContent = `Этап: ${client.funnel_stage || "new"}`;
+            if (stageBox) stageBox.textContent = `Stage: ${client.funnel_stage || "new"}`;
             const verifiedBox = document.getElementById("worker-client-verified");
-            if (verifiedBox) verifiedBox.textContent = `KYC: ${client.verified ? "ВКЛ" : "ВЫКЛ"}`;
+            if (verifiedBox) verifiedBox.textContent = `KYC: ${client.verified ? "ON" : "OFF"}`;
             const tradingBox = document.getElementById("worker-client-trading");
-            if (tradingBox) tradingBox.textContent = `Торговля: ${client.trading_enabled ? "ВКЛ" : "ВЫКЛ"}`;
+            if (tradingBox) tradingBox.textContent = `Trade: ${client.trading_enabled ? "ON" : "OFF"}`;
             const withdrawBox = document.getElementById("worker-client-withdraw");
-            if (withdrawBox) withdrawBox.textContent = `Вывод: ${client.withdraw_enabled ? "ВКЛ" : "ВЫКЛ"}`;
+            if (withdrawBox) withdrawBox.textContent = `Withdraw: ${client.withdraw_enabled ? "ON" : "OFF"}`;
             const favoriteBox = document.getElementById("worker-client-favorite");
-            if (favoriteBox) favoriteBox.textContent = `Избранное: ${client.favorite ? "ДА" : "НЕТ"}`;
+            if (favoriteBox) favoriteBox.textContent = `Favorite: ${client.favorite ? "YES" : "NO"}`;
             const blockedBox = document.getElementById("worker-client-blocked");
-            if (blockedBox) blockedBox.textContent = `Блок: ${client.blocked ? "ДА" : "НЕТ"}`;
+            if (blockedBox) blockedBox.textContent = `Block: ${client.blocked ? "YES" : "NO"}`;
             if (liveStatus) liveStatus.textContent = L("client_feed_online", "Client feed: online");
         } catch (err) {
             if (liveStatus) liveStatus.textContent = L("client_feed_reconnect", "Client feed: reconnect");
@@ -2033,33 +2033,33 @@ function bindWorkerClientPage() {
         try {
             const data = JSON.parse(event.data);
             if (!data.ok) return;
-            renderItems(activityBox, data.activity, "Событий пока нет.", (item) => {
+            renderItems(activityBox, data.activity, "No events yet.", (item) => {
                 const row = document.createElement("div");
                 row.className = "row worker-event-row";
                 row.innerHTML = `
                     <div class="worker-event-main">
                         <div class="worker-event-top">
-                            <b>${item.title || "Событие"}</b>
+                            <b>${item.title || "Event"}</b>
                             <span class="worker-event-time">${item.created_at || ""}</span>
                         </div>
-                        <small>${item.details || "Без деталей"}</small>
-                        <small>Источник: ${item.actor_source || "-"} · Тип: ${item.event_type || "-"}</small>
+                        <small>${item.details || "No details"}</small>
+                        <small>Source: ${item.actor_source || "-"} · Type: ${item.event_type || "-"}</small>
                     </div>
                     ${item.amount !== null && item.amount !== undefined ? `<div class="worker-event-amount">${Number(item.amount).toFixed(2)} ${item.currency || ""}</div>` : ""}
                 `;
                 return row;
             });
-            renderItems(document.getElementById("worker-client-support"), data.tickets, "Тикетов пока нет.", (item) => {
+            renderItems(document.getElementById("worker-client-support"), data.tickets, "No tickets yet.", (item) => {
                 const row = document.createElement("div");
                 row.className = "row support-row";
                 row.innerHTML = `
                     <div class="worker-event-main">
                         <div class="worker-event-top">
-                            <b>#${item.id} ${item.subject || "Тикет"}</b>
+                            <b>#${item.id} ${item.subject || "Ticket"}</b>
                             <span class="worker-event-time">${item.updated_at || ""}</span>
                         </div>
                         <small>${item.topic || "-"} · ${item.status || "new"}</small>
-                        <small>${item.last_message || "Без комментария"}</small>
+                        <small>${item.last_message || "No comment"}</small>
                     </div>
                 `;
                 return row;
@@ -2070,27 +2070,27 @@ function bindWorkerClientPage() {
             const balanceBox = document.getElementById("worker-client-balance");
             if (balanceBox) balanceBox.textContent = `${Number(client.balance || 0).toFixed(2)} ${client.currency || "USD"}`;
             const minDepBox = document.getElementById("worker-client-min-deposit");
-            if (minDepBox) minDepBox.textContent = `Мин. депозит: ${Number(client.min_deposit || 0).toFixed(2)}`;
+            if (minDepBox) minDepBox.textContent = `Min deposit: ${Number(client.min_deposit || 0).toFixed(2)}`;
             const minWdBox = document.getElementById("worker-client-min-withdraw");
-            if (minWdBox) minWdBox.textContent = `Мин. вывод: ${Number(client.min_withdraw || 0).toFixed(2)}`;
+            if (minWdBox) minWdBox.textContent = `Min withdraw: ${Number(client.min_withdraw || 0).toFixed(2)}`;
             const minTradeBox = document.getElementById("worker-client-min-trade");
-            if (minTradeBox) minTradeBox.textContent = `Мин. сделка: ${Number(client.min_trade_amount || 100).toFixed(2)}`;
+            if (minTradeBox) minTradeBox.textContent = `Min trade: ${Number(client.min_trade_amount || 100).toFixed(2)}`;
             const tradeCoefficientBox = document.getElementById("worker-client-trade-coefficient");
-            if (tradeCoefficientBox) tradeCoefficientBox.textContent = `Коэфф: ${Number(client.trade_coefficient || 1).toFixed(2)}`;
+            if (tradeCoefficientBox) tradeCoefficientBox.textContent = `Coeff: ${Number(client.trade_coefficient || 1).toFixed(2)}`;
             const autoRejectBox = document.getElementById("worker-client-auto-reject");
-            if (autoRejectBox) autoRejectBox.textContent = `Авто-откл: ${client.auto_reject_trades ? "ВКЛ" : "ВЫКЛ"}`;
+            if (autoRejectBox) autoRejectBox.textContent = `Auto-reject: ${client.auto_reject_trades ? "ON" : "OFF"}`;
             const stageBox = document.getElementById("worker-client-stage");
-            if (stageBox) stageBox.textContent = `Этап: ${client.funnel_stage || "new"}`;
+            if (stageBox) stageBox.textContent = `Stage: ${client.funnel_stage || "new"}`;
             const verifiedBox = document.getElementById("worker-client-verified");
-            if (verifiedBox) verifiedBox.textContent = `KYC: ${client.verified ? "ВКЛ" : "ВЫКЛ"}`;
+            if (verifiedBox) verifiedBox.textContent = `KYC: ${client.verified ? "ON" : "OFF"}`;
             const tradingBox = document.getElementById("worker-client-trading");
-            if (tradingBox) tradingBox.textContent = `Торговля: ${client.trading_enabled ? "ВКЛ" : "ВЫКЛ"}`;
+            if (tradingBox) tradingBox.textContent = `Trade: ${client.trading_enabled ? "ON" : "OFF"}`;
             const withdrawBox = document.getElementById("worker-client-withdraw");
-            if (withdrawBox) withdrawBox.textContent = `Вывод: ${client.withdraw_enabled ? "ВКЛ" : "ВЫКЛ"}`;
+            if (withdrawBox) withdrawBox.textContent = `Withdraw: ${client.withdraw_enabled ? "ON" : "OFF"}`;
             const favoriteBox = document.getElementById("worker-client-favorite");
-            if (favoriteBox) favoriteBox.textContent = `Избранное: ${client.favorite ? "ДА" : "НЕТ"}`;
+            if (favoriteBox) favoriteBox.textContent = `Favorite: ${client.favorite ? "YES" : "NO"}`;
             const blockedBox = document.getElementById("worker-client-blocked");
-            if (blockedBox) blockedBox.textContent = `Блок: ${client.blocked ? "ДА" : "НЕТ"}`;
+            if (blockedBox) blockedBox.textContent = `Block: ${client.blocked ? "YES" : "NO"}`;
             if (liveStatus) liveStatus.textContent = L("client_feed_live", "Client feed: live");
         } catch (_) {}
     });
