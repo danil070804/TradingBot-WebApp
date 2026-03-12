@@ -3338,6 +3338,129 @@ async def menu_open_ecn(message: Message, state: FSMContext):
     await start_ecn_flow(message, state)
 
 
+@dp.message(F.text.in_({"📥 Пополнить", "📥 Deposit", "📥 Поповнити"}))
+async def menu_deposit(message: Message, state: FSMContext):
+    await state.clear()
+    user_row = await get_user_row(message.from_user)
+    lang = normalize_lang(user_row["language"])
+    access = await get_client_access_flags(message.from_user.id)
+    if access["blocked"]:
+        await send_blocked_notice(message, lang)
+        return
+    currency = user_row["currency"] or "USD"
+    await send_section_message(
+        message,
+        "deposit",
+        t(lang, "deposit_enter_amount", currency=currency),
+        reply_markup=profile_back_keyboard(lang, (t(lang, "deposit_cancel"), "cancel_deposit")),
+    )
+    await state.set_state(DepositStates.waiting_amount)
+
+
+@dp.message(F.text.in_({"📤 Вывести", "📤 Withdraw", "📤 Вивести"}))
+async def menu_withdraw(message: Message, state: FSMContext):
+    await state.clear()
+    user_row = await get_user_row(message.from_user)
+    lang = normalize_lang(user_row["language"])
+    access = await get_client_access_flags(message.from_user.id)
+    if access["blocked"]:
+        await send_blocked_notice(message, lang)
+        return
+    if not access["withdraw_enabled"]:
+        await send_section_message(
+            message,
+            "withdraw",
+            tr(
+                lang,
+                "⛔ <b>Вывод средств временно отключён</b>\n\nДля уточнения причин обратитесь в техподдержку.",
+                "⛔ <b>Withdrawals are temporarily disabled</b>\n\nContact support for details.",
+                "⛔ <b>Виведення коштів тимчасово вимкнено</b>\n\nДля деталей зверніться в підтримку.",
+            ),
+            reply_markup=support_section_keyboard(lang),
+        )
+        return
+    currency = user_row["currency"] or "USD"
+    await send_section_message(
+        message,
+        "withdraw",
+        tr(
+            lang,
+            f"📤 На какую сумму вы хотите вывести средства? Введите сумму в {currency}.",
+            f"📤 How much do you want to withdraw? Enter amount in {currency}.",
+            f"📤 На яку суму ви хочете вивести кошти? Вкажіть суму в {currency}.",
+        ),
+        reply_markup=profile_back_keyboard(lang, ("❌ Отмена", "wd_cancel")),
+    )
+    await state.set_state(WithdrawStates.waiting_amount)
+
+
+@dp.message(F.text.in_({"✅ Верификация", "✅ Verification", "✅ Верифікація"}))
+async def menu_verify(message: Message, state: FSMContext):
+    await state.clear()
+    user_row = await get_user_row(message.from_user)
+    lang = normalize_lang(user_row["language"])
+    access = await get_client_access_flags(message.from_user.id)
+    if access["verified"]:
+        text = tr(
+            lang,
+            "✅ <b>Верификация подтверждена</b>\n\nВаш аккаунт уже прошёл проверку. Если потребуется обновить данные, откройте техподдержку.",
+            "✅ <b>Verification completed</b>\n\nYour account is already verified. If you need to update any details, open support.",
+            "✅ <b>Верифікацію підтверджено</b>\n\nВаш акаунт уже пройшов перевірку. Якщо потрібно оновити дані, відкрийте підтримку.",
+        )
+    else:
+        text = tr(
+            lang,
+            "🔐 <b>Верификация ещё не пройдена</b>\n\nЧтобы пройти проверку, откройте поддержку, сообщите свой ID и следуйте инструкциям менеджера.",
+            "🔐 <b>Verification is not completed yet</b>\n\nTo pass verification, open support, send your ID and follow the manager instructions.",
+            "🔐 <b>Верифікацію ще не пройдено</b>\n\nЩоб пройти перевірку, відкрийте підтримку, повідомте свій ID і дотримуйтесь інструкцій менеджера.",
+        )
+    await send_section_message(message, "verification", text, reply_markup=verification_keyboard())
+
+
+@dp.message(F.text.in_({"🧾 Мои сделки", "🧾 My Deals", "🧾 Мої угоди"}))
+async def menu_my_deals(message: Message, state: FSMContext):
+    await state.clear()
+    user_row = await get_user_row(message.from_user)
+    lang = normalize_lang(user_row["language"])
+    rows = await get_user_deals(message.from_user.id, limit=10)
+    if not rows:
+        await send_section_message(message, "my_deals", t(lang, "my_deals_empty"), reply_markup=profile_back_keyboard(lang))
+        return
+    text = f"{t(lang, 'my_deals_title')}\n\n{t(lang, 'my_deals_hint')}"
+    await send_section_message(message, "my_deals", text, reply_markup=my_deals_history_keyboard(rows, lang))
+
+
+@dp.message(F.text.in_({"⚙️ Настройки", "⚙️ Settings", "⚙️ Налаштування"}))
+async def menu_settings(message: Message, state: FSMContext):
+    await state.clear()
+    user_row = await get_user_row(message.from_user)
+    lang = normalize_lang(user_row["language"])
+    cur = user_row["currency"] or "не выбрана"
+    text = t(lang, "settings_title", lang_value=lang.upper(), cur=cur)
+    await send_section_message(message, "settings", text, reply_markup=settings_keyboard(lang))
+
+
+@dp.message(F.text.in_({"🛠 Панель воркера", "🛠 Worker Panel", "🛠 Панель воркера"}))
+async def menu_worker_panel(message: Message, state: FSMContext):
+    user_row = await get_user_row(message.from_user)
+    if not bool(user_row["is_worker"]):
+        await message.answer("⛔ Воркер-панель доступна только воркерам.")
+        return
+    await state.clear()
+    await send_worker_panel(message, message.from_user)
+
+
+@dp.message(F.text.in_({"🛠 Админ-панель", "🛠 Admin Panel", "🛠 Адмін-панель"}))
+async def menu_admin_panel(message: Message, state: FSMContext):
+    if not is_admin_id(message.from_user.id):
+        user_row = await get_user_row(message.from_user)
+        if not bool(user_row["is_admin"]):
+            await message.answer("⛔ Нет доступа.")
+            return
+    await state.clear()
+    await send_admin_panel(message)
+
+
 async def start_ecn_flow(msg, state: FSMContext):
     if isinstance(msg, CallbackQuery):
         message = msg.message
@@ -4564,7 +4687,7 @@ async def worker_guide_cb(callback: CallbackQuery):
         "╭ <b>База рефералов</b>\n"
         "├ <b>День / Неделя / Месяц / Всё время</b> — фильтрует базу по активности.\n"
         "├ <b>Избранные</b> — показывает только приоритетных клиентов.\n"
-        "╰ <b>Поиск по ID</b> — быстрый вход в карточку по номеру /n<ID>.\n\n"
+        "╰ <b>Поиск по ID</b> — быстрый вход в карточку по номеру <code>/n123</code>.\n\n"
         "╭ <b>Settings сервиса</b>\n"
         "├ <b>Мин. пополнение</b> — лимит для вашей воронки по пополнению.\n"
         "╰ <b>Мин. вывод</b> — лимит по выводу для клиентов вашей ветки.\n\n"
