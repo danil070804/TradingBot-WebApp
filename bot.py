@@ -1283,6 +1283,7 @@ async def format_trade_result_message(trade_row) -> str:
     start_price = float(trade_row["start_price"] or 0.0)
     change_percent = float(trade_row["change_percent"] or 0.0)
     leverage = int(trade_row["leverage"] or 10)
+    effective_percent = round(change_percent * leverage, 3)
     is_win = bool(trade_row["is_win"])
     credited_amount = max(0.0, amount + profit)
     balance_after = await get_user_balance(int(trade_row["user_tg_id"]))
@@ -1316,6 +1317,12 @@ async def format_trade_result_message(trade_row) -> str:
             f"• <b>Net result:</b> loss {amount:.2f} {currency}",
             f"• <b>Чистий результат:</b> втрата {amount:.2f} {currency}",
         )
+    leverage_formula_line = tr(
+        lang,
+        f"• <b>Расчёт по плечу:</b> {change_percent:.3f}% × {leverage} = {effective_percent:.3f}%",
+        f"• <b>Leverage formula:</b> {change_percent:.3f}% × {leverage} = {effective_percent:.3f}%",
+        f"• <b>Розрахунок по плечу:</b> {change_percent:.3f}% × {leverage} = {effective_percent:.3f}%",
+    )
     return "\n".join(
         [
             status_line,
@@ -1328,9 +1335,11 @@ async def format_trade_result_message(trade_row) -> str:
             f"• <b>{tr(lang, 'Начальный курс', 'Start price', 'Початкова ціна')}:</b> {start_price:.4f} USD",
             f"• <b>{tr(lang, 'Курс в конце сделки', 'End price', 'Кінцева ціна')}:</b> {end_price:.4f} USD",
             f"• <b>{tr(lang, 'Движение цены', 'Price move', 'Рух ціни')}:</b> {change_percent:.3f}%",
+            f"• <b>{tr(lang, 'Движение с плечом', 'Leveraged move', 'Рух з плечем')}:</b> {effective_percent:.3f}%",
             "",
             f"💰 <b>{tr(lang, 'Финансовый итог', 'Financial result', 'Фінальний результат')}</b>",
             f"• <b>PnL:</b> {pnl_line}",
+            leverage_formula_line,
             formula_line,
             balance_flow_line,
             f"• <b>{tr(lang, 'Баланс после сделки', 'Balance after trade', 'Баланс після угоди')}:</b> {balance_after:.2f} {currency}",
