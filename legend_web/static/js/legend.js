@@ -17,6 +17,123 @@ function uiLang() {
     return String(document.body?.dataset?.lang || "en").toLowerCase();
 }
 
+function emptyStateConfig(kind) {
+    const lang = uiLang();
+    const dict = {
+        en: {
+            positions: { title: "No open positions yet", text: "Open your first position from the trade form and track it live here.", cta: "Open Trade", href: "/trade" },
+            tape: { title: "Tape is warming up", text: "Live prints will appear here as soon as market feed starts streaming.", cta: "Open Markets", href: "/markets" },
+            activity: { title: "No live activity yet", text: "When a deal closes, the latest result will appear in this feed.", cta: "Go to Trade", href: "/trade" },
+            markets: { title: "No markets for this filter", text: "Try another filter or clear search to see more instruments.", cta: "Reset Filters", href: "#reset-markets" },
+        },
+        ru: {
+            positions: { title: "Пока нет открытых позиций", text: "Откройте первую сделку в терминале, и она появится здесь в реальном времени.", cta: "Открыть сделку", href: "/trade" },
+            tape: { title: "Лента прогревается", text: "Сделки рынка появятся здесь сразу после запуска потока данных.", cta: "Открыть рынки", href: "/markets" },
+            activity: { title: "Пока нет живой активности", text: "После закрытия сделки ее результат появится в этой ленте.", cta: "Перейти к торговле", href: "/trade" },
+            markets: { title: "По этому фильтру ничего не найдено", text: "Смените фильтр или очистите поиск, чтобы увидеть больше инструментов.", cta: "Сбросить фильтр", href: "#reset-markets" },
+        },
+        uk: {
+            positions: { title: "Поки немає відкритих позицій", text: "Відкрийте першу угоду в терміналі, і вона з'явиться тут у реальному часі.", cta: "Відкрити угоду", href: "/trade" },
+            tape: { title: "Стрічка прогрівається", text: "Ринкові принти з'являться тут одразу після запуску потоку.", cta: "Відкрити ринки", href: "/markets" },
+            activity: { title: "Поки немає живої активності", text: "Після закриття угоди її результат з'явиться в цій стрічці.", cta: "Перейти до торгівлі", href: "/trade" },
+            markets: { title: "За цим фільтром нічого не знайдено", text: "Змініть фільтр або очистіть пошук, щоб побачити більше інструментів.", cta: "Скинути фільтр", href: "#reset-markets" },
+        },
+    };
+    const src = dict[lang] || dict.en;
+    return src[kind] || src.positions;
+}
+
+function emptyStateMarkup(kind) {
+    const cfg = emptyStateConfig(kind);
+    return `
+        <div class="empty-state" data-empty-kind="${kind}">
+            <div class="empty-state-head">
+                <span class="empty-orb"></span>
+                <div class="empty-title">${cfg.title}</div>
+            </div>
+            <div class="empty-text">${cfg.text}</div>
+            <a class="qa-btn empty-cta" href="${cfg.href}">${cfg.cta}</a>
+        </div>
+    `;
+}
+
+function mountEmptyState(container, kind) {
+    if (!container) return;
+    container.innerHTML = emptyStateMarkup(kind);
+    const cta = container.querySelector(".empty-cta");
+    if (!cta) return;
+    cta.addEventListener("click", (event) => {
+        const href = cta.getAttribute("href") || "";
+        if (href !== "#reset-markets") return;
+        event.preventDefault();
+        const search = document.getElementById("markets-search");
+        const sort = document.getElementById("markets-sort");
+        const allChip = document.querySelector('.market-filter-chip[data-filter-mode="all"]');
+        if (search) search.value = "";
+        if (sort) sort.value = "change_desc";
+        if (allChip) allChip.click();
+        const e = new Event("input", { bubbles: true });
+        search?.dispatchEvent(e);
+    });
+}
+
+function initPageIntroRibbon() {
+    const ribbon = document.getElementById("page-intro-ribbon");
+    const page = document.body?.dataset?.page || "";
+    if (!ribbon || !["trade", "markets", "profile"].includes(page)) return;
+    const lang = uiLang();
+    const copy = {
+        en: {
+            trade: { title: "Execution Desk Ready", text: "Live feed, chart and risk deck are synced. You can open positions with one flow.", cta: "Open Full Chart", href: "/trade/chart" },
+            markets: { title: "Market Scanner Live", text: "Use watchlist stars, filters and sort to build your personal trading universe.", cta: "Open Trade Terminal", href: "/trade" },
+            profile: { title: "Control Center", text: "Track account health, open risk and latest activity in one panel.", cta: "Go To Markets", href: "/markets" },
+        },
+        ru: {
+            trade: { title: "Торговый стол готов", text: "Лента, график и риск-панель синхронизированы. Сделку можно открыть в один поток.", cta: "Открыть полный график", href: "/trade/chart" },
+            markets: { title: "Сканер рынков в онлайне", text: "Используйте watchlist, фильтры и сортировку для своего торгового пула.", cta: "Открыть терминал", href: "/trade" },
+            profile: { title: "Центр управления", text: "Следите за состоянием счета, риском позиций и активностью в одном окне.", cta: "Перейти к рынкам", href: "/markets" },
+        },
+        uk: {
+            trade: { title: "Торговий стіл готовий", text: "Стрічка, графік і панель ризику синхронізовані. Угоду можна відкрити в один потік.", cta: "Відкрити повний графік", href: "/trade/chart" },
+            markets: { title: "Сканер ринків онлайн", text: "Використовуйте watchlist, фільтри та сортування для власного торгового пулу.", cta: "Відкрити термінал", href: "/trade" },
+            profile: { title: "Центр керування", text: "Відстежуйте стан рахунку, ризик позицій і активність в одному вікні.", cta: "Перейти до ринків", href: "/markets" },
+        },
+    };
+    const src = copy[lang] || copy.en;
+    const cfg = src[page];
+    if (!cfg) return;
+
+    let seen = false;
+    try {
+        const key = `legend_intro_seen_${page}`;
+        seen = sessionStorage.getItem(key) === "1";
+        sessionStorage.setItem(key, "1");
+    } catch (_) {
+        seen = false;
+    }
+    if (seen) {
+        ribbon.remove();
+        return;
+    }
+
+    ribbon.innerHTML = `
+        <b>${cfg.title}</b>
+        <small>${cfg.text}</small>
+        <div class="page-intro-actions">
+            <a class="qa-btn" href="${cfg.href}">${cfg.cta}</a>
+            <button type="button" class="chip page-intro-close">OK</button>
+        </div>
+    `;
+    ribbon.hidden = false;
+    requestAnimationFrame(() => ribbon.classList.add("show"));
+    const close = () => {
+        ribbon.classList.remove("show");
+        window.setTimeout(() => ribbon.remove(), 220);
+    };
+    ribbon.querySelector(".page-intro-close")?.addEventListener("click", close);
+    window.setTimeout(close, 6200);
+}
+
 function animateNumericText(el, nextValue, options = {}) {
     if (!el || !Number.isFinite(Number(nextValue))) return;
     const {
@@ -127,6 +244,8 @@ function updateProfileLatestDeal(latestDeal) {
     `;
     const empty = wrap.querySelector(".empty");
     if (empty) empty.remove();
+    const emptyState = wrap.querySelector(".empty-state");
+    if (emptyState) emptyState.remove();
     wrap.prepend(row);
     while (wrap.children.length > 6) {
         wrap.lastElementChild.remove();
@@ -1426,6 +1545,11 @@ function bindUserSocket() {
         }
         if (data.latest_deal) {
             updateProfileLatestDeal(data.latest_deal);
+        } else {
+            const activityWrap = document.getElementById("profile-live-activity");
+            if (activityWrap && !activityWrap.querySelector(".profile-row")) {
+                mountEmptyState(activityWrap, "activity");
+            }
         }
     });
 }
@@ -1434,7 +1558,7 @@ function renderOpenPositions(items, tgId) {
     const wrap = document.getElementById("open-positions-list");
     if (!wrap) return;
     if (!items.length) {
-        wrap.innerHTML = `<div class="empty">No open positions.</div>`;
+        mountEmptyState(wrap, "positions");
         const timer = document.getElementById("trade-timer");
         const progress = document.getElementById("trade-progress");
         const result = document.getElementById("trade-result");
@@ -1956,6 +2080,8 @@ function bindMarketsToolbar() {
         allCards.forEach((card) => {
             card.style.display = "none";
         });
+        const oldEmpty = list.querySelector(".markets-empty-state");
+        if (oldEmpty) oldEmpty.remove();
         cards.forEach((card) => {
             card.style.display = "";
             card.classList.remove("market-enter");
@@ -1963,6 +2089,12 @@ function bindMarketsToolbar() {
             card.classList.add("market-enter");
             list.appendChild(card);
         });
+        if (!cards.length) {
+            const holder = document.createElement("div");
+            holder.className = "markets-empty-state";
+            mountEmptyState(holder, "markets");
+            list.appendChild(holder);
+        }
         updateStats(cards);
     };
 
@@ -2862,6 +2994,11 @@ function renderTape(items) {
     const pulse = document.getElementById("market-pulse");
     if (!wrap) return;
     wrap.innerHTML = "";
+    if (!Array.isArray(items) || !items.length) {
+        mountEmptyState(wrap, "tape");
+        if (pulse) pulse.innerHTML = "";
+        return;
+    }
     const pulseItems = [];
     items.forEach((item) => {
         const row = document.createElement("div");
@@ -2926,6 +3063,7 @@ bindTradeQuickActions();
 bindDealHistoryCards();
 initInteractiveFeedback();
 initPageSkeleton();
+initPageIntroRibbon();
 bindPageTransitions();
 initBottomNavMotion();
 initPageArrivalFx();
