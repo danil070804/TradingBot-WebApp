@@ -85,9 +85,18 @@ class _PGConnectionCtx:
 
         if q_upper.startswith("INSERT") and "RETURNING" not in q_upper:
             try:
-                row = await self.conn.fetchrow(q + " RETURNING id", *params)
+                row = await self.conn.fetchrow(q + " RETURNING *", *params)
+                lastrowid = None
+                if row:
+                    for key in ("id", "trade_id", "deposit_id", "withdraw_id"):
+                        if key in row:
+                            try:
+                                lastrowid = int(row[key])
+                            except Exception:
+                                lastrowid = None
+                            break
                 return _PGCursor(
-                    lastrowid=int(row["id"]) if row and "id" in row else None,
+                    lastrowid=lastrowid,
                     rowcount=1 if row else 0,
                 )
             except Exception:
