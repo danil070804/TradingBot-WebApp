@@ -3,7 +3,9 @@
 {% block content %}
 <section class="card hero markets-hero">
     <h1>{{ labels.markets_title if labels else "Markets" }}</h1>
-    <div class="hint">{{ labels.live_tape if labels else "Market Tape (live)" }}</div>
+    <div class="hint">
+        {% if lang == "ru" %}Лента рынка (live){% elif lang == "uk" %}Стрічка ринку (live){% else %}Market Tape (live){% endif %}
+    </div>
     <div class="stats-grid markets-stats">
         <article class="card stat-card"><small>TOTAL</small><b id="markets-total">{{ markets|length }}</b></article>
         <article class="card stat-card"><small>GAINERS</small><b id="markets-gainers">0</b></article>
@@ -15,20 +17,20 @@
 <section class="card">
     <div class="section-title">{{ labels.markets_title if labels else "Markets" }}</div>
     <div class="markets-filters">
-        <button type="button" class="chip market-filter-chip active" data-filter-mode="all">All</button>
-        <button type="button" class="chip market-filter-chip" data-filter-mode="watch">Watchlist</button>
-        <button type="button" class="chip market-filter-chip" data-filter-mode="gainers">Gainers</button>
-        <button type="button" class="chip market-filter-chip" data-filter-mode="losers">Losers</button>
-        <button type="button" class="chip market-filter-chip" data-filter-mode="volatile">Volatile</button>
+        <button type="button" class="chip market-filter-chip active" data-filter-mode="all">{% if lang == "ru" %}Все{% elif lang == "uk" %}Усі{% else %}All{% endif %}</button>
+        <button type="button" class="chip market-filter-chip" data-filter-mode="watch">{% if lang == "ru" %}Избранное{% elif lang == "uk" %}Обране{% else %}Watchlist{% endif %}</button>
+        <button type="button" class="chip market-filter-chip" data-filter-mode="gainers">{% if lang == "ru" %}Рост{% elif lang == "uk" %}Зростання{% else %}Gainers{% endif %}</button>
+        <button type="button" class="chip market-filter-chip" data-filter-mode="losers">{% if lang == "ru" %}Падение{% elif lang == "uk" %}Падіння{% else %}Losers{% endif %}</button>
+        <button type="button" class="chip market-filter-chip" data-filter-mode="volatile">{% if lang == "ru" %}Волатильные{% elif lang == "uk" %}Волатильні{% else %}Volatile{% endif %}</button>
     </div>
     <div class="markets-toolbar">
-        <input id="markets-search" class="markets-search" type="text" placeholder="Search: BTC, Bitcoin, ETH...">
+        <input id="markets-search" class="markets-search" type="text" placeholder="{% if lang == 'ru' %}Поиск: BTC, Bitcoin, ETH...{% elif lang == 'uk' %}Пошук: BTC, Bitcoin, ETH...{% else %}Search: BTC, Bitcoin, ETH...{% endif %}">
         <select id="markets-sort" class="markets-sort">
-            <option value="change_desc">Top gainers</option>
-            <option value="change_asc">Top losers</option>
-            <option value="price_desc">Price: high</option>
-            <option value="price_asc">Price: low</option>
-            <option value="name_asc">Alphabetical</option>
+            <option value="change_desc">{% if lang == "ru" %}Лидеры роста{% elif lang == "uk" %}Лідери зростання{% else %}Top gainers{% endif %}</option>
+            <option value="change_asc">{% if lang == "ru" %}Лидеры падения{% elif lang == "uk" %}Лідери падіння{% else %}Top losers{% endif %}</option>
+            <option value="price_desc">{% if lang == "ru" %}Цена: выше{% elif lang == "uk" %}Ціна: вище{% else %}Price: high{% endif %}</option>
+            <option value="price_asc">{% if lang == "ru" %}Цена: ниже{% elif lang == "uk" %}Ціна: нижче{% else %}Price: low{% endif %}</option>
+            <option value="name_asc">{% if lang == "ru" %}По алфавиту{% elif lang == "uk" %}За алфавітом{% else %}Alphabetical{% endif %}</option>
         </select>
     </div>
     <div class="list" id="markets-list">
@@ -58,7 +60,7 @@
 </section>
 
 <section class="card">
-    <div class="section-title">Market Insights</div>
+    <div class="section-title">{% if lang == "ru" %}Инсайты рынка{% elif lang == "uk" %}Інсайти ринку{% else %}Market Insights{% endif %}</div>
     <div class="stats-grid" id="markets-insights">
         <article class="card stat-card"><small>TOP SYMBOL</small><b id="insight-top-symbol">--</b></article>
         <article class="card stat-card"><small>TOP MOVE</small><b id="insight-top-move">--</b></article>
@@ -68,7 +70,7 @@
 </section>
 
 <section class="card" id="market-detail-card" hidden>
-    <div class="section-title">Instrument Drawer</div>
+    <div class="section-title">{% if lang == "ru" %}Панель инструмента{% elif lang == "uk" %}Панель інструмента{% else %}Instrument Drawer{% endif %}</div>
     <div id="market-detail-content"></div>
 </section>
 {% endblock %}

@@ -220,7 +220,13 @@ function updateExposureWidgets(items, currency = "USD") {
     if (dashRiskLabel) dashRiskLabel.textContent = `${riskLoad.toFixed(1)}%`;
     if (dashRiskFill) dashRiskFill.style.width = `${riskLoad.toFixed(1)}%`;
     if (qOpenExp) qOpenExp.textContent = `${exposure.toFixed(2)} ${currency}`;
-    if (qOpenCount) qOpenCount.textContent = `${openCount} ${openCount === 1 ? "position" : "positions"}`;
+    if (qOpenCount) {
+        const lang = uiLang();
+        let unit = openCount === 1 ? "position" : "positions";
+        if (lang === "ru") unit = openCount === 1 ? "позиция" : "позиций";
+        if (lang === "uk") unit = openCount === 1 ? "позиція" : "позицій";
+        qOpenCount.textContent = `${openCount} ${unit}`;
+    }
     const profileRiskLabel = document.getElementById("profile-open-risk");
     const profileRiskFill = document.getElementById("profile-risk-fill");
     if (profileRiskLabel) profileRiskLabel.textContent = `${riskLoad.toFixed(1)}%`;
@@ -1184,9 +1190,17 @@ function updateMarketStats(data) {
         const span = Math.max(0, LIVE_STATE.high - LIVE_STATE.low);
         if (LIVE_STATE.spread > 0 && span > 0) {
             const pressure = Math.min(100, (LIVE_STATE.spread / span) * 100);
-            qSignal.textContent = pressure > 34 ? "High volatility" : pressure > 16 ? "Balanced flow" : "Tight spread";
+            const lang = uiLang();
+            if (lang === "ru") {
+                qSignal.textContent = pressure > 34 ? "Высокая волатильность" : pressure > 16 ? "Сбалансированный поток" : "Узкий спред";
+            } else if (lang === "uk") {
+                qSignal.textContent = pressure > 34 ? "Висока волатильність" : pressure > 16 ? "Збалансований потік" : "Вузький спред";
+            } else {
+                qSignal.textContent = pressure > 34 ? "High volatility" : pressure > 16 ? "Balanced flow" : "Tight spread";
+            }
         } else {
-            qSignal.textContent = "Streaming";
+            const lang = uiLang();
+            qSignal.textContent = lang === "ru" ? "Поток активен" : lang === "uk" ? "Потік активний" : "Streaming";
         }
     }
 }
@@ -3326,8 +3340,21 @@ function renderTape(items) {
         const inMin = items.filter((x) => Math.abs(nowSec - Number(x.ts || nowSec)) <= 60);
         const tpm = inMin.length || Math.min(20, items.length);
         const symbols = new Set(items.map((x) => String(x.symbol || "").toUpperCase()).filter(Boolean)).size;
-        if (flowText) flowText.textContent = `${tpm} trades/min`;
-        if (participantsText) participantsText.textContent = `${symbols} symbols active`;
+        const lang = uiLang();
+        if (flowText) {
+            flowText.textContent = lang === "ru"
+                ? `${tpm} сделок/мин`
+                : lang === "uk"
+                    ? `${tpm} угод/хв`
+                    : `${tpm} trades/min`;
+        }
+        if (participantsText) {
+            participantsText.textContent = lang === "ru"
+                ? `${symbols} активных символов`
+                : lang === "uk"
+                    ? `${symbols} активних символів`
+                    : `${symbols} symbols active`;
+        }
     }
 }
 

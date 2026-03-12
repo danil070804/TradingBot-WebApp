@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Торговля | Legend Trading{% endblock %}
+{% block title %}{{ labels.nav_trade if labels else ( "Торговля" if lang == "ru" else ("Торгівля" if lang == "uk" else "Trade") ) }} | Legend Trading{% endblock %}
 {% block content %}
 <script>
     window.LEGEND_INITIAL_OPEN_POSITIONS = {{ (initial_open_positions or []) | tojson }};
@@ -12,27 +12,31 @@
     <div class="activity-strip">
         <span id="market-live-dot" class="activity-dot"></span>
         <strong id="market-live-text">{{ labels.trade_feed_booting if labels else "Рынок: подключение" }}</strong>
-        <span id="market-flow">0 trades/min</span>
-        <span id="market-participants">0 symbols active</span>
+        <span id="market-flow">
+            {% if lang == "ru" %}0 сделок/мин{% elif lang == "uk" %}0 угод/хв{% else %}0 trades/min{% endif %}
+        </span>
+        <span id="market-participants">
+            {% if lang == "ru" %}0 активных символов{% elif lang == "uk" %}0 активних символів{% else %}0 symbols active{% endif %}
+        </span>
     </div>
     <div class="pulse-wrap"><div id="market-pulse" class="pulse-track"></div></div>
 </section>
 
 <section class="trade-quickdeck">
     <article class="card quickdeck-card">
-        <small>Risk %</small>
+        <small>{% if lang == "ru" %}Риск %{% elif lang == "uk" %}Ризик %{% else %}Risk %{% endif %}</small>
         <b id="q-risk-pct">0.0%</b>
         <span id="q-risk-amt">0.00</span>
     </article>
     <article class="card quickdeck-card">
-        <small>Market mode</small>
+        <small>{% if lang == "ru" %}Режим рынка{% elif lang == "uk" %}Режим ринку{% else %}Market mode{% endif %}</small>
         <b id="q-market-mode">--</b>
-        <span id="q-market-signal">Awaiting feed</span>
+        <span id="q-market-signal">{% if lang == "ru" %}Ожидание потока{% elif lang == "uk" %}Очікування потоку{% else %}Awaiting feed{% endif %}</span>
     </article>
     <article class="card quickdeck-card">
-        <small>Exposure</small>
+        <small>{% if lang == "ru" %}Экспозиция{% elif lang == "uk" %}Експозиція{% else %}Exposure{% endif %}</small>
         <b id="q-open-exp">0.00</b>
-        <span id="q-open-count">0 positions</span>
+        <span id="q-open-count">{% if lang == "ru" %}0 позиций{% elif lang == "uk" %}0 позицій{% else %}0 positions{% endif %}</span>
     </article>
 </section>
 
@@ -94,7 +98,7 @@
             <label>{{ labels.trade_amount if labels else "Сумма" }}
                 <input id="trade-amount-input" type="number" step="0.01" min="100" name="amount" value="100">
             </label>
-            <label>Risk %
+            <label>{% if lang == "ru" %}Риск %{% elif lang == "uk" %}Ризик %{% else %}Risk %{% endif %}
                 <input id="risk-input" type="number" step="0.1" min="0" max="100" name="risk_percent" value="0">
             </label>
             <div class="chips">
@@ -130,10 +134,10 @@
                 </select>
             </label>
             <div class="direction-group">
-                <label>TP %
+                <label>{% if lang == "ru" %}TP %{% elif lang == "uk" %}TP %{% else %}TP %{% endif %}
                     <input type="number" name="tp_percent" step="0.1" min="0" value="0">
                 </label>
-                <label>SL %
+                <label>{% if lang == "ru" %}SL %{% elif lang == "uk" %}SL %{% else %}SL %{% endif %}
                     <input type="number" name="sl_percent" step="0.1" min="0" value="0">
                 </label>
             </div>
@@ -173,9 +177,9 @@
     </div>
     <div id="trade-result" class="result-box"></div>
     <div class="trade-insight" id="trade-insight">
-        <div><small>Direction</small><b id="insight-direction">LONG</b></div>
-        <div><small>Potential TP</small><b id="insight-tp">--</b></div>
-        <div><small>Potential SL</small><b id="insight-sl">--</b></div>
+        <div><small>{% if lang == "ru" %}Направление{% elif lang == "uk" %}Напрям{% else %}Direction{% endif %}</small><b id="insight-direction">LONG</b></div>
+        <div><small>{% if lang == "ru" %}Потенциал TP{% elif lang == "uk" %}Потенціал TP{% else %}Potential TP{% endif %}</small><b id="insight-tp">--</b></div>
+        <div><small>{% if lang == "ru" %}Потенциал SL{% elif lang == "uk" %}Потенціал SL{% else %}Potential SL{% endif %}</small><b id="insight-sl">--</b></div>
     </div>
 </section>
 <section class="card">
@@ -194,38 +198,46 @@
 <div id="trade-confirm-overlay" class="trade-confirm-overlay" hidden>
     <div class="trade-confirm-card">
         <div class="trade-confirm-head">
-            <strong id="tc-title">Confirm trade</strong>
+            <strong id="tc-title">{% if lang == "ru" %}Подтверждение сделки{% elif lang == "uk" %}Підтвердження угоди{% else %}Confirm trade{% endif %}</strong>
             <button type="button" class="chip" id="tc-cancel-top">✕</button>
         </div>
         <div class="trade-confirm-grid">
-            <div class="trade-confirm-cell"><span>Asset</span><b id="tc-asset">--</b></div>
-            <div class="trade-confirm-cell"><span>Side</span><b id="tc-side">--</b></div>
-            <div class="trade-confirm-cell"><span>Amount</span><b id="tc-amount">--</b></div>
-            <div class="trade-confirm-cell"><span>Leverage</span><b id="tc-lev">--</b></div>
-            <div class="trade-confirm-cell"><span>Expiration</span><b id="tc-exp">--</b></div>
+            <div class="trade-confirm-cell"><span>{% if lang == "ru" %}Актив{% elif lang == "uk" %}Актив{% else %}Asset{% endif %}</span><b id="tc-asset">--</b></div>
+            <div class="trade-confirm-cell"><span>{% if lang == "ru" %}Направление{% elif lang == "uk" %}Напрям{% else %}Side{% endif %}</span><b id="tc-side">--</b></div>
+            <div class="trade-confirm-cell"><span>{% if lang == "ru" %}Сумма{% elif lang == "uk" %}Сума{% else %}Amount{% endif %}</span><b id="tc-amount">--</b></div>
+            <div class="trade-confirm-cell"><span>{% if lang == "ru" %}Плечо{% elif lang == "uk" %}Плече{% else %}Leverage{% endif %}</span><b id="tc-lev">--</b></div>
+            <div class="trade-confirm-cell"><span>{% if lang == "ru" %}Экспирация{% elif lang == "uk" %}Експірація{% else %}Expiration{% endif %}</span><b id="tc-exp">--</b></div>
             <div class="trade-confirm-cell"><span>Mark</span><b id="tc-mark">--</b></div>
         </div>
         <div class="trade-confirm-risk">
-            <div><small>Potential TP</small><b class="pos" id="tc-tp">--</b></div>
-            <div><small>Potential SL</small><b class="neg" id="tc-sl">--</b></div>
-            <div><small>Risk load</small><b id="tc-risk-load">--</b></div>
+            <div><small>{% if lang == "ru" %}Потенциал TP{% elif lang == "uk" %}Потенціал TP{% else %}Potential TP{% endif %}</small><b class="pos" id="tc-tp">--</b></div>
+            <div><small>{% if lang == "ru" %}Потенциал SL{% elif lang == "uk" %}Потенціал SL{% else %}Potential SL{% endif %}</small><b class="neg" id="tc-sl">--</b></div>
+            <div><small>{% if lang == "ru" %}Риск нагрузки{% elif lang == "uk" %}Ризик навантаження{% else %}Risk load{% endif %}</small><b id="tc-risk-load">--</b></div>
         </div>
         <div class="trade-scenario-wrap">
             <div class="trade-scenario-head">
-                <small id="tc-scenario-title">Scenario Preview</small>
+                <small id="tc-scenario-title">{% if lang == "ru" %}Сценарий{% elif lang == "uk" %}Сценарій{% else %}Scenario Preview{% endif %}</small>
                 <span id="tc-scenario-exp">--</span>
             </div>
             <canvas id="tc-scenario-canvas" width="420" height="128"></canvas>
             <div class="trade-scenario-legend">
-                <span><i class="sc-line"></i><b id="tc-entry-label">Entry</b></span>
-                <span><i class="sc-tp"></i><b id="tc-tp-label">TP zone</b></span>
-                <span><i class="sc-sl"></i><b id="tc-sl-label">SL zone</b></span>
+                <span><i class="sc-line"></i><b id="tc-entry-label">{% if lang == "ru" %}Вход{% elif lang == "uk" %}Вхід{% else %}Entry{% endif %}</b></span>
+                <span><i class="sc-tp"></i><b id="tc-tp-label">{% if lang == "ru" %}TP зона{% elif lang == "uk" %}TP зона{% else %}TP zone{% endif %}</b></span>
+                <span><i class="sc-sl"></i><b id="tc-sl-label">{% if lang == "ru" %}SL зона{% elif lang == "uk" %}SL зона{% else %}SL zone{% endif %}</b></span>
             </div>
         </div>
-        <div class="trade-confirm-note" id="tc-note">This estimate is not guaranteed and depends on live market conditions.</div>
+        <div class="trade-confirm-note" id="tc-note">
+            {% if lang == "ru" %}
+            Оценка, не гарантия. Финальный результат зависит от движения рынка.
+            {% elif lang == "uk" %}
+            Оцінка, не гарантія. Фінальний результат залежить від руху ринку.
+            {% else %}
+            This estimate is not guaranteed and depends on live market conditions.
+            {% endif %}
+        </div>
         <div class="trade-confirm-actions">
-            <button type="button" class="chip" id="tc-cancel">Cancel</button>
-            <button type="button" class="submit" id="tc-confirm">Confirm & Open</button>
+            <button type="button" class="chip" id="tc-cancel">{% if lang == "ru" %}Отмена{% elif lang == "uk" %}Скасувати{% else %}Cancel{% endif %}</button>
+            <button type="button" class="submit" id="tc-confirm">{% if lang == "ru" %}Подтвердить и открыть{% elif lang == "uk" %}Підтвердити та відкрити{% else %}Confirm & Open{% endif %}</button>
         </div>
     </div>
 </div>
