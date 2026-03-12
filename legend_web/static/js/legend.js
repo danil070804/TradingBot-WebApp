@@ -9,6 +9,8 @@ function initAppPreloader() {
     const overlay = document.getElementById("app-preloader");
     const fill = document.getElementById("preloader-bar-fill");
     if (!overlay || !fill) return;
+    const startedAt = Date.now();
+    const minVisibleMs = 1300;
     const steps = [18, 36, 58, 78, 92];
     let idx = 0;
     const t = setInterval(() => {
@@ -19,10 +21,12 @@ function initAppPreloader() {
 
     const close = () => {
         fill.style.width = "100%";
-        window.setTimeout(() => overlay.classList.add("done"), 90);
+        const elapsed = Date.now() - startedAt;
+        const waitMore = Math.max(0, minVisibleMs - elapsed);
+        window.setTimeout(() => overlay.classList.add("done"), waitMore + 120);
     };
     window.addEventListener("load", close, { once: true });
-    window.setTimeout(close, 850);
+    window.setTimeout(close, 2200);
 }
 
 function applyRuntimeProfile() {
@@ -496,6 +500,37 @@ function bindMarketSocket() {
         const v = (chartSymbolSelect && chartSymbolSelect.value) || (pairSelect && pairSelect.value) || "BTC";
         return v;
     };
+    const normalizeSymbol = (raw) => String(raw || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+    const symbolAliases = (raw) => {
+        const n = normalizeSymbol(raw);
+        const aliases = new Set([n]);
+        const map = {
+            BITCOIN: ["BTC", "BTCUSDT", "XBT"],
+            ETHEREUM: ["ETH", "ETHUSDT"],
+            TONCOIN: ["TON", "TONUSDT"],
+            SHIBAINU: ["SHIB", "SHIBUSDT"],
+            CARDANO: ["ADA", "ADAUSDT"],
+            SOLANA: ["SOL", "SOLUSDT"],
+            RIPPLE: ["XRP", "XRPUSDT"],
+            TRON: ["TRX", "TRXUSDT"],
+        };
+        Object.entries(map).forEach(([name, group]) => {
+            if (n === name || group.includes(n)) {
+                aliases.add(name);
+                group.forEach((x) => aliases.add(x));
+            }
+        });
+        return aliases;
+    };
+    const symbolsMatch = (incoming, active) => {
+        if (!incoming) return true;
+        const incomingAliases = symbolAliases(incoming);
+        const activeAliases = symbolAliases(active);
+        for (const x of incomingAliases) {
+            if (activeAliases.has(x)) return true;
+        }
+        return false;
+    };
 
     const hasLW = Boolean(window.LightweightCharts && tvChartEl);
     let lwChart = null;
@@ -625,6 +660,13 @@ function bindMarketSocket() {
             state.lastSmoothMark = incomingMark;
         }
         const ref = Number(state.lastSmoothMark);
+        // Guard against outlier ticks that can break the candle structure.
+        if (ref > 0) {
+            const jumpRatio = Math.abs(incomingMark - ref) / ref;
+            if (jumpRatio > 0.12) {
+                return;
+            }
+        }
         const maxDrift = Math.max(ref * 0.0035, 0.00001); // keep intrabar updates exchange-like, not spiky
         const drift = Math.max(-maxDrift, Math.min(maxDrift, incomingMark - ref));
         const clampedMark = ref + drift;
@@ -854,6 +896,9 @@ function bindMarketSocket() {
 
     const applyMarketData = (data, source = "ws") => {
         if (disposed) return;
+        if (source === "ws" && !symbolsMatch(data.symbol || data.asset_name || "", getActiveSymbol())) {
+            return;
+        }
         const markValue = Number(data.mark);
         if (!Number.isFinite(markValue) || markValue <= 0) return;
         if (fallbackTimer && ws && ws.readyState === WebSocket.OPEN) {
