@@ -258,7 +258,7 @@ I18N = {
 
 
 def normalize_lang(lang: str | None) -> str:
-    code = (lang or "ru").strip().lower()
+    code = (lang or "en").strip().lower()
     if code.startswith("uk"):
         return "uk"
     if code.startswith("en"):
@@ -268,7 +268,7 @@ def normalize_lang(lang: str | None) -> str:
 
 def t(lang: str | None, key: str, **kwargs) -> str:
     lang_code = normalize_lang(lang)
-    text = I18N.get(lang_code, I18N["ru"]).get(key, I18N["ru"].get(key, key))
+    text = I18N.get(lang_code, I18N["en"]).get(key, I18N["ru"].get(key, key))
     return text.format(**kwargs) if kwargs else text
 
 
@@ -2997,16 +2997,16 @@ async def set_worker_setting(worker_tg_id: int, field: str, value: float):
 
 def start_rules_text() -> str:
     return (
-        "👋 <b>Добро пожаловать в Legend Trading</b>\n\n"
-        "╭ <b>Первичная настройка</b>\n"
-        "├ Ознакомьтесь с правилами сервиса\n"
-        "├ Подтвердите согласие с регламентом\n"
-        "╰ После этого выберите язык и валюту счёта\n\n"
-        "Нажмите кнопку ниже, чтобы продолжить."
+        "👋 <b>Welcome to Legend Trading</b>\n\n"
+        "╭ <b>Initial setup</b>\n"
+        "├ Review the service rules\n"
+        "├ Confirm agreement with the terms\n"
+        "╰ Then choose your language and account currency\n\n"
+        "Tap the button below to continue."
     )
 
 
-def start_language_text(lang: str = "ru") -> str:
+def start_language_text(lang: str = "en") -> str:
     return tr(
         lang,
         "🌐 <b>Шаг 1 из 2 · Язык интерфейса</b>\n\n"
@@ -3021,7 +3021,7 @@ def start_language_text(lang: str = "ru") -> str:
     )
 
 
-def start_currency_text(lang: str = "ru") -> str:
+def start_currency_text(lang: str = "en") -> str:
     return tr(
         lang,
         "💱 <b>Шаг 2 из 2 · Валюта счёта</b>\n\n"
@@ -3036,7 +3036,7 @@ def start_currency_text(lang: str = "ru") -> str:
     )
 
 
-def start_complete_text(lang: str = "ru") -> str:
+def start_complete_text(lang: str = "en") -> str:
     return tr(
         lang,
         "✅ <b>Стартовая настройка завершена</b>\n\n"
@@ -3050,8 +3050,8 @@ def start_complete_text(lang: str = "ru") -> str:
 
 def rules_keyboard():
     kb = InlineKeyboardBuilder()
-    kb.button(text="📄 Правила сервиса", url=config.user_agreement_url or "https://telegra.ph/Polzovatelskoe-soglashenie-03-27-13")
-    kb.button(text="✅ Принять правила", callback_data="accept_rules")
+    kb.button(text="📄 Service Rules", url=config.user_agreement_url or "https://telegra.ph/Polzovatelskoe-soglashenie-03-27-13")
+    kb.button(text="✅ Accept Rules", callback_data="accept_rules")
     kb.adjust(1)
     return kb.as_markup()
 
@@ -3063,23 +3063,29 @@ LANG_BUTTONS = [
 ]
 
 
-def language_keyboard(include_back: bool = False):
+def language_keyboard(include_back: bool = False, lang: str = "en"):
     kb = InlineKeyboardBuilder()
     for text, code in LANG_BUTTONS:
         kb.button(text=text, callback_data=f"lang:{code}")
     if include_back:
-        kb.button(text="⬅️ К правилам", callback_data="start_back_rules")
+        kb.button(
+            text=tr(lang, "⬅️ К правилам", "⬅️ Back to rules", "⬅️ До правил"),
+            callback_data="start_back_rules",
+        )
         kb.adjust(3, 1)
     else:
         kb.adjust(3)
     return kb.as_markup()
 
 
-def settings_language_keyboard():
+def settings_language_keyboard(lang: str = "en"):
     kb = InlineKeyboardBuilder()
     for text, code in LANG_BUTTONS:
         kb.button(text=text, callback_data=f"lang:{code}")
-    kb.button(text="⬅️ К настройкам", callback_data="settings")
+    kb.button(
+        text=tr(lang, "⬅️ К настройкам", "⬅️ Back to settings", "⬅️ До налаштувань"),
+        callback_data="settings",
+    )
     kb.adjust(3, 1)
     return kb.as_markup()
 
@@ -3206,23 +3212,29 @@ TRADE_PRICE_HINTS = {
 }
 
 
-def currency_keyboard(include_back: bool = False):
+def currency_keyboard(include_back: bool = False, lang: str = "en"):
     kb = InlineKeyboardBuilder()
     for cur in CURRENCIES:
         kb.button(text=cur, callback_data=f"cur:{cur}")
     if include_back:
-        kb.button(text="⬅️ К языку", callback_data="start_back_lang")
+        kb.button(
+            text=tr(lang, "⬅️ К языку", "⬅️ Back to language", "⬅️ До мови"),
+            callback_data="start_back_lang",
+        )
         kb.adjust(4, 4, 4, 1)
     else:
         kb.adjust(4, 4, 4)
     return kb.as_markup()
 
 
-def settings_currency_keyboard():
+def settings_currency_keyboard(lang: str = "en"):
     kb = InlineKeyboardBuilder()
     for cur in CURRENCIES:
         kb.button(text=cur, callback_data=f"cur:{cur}")
-    kb.button(text="⬅️ К настройкам", callback_data="settings")
+    kb.button(
+        text=tr(lang, "⬅️ К настройкам", "⬅️ Back to settings", "⬅️ До налаштувань"),
+        callback_data="settings",
+    )
     kb.adjust(4, 4, 4, 1)
     return kb.as_markup()
 
@@ -3638,7 +3650,7 @@ async def cmd_start(message: Message, state: FSMContext):
             lang = normalize_lang(user_row["language"])
             await message.answer(
                 start_language_text(lang),
-                reply_markup=language_keyboard(include_back=True),
+                reply_markup=language_keyboard(include_back=True, lang=lang),
             )
 
 
@@ -3647,8 +3659,8 @@ async def on_accept_rules(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     await set_accepted_rules(callback.from_user.id)
     await callback.message.edit_text(
-        start_language_text("ru"),
-        reply_markup=language_keyboard(include_back=True),
+        start_language_text("en"),
+        reply_markup=language_keyboard(include_back=True, lang="en"),
     )
     await callback.answer()
 
@@ -3674,7 +3686,7 @@ async def on_language_selected(callback: CallbackQuery, state: FSMContext):
     else:
         await callback.message.edit_text(
             start_currency_text(lang_code),
-            reply_markup=currency_keyboard(include_back=True),
+            reply_markup=currency_keyboard(include_back=True, lang=lang_code),
         )
     await callback.answer()
 
@@ -3685,7 +3697,7 @@ async def start_back_lang(callback: CallbackQuery):
     lang = normalize_lang(user_row["language"])
     await callback.message.edit_text(
         start_language_text(lang),
-        reply_markup=language_keyboard(include_back=True),
+        reply_markup=language_keyboard(include_back=True, lang=lang),
     )
     await callback.answer()
 
@@ -3703,14 +3715,15 @@ async def on_currency_selected(callback: CallbackQuery, state: FSMContext):
         await send_section_message(callback.message, "settings", text, reply_markup=settings_keyboard(lang))
     else:
         await callback.message.edit_text(start_complete_text(lang))
-        await send_main_menu(callback.message)
+        await send_main_menu(callback.message, callback.from_user)
     await callback.answer()
 
 
-async def send_main_menu(message: Message):
-    user_row = await get_user_row(message.from_user)
+async def send_main_menu(message: Message, tg_user=None):
+    user = tg_user or message.from_user
+    user_row = await get_user_row(user)
     lang = normalize_lang(user_row["language"])
-    text = t(lang, "menu_welcome", name=message.from_user.first_name)
+    text = t(lang, "menu_welcome", name=user.first_name)
     await message.answer(text, reply_markup=main_menu_keyboard(lang))
 
 
@@ -5291,7 +5304,12 @@ async def on_settings_lang(callback: CallbackQuery, state: FSMContext):
     user_row = await get_user_row(callback.from_user)
     lang = normalize_lang(user_row["language"])
     await state.set_state(SettingsFlowStates.choosing_lang)
-    await send_section_message(callback.message, "settings", t(lang, "settings_choose_lang"), reply_markup=settings_language_keyboard())
+    await send_section_message(
+        callback.message,
+        "settings",
+        t(lang, "settings_choose_lang"),
+        reply_markup=settings_language_keyboard(lang),
+    )
 
 
 @dp.callback_query(F.data == "settings_currency")
@@ -5300,7 +5318,12 @@ async def on_settings_currency(callback: CallbackQuery, state: FSMContext):
     user_row = await get_user_row(callback.from_user)
     lang = normalize_lang(user_row["language"])
     await state.set_state(SettingsFlowStates.choosing_currency)
-    await send_section_message(callback.message, "settings", t(lang, "settings_choose_currency"), reply_markup=settings_currency_keyboard())
+    await send_section_message(
+        callback.message,
+        "settings",
+        t(lang, "settings_choose_currency"),
+        reply_markup=settings_currency_keyboard(lang),
+    )
 
 
 @dp.callback_query(F.data == "my_deals")
