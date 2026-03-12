@@ -636,6 +636,84 @@ function replaceTradeAssetInUrl(assetName) {
     window.history.replaceState({}, "", url.toString());
 }
 
+function buildTradePreset(assetName) {
+    const name = String(assetName || "").toLowerCase();
+    const isMajor = /(bitcoin|btc|ethereum|eth|solana|sol|bnb|ripple|xrp)/.test(name);
+    const isMeme = /(doge|shib|pepe|floki|bonk)/.test(name);
+    const isDex = /(pancake|swap|uni|aave|curve|link)/.test(name);
+    const balance = Number((document.getElementById("balance-raw") || {}).value || 0);
+    const baseRisk = balance >= 10000 ? 2 : balance >= 3000 ? 3 : 5;
+    const riskPercent = isMeme ? Math.min(2, baseRisk) : isMajor ? baseRisk : Math.min(4, baseRisk);
+    const leverage = isMajor ? 12 : isDex ? 8 : isMeme ? 5 : 9;
+    const seconds = isMajor ? 60 : isDex ? 30 : 30;
+    const tpPercent = isMajor ? 1.8 : isDex ? 2.4 : 2.0;
+    const slPercent = isMajor ? 1.0 : isDex ? 1.2 : 1.1;
+    const direction = LIVE_STATE.mode === "live" && Number(LIVE_STATE.spread || 0) > 0 ? "up" : "up";
+    const amount = balance > 0 ? Number(((balance * riskPercent) / 100).toFixed(2)) : 100;
+    return {
+        riskPercent,
+        leverage,
+        seconds,
+        tpPercent,
+        slPercent,
+        direction,
+        amount: Math.max(100, amount),
+        note: langPick(
+            isMajor
+                ? "Стартовый сценарий для ликвидного актива: умеренный риск и чуть длиннее экспирация."
+                : isDex
+                    ? "Стартовый сценарий для альта: ниже плечо и умеренный TP/SL для аккуратного входа."
+                    : "Стартовый сценарий: короткая экспирация и сдержанный риск без агрессии.",
+            isMajor
+                ? "Starter setup for a liquid asset: moderate risk and slightly longer expiration."
+                : isDex
+                    ? "Starter setup for an alt: lower leverage and moderate TP/SL for a cleaner entry."
+                    : "Starter setup: short expiration and controlled risk without aggression.",
+            isMajor
+                ? "Стартовий сценарій для ліквідного активу: помірний ризик і трохи довша експірація."
+                : isDex
+                    ? "Стартовий сценарій для альта: нижче плече і помірний TP/SL для акуратного входу."
+                    : "Стартовий сценарій: коротка експірація та стриманий ризик без агресії."
+        ),
+    };
+}
+
+function applyTradePreset(assetName, opts = {}) {
+    const force = Boolean(opts.force);
+    const form = document.getElementById("trade-form");
+    if (!form) return;
+    const amountInput = document.getElementById("trade-amount-input");
+    const riskInput = document.getElementById("risk-input");
+    const levRange = document.getElementById("lev-range");
+    const levHidden = document.getElementById("lev-hidden");
+    const secondsSelect = form.querySelector('select[name="seconds"]');
+    const tpInput = form.querySelector('input[name="tp_percent"]');
+    const slInput = form.querySelector('input[name="sl_percent"]');
+    const directionInput = document.getElementById("direction-input");
+    const presetNote = document.getElementById("trade-preset-note");
+    if (!amountInput || !riskInput || !levRange || !levHidden || !secondsSelect || !tpInput || !slInput || !directionInput) return;
+    const currentAsset = String(assetName || "");
+    if (!currentAsset) return;
+    if (!force && form.dataset.prefillAsset === currentAsset) return;
+    const preset = buildTradePreset(currentAsset);
+    amountInput.value = String(preset.amount);
+    riskInput.value = String(preset.riskPercent);
+    levRange.value = String(preset.leverage);
+    levHidden.value = String(preset.leverage);
+    secondsSelect.value = String(preset.seconds);
+    tpInput.value = String(preset.tpPercent);
+    slInput.value = String(preset.slPercent);
+    directionInput.value = preset.direction;
+    document.querySelectorAll(".dir-btn").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.dir === preset.direction);
+    });
+    const levVal = document.getElementById("lev-val");
+    if (levVal) levVal.textContent = `${preset.leverage}x`;
+    if (presetNote) presetNote.textContent = preset.note;
+    form.dataset.prefillAsset = currentAsset;
+    updateTradeInsight();
+}
+
 function drawTradeScenarioPreview(payload, progress = 1) {
     const canvas = document.getElementById("tc-scenario-canvas");
     if (!canvas) return;
@@ -1026,6 +1104,13 @@ function bindTradeControls() {
         });
         amountInput.addEventListener("input", syncRiskDeck);
     }
+    const pairSelect = document.querySelector('#trade-form select[name="asset_name"]');
+    if (pairSelect) {
+        pairSelect.addEventListener("change", () => {
+            applyTradePreset(pairSelect.value, { force: true });
+            syncRiskDeck();
+        });
+    }
 
     const levRange = document.getElementById("lev-range");
     const levVal = document.getElementById("lev-val");
@@ -1044,6 +1129,9 @@ function bindTradeControls() {
     document.querySelectorAll(".dir-btn").forEach((el) => {
         el.addEventListener("click", updateTradeInsight);
     });
+    if (pairSelect) {
+        applyTradePreset(pairSelect.value, { force: true });
+    }
     syncRiskDeck();
     updateTradeInsight();
 }
