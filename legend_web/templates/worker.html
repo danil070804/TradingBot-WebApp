@@ -1,14 +1,12 @@
 {% extends "base.html" %}
-{% block title %}{{ labels.get('worker_page_title', 'Worker Panel') if labels else "Worker Panel" }} | Legend Trading{% endblock %}
+{% block title %}{{ labels.worker_page_title if labels else "Worker Panel" }} | Legend Trading{% endblock %}
 {% block content %}
 <section class="card hero">
     <div class="markets-hero-top">
         <div class="markets-hero-copy">
             <h1>{{ labels.worker_title if labels else "Панель воркера" }}</h1>
-            <strong class="markets-hero-headline">
-                {% if lang == "ru" %}Управляй клиентами, воронкой и поддержкой из одного рабочего центра{% elif lang == "uk" %}Керуй клієнтами, воронкою та підтримкою з одного робочого центру{% else %}Manage clients, funnel and support from one operating desk{% endif %}
-            </strong>
-            <p class="markets-hero-lead">{{ labels.worker_hint if labels else ("Управление вашими рефералами в реальном времени" if lang == "ru" else ("Керування вашими рефералами в реальному часі" if lang == "uk" else "Manage your referrals in real time")) }}</p>
+            <strong class="markets-hero-headline">{{ labels.worker_hero_title if labels else "Manage clients, funnel and support from one operating desk" }}</strong>
+            <p class="markets-hero-lead">{{ labels.worker_hint if labels else "Manage your referrals in real time" }}</p>
         </div>
     </div>
     <div class="worker-meta">
@@ -18,7 +16,7 @@
     <div id="worker-live-meta" data-worker-id="{{ worker_id }}"></div>
     {% if worker_ref_link %}
     <div class="worker-ref-box">
-        <small>{{ labels.get('worker_ref_link', 'Referral link') if labels else "Referral link" }}</small>
+        <small>{{ labels.worker_ref_link if labels else "Referral link" }}</small>
         <code>{{ worker_ref_link }}</code>
     </div>
     {% endif %}
@@ -32,7 +30,7 @@
 </section>
 
 <section class="card worker-stage-panel">
-    <div class="section-title">{{ labels.get('worker_funnel_title', 'Referral Funnel') if labels else ("Реферальная воронка" if lang == "ru" else ("Реферальна воронка" if lang == "uk" else "Referral Funnel")) }}</div>
+    <div class="section-title">{{ labels.worker_funnel_title if labels else "Referral Funnel" }}</div>
     <div class="funnel-track">
         <span class="funnel-step active">new</span>
         <span class="funnel-step active">web</span>
@@ -45,7 +43,7 @@
 
 <section class="card">
     <div class="section-title">{{ labels.worker_title if labels else "Панель воркера" }}</div>
-    <p class="deposit-lead">{{ labels.get('worker_manage_lead', 'Manage clients, limits, and statuses in one view. Click a client card to open profile.') if labels else "Manage clients, limits, and statuses in one view. Click a client card to open profile." }}</p>
+    <p class="deposit-lead">{{ labels.worker_manage_lead if labels else "Manage clients, limits, and statuses in one view. Click a client card to open profile." }}</p>
     <div class="worker-toolbar">
         <input id="worker-search" type="search" placeholder="{{ labels.get('worker_search_placeholder', 'Search by name, ID or username') if labels else 'Search by name, ID or username' }}">
         <select id="worker-filter">
