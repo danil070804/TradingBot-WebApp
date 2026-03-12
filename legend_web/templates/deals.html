@@ -9,11 +9,20 @@
             href="/deals/{{ d.id }}"
             class="row deal-history-row"
         >
-            <div>
-                <b>#{{ d.id }} {{ d.asset_name }} {{ "UP" if d.direction == "up" else "DOWN" }}</b>
-                <small>{{ d.amount }} {{ d.currency }} | {{ d.created_at }}</small>
+            <div class="deal-history-main">
+                <div class="deal-history-top">
+                    <span class="deal-ticket">#{{ d.id }}</span>
+                    <b>{{ d.asset_name }}</b>
+                    <span class="deal-side {{ 'is-up' if d.direction == 'up' else 'is-down' }}">
+                        {{ "UP" if d.direction == "up" else "DOWN" }}
+                    </span>
+                </div>
+                <small>{{ "%.2f"|format(d.amount) }} {{ d.currency }} · {{ d.created_at }}</small>
             </div>
-            <div class="{{ 'pos' if d.is_win else 'neg' }}">{{ "%+.2f"|format(d.profit) }}</div>
+            <div class="deal-history-pnl {{ 'profit' if d.is_win else 'loss' }}">
+                <span class="deal-pnl-label">{{ "Profit" if d.is_win else "Loss" }}</span>
+                <strong class="{{ 'pos' if d.is_win else 'neg' }}">{{ "%+.2f"|format(d.profit) }}</strong>
+            </div>
         </a>
         {% else %}
         <div class="empty">{{ labels.deals_empty if labels else "История пока пустая." }}</div>
