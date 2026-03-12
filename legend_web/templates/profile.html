@@ -77,11 +77,11 @@
 <section class="quick-actions profile-quick-actions">
     <a class="qa-btn" href="/trade">{{ labels.quick_trade if labels else "Открыть сделку" }}</a>
     <a class="qa-btn" href="/deposit">{{ labels.nav_deposit if labels else "Пополнить" }}</a>
+    <a class="qa-btn" href="/withdraw">{{ labels.nav_withdraw if labels else "Вывести" }}</a>
     <a class="qa-btn" href="/deals">{{ labels.nav_deals if labels else "Сделки" }}</a>
     <a class="qa-btn" href="/markets">{{ labels.nav_markets if labels else "Рынки" }}</a>
-    {% if support_url %}
-    <a class="qa-btn" href="{{ support_url }}" target="_blank" rel="noopener noreferrer">{{ labels.quick_verify if labels else "Пройти верификацию" }}</a>
-    {% endif %}
+    <a class="qa-btn" href="/verify">{{ labels.quick_verify if labels else "Пройти верификацию" }}</a>
+    <a class="qa-btn" href="/support">{{ labels.js_support_btn if labels else "Перейти в поддержку" }}</a>
     {% if user and user.is_worker %}
     <a class="qa-btn" href="/worker">{{ labels.quick_worker if labels else "Панель воркера" }}</a>
     {% endif %}
@@ -99,6 +99,36 @@
         <div class="profile-meta"><span>{{ labels.profile_currency if labels else "Валюта" }}</span><b>{{ user.currency if user and user.currency else "USD" }}</b></div>
         <div class="profile-meta"><span>{{ labels.profile_pending if labels else "На выводе" }}</span><b>{{ "%.2f"|format(pending) }}</b></div>
         <div class="profile-meta"><span>Status</span><b>{{ "Admin" if user and user.is_admin else ("Worker" if user and user.is_worker else "Client") }}</b></div>
+    </div>
+</section>
+
+<section class="card">
+    <div class="section-title">{% if lang == "ru" %}Верификация и поддержка{% elif lang == "uk" %}Верифікація та підтримка{% else %}Verification and Support{% endif %}</div>
+    <div class="profile-grid">
+        <div class="profile-meta">
+            <span>{% if lang == "ru" %}Верификация{% elif lang == "uk" %}Верифікація{% else %}Verification{% endif %}</span>
+            <b class="{{ 'pos' if access.verified else 'neg' }}">
+                {% if access.verified %}
+                    {% if lang == "ru" %}Пройдена{% elif lang == "uk" %}Пройдена{% else %}Completed{% endif %}
+                {% else %}
+                    {% if lang == "ru" %}Не пройдена{% elif lang == "uk" %}Не пройдена{% else %}Not completed{% endif %}
+                {% endif %}
+            </b>
+        </div>
+        <div class="profile-meta">
+            <span>{% if lang == "ru" %}Следующий шаг{% elif lang == "uk" %}Наступний крок{% else %}Next step{% endif %}</span>
+            <b>
+                {% if access.verified %}
+                    {% if lang == "ru" %}Поддержка по запросу{% elif lang == "uk" %}Підтримка за запитом{% else %}Open support if needed{% endif %}
+                {% else %}
+                    {% if lang == "ru" %}Открыть верификацию{% elif lang == "uk" %}Відкрити верифікацію{% else %}Open verification{% endif %}
+                {% endif %}
+            </b>
+        </div>
+    </div>
+    <div class="quick-actions profile-quick-actions">
+        <a class="qa-btn" href="/verify">{{ labels.quick_verify if labels else "Пройти верификацию" }}</a>
+        <a class="qa-btn" href="/support">{{ labels.js_support_btn if labels else "Перейти в поддержку" }}</a>
     </div>
 </section>
 

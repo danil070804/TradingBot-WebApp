@@ -2453,6 +2453,66 @@ async def deal_detail(request: Request, deal_id: int):
     )
 
 
+@app.get("/support")
+async def support_page_redirect(request: Request):
+    tg_id = await get_current_user_id(request)
+    if tg_id:
+        user = await fetch_one("SELECT first_name, username FROM users WHERE tg_id = ?", (tg_id,))
+        worker_id = await bot.get_worker_for_client(tg_id)
+        existing = await bot.get_latest_open_support_ticket(tg_id, "general")
+        if existing:
+            await bot.update_support_ticket_status(int(existing["id"]), "new", last_message="Клиент открыл раздел техподдержки в WebApp")
+        else:
+            await bot.create_support_ticket(
+                client_tg_id=tg_id,
+                worker_tg_id=worker_id,
+                source="web",
+                topic="general",
+                subject="Обращение в техподдержку",
+                status="new",
+                last_message="Клиент открыл раздел техподдержки в WebApp",
+            )
+        await log_web_activity_for_worker(
+            client_tg_id=tg_id,
+            actor_tg_id=tg_id,
+            event_type="web_support_section_opened",
+            title="Открыта техподдержка",
+            details="Лохматый открыл раздел техподдержки в WebApp.",
+        )
+    target = (bot.config.support_url or "").strip() or "/profile"
+    return RedirectResponse(url=target, status_code=302)
+
+
+@app.get("/verify")
+async def verification_page_redirect(request: Request):
+    tg_id = await get_current_user_id(request)
+    if tg_id:
+        user = await fetch_one("SELECT first_name, username FROM users WHERE tg_id = ?", (tg_id,))
+        worker_id = await bot.get_worker_for_client(tg_id)
+        existing = await bot.get_latest_open_support_ticket(tg_id, "verification")
+        if existing:
+            await bot.update_support_ticket_status(int(existing["id"]), "new", last_message="Клиент открыл раздел верификации в WebApp")
+        else:
+            await bot.create_support_ticket(
+                client_tg_id=tg_id,
+                worker_tg_id=worker_id,
+                source="web",
+                topic="verification",
+                subject="Запрос на верификацию",
+                status="new",
+                last_message="Клиент открыл раздел верификации в WebApp",
+            )
+        await log_web_activity_for_worker(
+            client_tg_id=tg_id,
+            actor_tg_id=tg_id,
+            event_type="web_verification_opened",
+            title="Открыта верификация",
+            details="Лохматый открыл раздел верификации в WebApp.",
+        )
+    target = (bot.config.support_url or "").strip() or "/profile"
+    return RedirectResponse(url=target, status_code=302)
+
+
 @app.get("/profile", response_class=HTMLResponse)
 async def profile_page(request: Request):
     tg_id = await get_current_user_id(request)
@@ -2465,6 +2525,7 @@ async def profile_page(request: Request):
     user = await get_nav_user(tg_id)
     stats = await bot.get_user_deal_stats(tg_id) if tg_id else {"wins": 0, "losses": 0, "total": 0, "total_profit": 0.0}
     pending = await bot.get_user_pending_withdraw_sum(tg_id) if tg_id else 0.0
+    access = await bot.get_client_access_flags(tg_id) if tg_id else {"verified": False, "blocked": False, "withdraw_enabled": False, "trading_enabled": True}
     withdrawals = await fetch_all(
         "SELECT amount, currency, method, status, created_at FROM withdrawals WHERE user_tg_id = ? ORDER BY id DESC LIMIT 8",
         (tg_id,),
@@ -2482,6 +2543,7 @@ async def profile_page(request: Request):
             "user": user,
             "stats": stats,
             "pending": pending,
+            "access": access,
             "tg_id": tg_id,
             "withdrawals": withdrawals,
             "deposits": deposits,
