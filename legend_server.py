@@ -3337,11 +3337,13 @@ async def ws_user(websocket: WebSocket):
         payload = json.loads(first)
         tg_id = int(payload.get("tg_id") or 0)
     except Exception:
-        await websocket.close()
+        with contextlib.suppress(Exception):
+            await websocket.close()
         return
 
     if tg_id <= 0:
-        await websocket.close()
+        with contextlib.suppress(Exception):
+            await websocket.close()
         return
 
     try:
@@ -3384,6 +3386,10 @@ async def ws_user(websocket: WebSocket):
             )
             await asyncio.sleep(1.2)
     except WebSocketDisconnect:
+        return
+    except Exception:
+        with contextlib.suppress(Exception):
+            await websocket.close()
         return
 
 

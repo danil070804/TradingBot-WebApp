@@ -7,26 +7,25 @@
     <div class="empty">{{ labels.profile_not_init_desc if labels else "Откройте WebApp напрямую из Telegram-кнопки бота, чтобы загрузить ваш профиль." }}</div>
 </section>
 {% else %}
-<section class="card hero">
+<section class="card hero profile-hero">
     <input type="hidden" name="tg_id" value="{{ tg_id }}">
-    <h1>{{ labels.profile_title if labels else "Профиль аккаунта" }}</h1>
+    <div class="profile-hero-top">
+        <div class="profile-avatar">{{ (user.first_name[:1] if user and user.first_name else "U")|upper }}</div>
+        <div>
+            <h1>{{ labels.profile_title if labels else "Профиль аккаунта" }}</h1>
+            <div class="profile-name">{{ user.first_name if user else "—" }}</div>
+            <div class="hint">TG ID: <code>{{ tg_id }}</code></div>
+        </div>
+    </div>
     <div class="balance">{{ "%.2f"|format((user.balance if user else 0) or 0) }} {{ (user.currency if user else "USD") or "USD" }}</div>
-    <div class="hint">TG ID: {{ tg_id }}</div>
-    <div class="hint">Открытые сделки: <span id="live-open-trades">0</span></div>
-</section>
-
-<section class="card">
-    <div class="section-title">{{ labels.profile_user_data if labels else "Данные пользователя" }}</div>
-    <div class="list">
-        <div class="row"><div><b>{{ labels.profile_name if labels else "Имя" }}</b></div><div>{{ user.first_name if user else "-" }}</div></div>
-        <div class="row"><div><b>{{ labels.profile_username if labels else "Username" }}</b></div><div>@{{ user.username if user and user.username else "-" }}</div></div>
-        <div class="row"><div><b>{{ labels.profile_lang if labels else "Язык" }}</b></div><div>{{ user.language if user and user.language else "ru" }}</div></div>
-        <div class="row"><div><b>{{ labels.profile_currency if labels else "Валюта" }}</b></div><div>{{ user.currency if user and user.currency else "USD" }}</div></div>
-        <div class="row"><div><b>{{ labels.profile_pending if labels else "На выводе" }}</b></div><div>{{ "%.2f"|format(pending) }}</div></div>
+    <div class="profile-chips">
+        <span class="profile-chip">Open: <b id="live-open-trades">0</b></span>
+        <span class="profile-chip">PNL: <b class="{{ 'pos' if stats.total_profit >= 0 else 'neg' }}">{{ "%+.2f"|format(stats.total_profit) }}</b></span>
+        <span class="profile-chip">Deals: <b>{{ stats.total }}</b></span>
     </div>
 </section>
 
-<section class="metrics">
+<section class="metrics profile-metrics">
     <article class="card metric">
         <h3>{{ labels.profile_total_deals if labels else "Сделок" }}</h3>
         <p>{{ stats.total }}</p>
@@ -40,7 +39,12 @@
         <p class="{{ 'pos' if stats.total_profit >= 0 else 'neg' }}">{{ "%+.2f"|format(stats.total_profit) }}</p>
     </article>
 </section>
-<section class="quick-actions">
+
+<section class="quick-actions profile-quick-actions">
+    <a class="qa-btn" href="/trade">{{ labels.quick_trade if labels else "Открыть сделку" }}</a>
+    <a class="qa-btn" href="/deposit">{{ labels.nav_deposit if labels else "Пополнить" }}</a>
+    <a class="qa-btn" href="/deals">{{ labels.nav_deals if labels else "Сделки" }}</a>
+    <a class="qa-btn" href="/markets">{{ labels.nav_markets if labels else "Рынки" }}</a>
     {% if support_url %}
     <a class="qa-btn" href="{{ support_url }}" target="_blank" rel="noopener noreferrer">{{ labels.quick_verify if labels else "Пройти верификацию" }}</a>
     {% endif %}
@@ -51,6 +55,19 @@
     <a class="qa-btn" href="/admin">{{ labels.quick_admin if labels else "Админ-панель" }}</a>
     {% endif %}
 </section>
+
+<section class="card">
+    <div class="section-title">{{ labels.profile_user_data if labels else "Данные пользователя" }}</div>
+    <div class="profile-grid">
+        <div class="profile-meta"><span>{{ labels.profile_name if labels else "Имя" }}</span><b>{{ user.first_name if user else "-" }}</b></div>
+        <div class="profile-meta"><span>{{ labels.profile_username if labels else "Username" }}</span><b>@{{ user.username if user and user.username else "-" }}</b></div>
+        <div class="profile-meta"><span>{{ labels.profile_lang if labels else "Язык" }}</span><b>{{ user.language if user and user.language else "ru" }}</b></div>
+        <div class="profile-meta"><span>{{ labels.profile_currency if labels else "Валюта" }}</span><b>{{ user.currency if user and user.currency else "USD" }}</b></div>
+        <div class="profile-meta"><span>{{ labels.profile_pending if labels else "На выводе" }}</span><b>{{ "%.2f"|format(pending) }}</b></div>
+        <div class="profile-meta"><span>Status</span><b>{{ "Admin" if user and user.is_admin else ("Worker" if user and user.is_worker else "Client") }}</b></div>
+    </div>
+</section>
+
 <section class="card">
     <div class="section-title">{{ labels.trade_open_positions if labels else "Открытые позиции" }}</div>
     <div class="list" id="open-positions-list">
@@ -61,9 +78,9 @@
     <div class="section-title">{{ labels.profile_recent_deposits if labels else "Последние пополнения" }}</div>
     <div class="list">
         {% for d in deposits %}
-        <div class="row">
+        <div class="row profile-row">
             <div><b>{{ d.method }}</b><small>{{ d.created_at }}</small></div>
-            <div>{{ "%.2f"|format(d.amount) }} {{ d.currency }} • {{ d.status }}</div>
+            <div><b>{{ "%.2f"|format(d.amount) }} {{ d.currency }}</b><small>{{ d.status }}</small></div>
         </div>
         {% else %}
         <div class="empty">{{ labels.profile_no_deposits if labels else "Пополнений пока нет." }}</div>
@@ -74,9 +91,9 @@
     <div class="section-title">{{ labels.profile_recent_withdraws if labels else "Последние выводы" }}</div>
     <div class="list">
         {% for w in withdrawals %}
-        <div class="row">
+        <div class="row profile-row">
             <div><b>{{ w.method }}</b><small>{{ w.created_at }}</small></div>
-            <div>{{ "%.2f"|format(w.amount) }} {{ w.currency }} • {{ w.status }}</div>
+            <div><b>{{ "%.2f"|format(w.amount) }} {{ w.currency }}</b><small>{{ w.status }}</small></div>
         </div>
         {% else %}
         <div class="empty">{{ labels.profile_no_withdraws if labels else "Выводов пока нет." }}</div>

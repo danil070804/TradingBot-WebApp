@@ -319,7 +319,7 @@ function bindDepositForm() {
 }
 
 function buildCandleState() {
-    return { tf: 60, candles: [] };
+    return { tf: 60, candles: [], lastSmoothMark: null };
 }
 
 function pushCandle(state, price, ts) {
@@ -460,22 +460,33 @@ function bindMarketSocket() {
         lwChart = window.LightweightCharts.createChart(tvChartEl, {
             width: tvChartEl.clientWidth || 430,
             height: tvChartEl.clientHeight || 360,
-            layout: { background: { color: "#06090d" }, textColor: "#9aa3ad" },
-            rightPriceScale: { borderColor: "rgba(255,255,255,0.08)" },
-            timeScale: { borderColor: "rgba(255,255,255,0.08)", timeVisible: true, secondsVisible: false },
+            layout: { background: { color: "#07131f" }, textColor: "#9db4c8" },
+            rightPriceScale: { borderColor: "rgba(140, 186, 219, 0.18)" },
+            timeScale: {
+                borderColor: "rgba(140, 186, 219, 0.18)",
+                timeVisible: true,
+                secondsVisible: false,
+                rightOffset: 2,
+                barSpacing: 8,
+                minBarSpacing: 4,
+            },
             grid: {
-                vertLines: { color: "rgba(255,255,255,0.06)" },
-                horzLines: { color: "rgba(255,255,255,0.06)" },
+                vertLines: { color: "rgba(128, 173, 207, 0.10)" },
+                horzLines: { color: "rgba(128, 173, 207, 0.10)" },
             },
             crosshair: { mode: crosshairEnabled ? 1 : 0 },
+            localization: { locale: "en-US" },
         });
         candleSeries = lwChart.addCandlestickSeries({
-            upColor: "#00d2c9",
-            downColor: "#ff375f",
-            wickUpColor: "#00d2c9",
-            wickDownColor: "#ff375f",
-            borderVisible: false,
-            priceLineColor: "#ff375f",
+            upColor: "#00d69f",
+            downColor: "#ff4f72",
+            wickUpColor: "#00d69f",
+            wickDownColor: "#ff4f72",
+            borderUpColor: "#00d69f",
+            borderDownColor: "#ff4f72",
+            borderVisible: true,
+            priceLineColor: "#45c0ff",
+            priceLineWidth: 1,
         });
         volumeSeries = lwChart.addHistogramSeries({
             priceFormat: { type: "volume" },
@@ -485,10 +496,10 @@ function bindMarketSocket() {
         });
         lwChart.priceScale("vol").applyOptions({
             visible: false,
-            scaleMargins: { top: 0.82, bottom: 0.02 },
+            scaleMargins: { top: 0.80, bottom: 0.02 },
         });
         lwChart.priceScale("right").applyOptions({
-            scaleMargins: { top: 0.06, bottom: 0.22 },
+            scaleMargins: { top: 0.05, bottom: 0.20 },
         });
         onResize = () => {
             lwChart.applyOptions({ width: tvChartEl.clientWidth || 430 });
@@ -532,6 +543,7 @@ function bindMarketSocket() {
         if (!Array.isArray(candles) || !candles.length) return;
         state.candles = candles;
         state.lastBar = candles[candles.length - 1];
+        state.lastSmoothMark = Number(state.lastBar.close || state.lastBar.open || 0) || null;
         if (lwChart && candleSeries && volumeSeries) {
             candleSeries.setData(
                 candles.map((c) => ({
@@ -560,6 +572,19 @@ function bindMarketSocket() {
     };
 
     const updateLiveBar = (mark, ts) => {
+        const incomingMark = Number(mark);
+        if (!Number.isFinite(incomingMark) || incomingMark <= 0) return;
+        if (!state.lastSmoothMark || !Number.isFinite(state.lastSmoothMark)) {
+            state.lastSmoothMark = incomingMark;
+        }
+        const ref = Number(state.lastSmoothMark);
+        const maxDrift = Math.max(ref * 0.0035, 0.00001); // keep intrabar updates exchange-like, not spiky
+        const drift = Math.max(-maxDrift, Math.min(maxDrift, incomingMark - ref));
+        const clampedMark = ref + drift;
+        const smoothMark = ref * 0.72 + clampedMark * 0.28;
+        mark = Number(smoothMark.toFixed(8));
+        state.lastSmoothMark = mark;
+
         const tf = Number(state.tf || 60);
         const bucket = Math.floor(ts / tf) * tf;
         const prev = state.lastBar;

@@ -1110,6 +1110,11 @@ async def get_section_photo_file_id(section_key: str) -> str:
 async def send_section_message(target: Message, section_key: str, text: str, reply_markup=None):
     photo_id = await get_section_photo_file_id(section_key)
     if photo_id:
+        # Telegram caption limit is 1024 chars; long section texts should still keep media.
+        if len(text or "") > 1024:
+            with contextlib.suppress(Exception):
+                await target.answer_photo(photo=photo_id, caption="📌")
+                return await target.answer(text, reply_markup=reply_markup, disable_web_page_preview=True)
         with contextlib.suppress(Exception):
             return await target.answer_photo(photo=photo_id, caption=text, reply_markup=reply_markup)
     return await target.answer(text, reply_markup=reply_markup, disable_web_page_preview=True)

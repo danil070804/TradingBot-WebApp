@@ -47,6 +47,7 @@
 <script>
 window.LEGEND_LABELS = {{ labels|tojson if labels else '{}' }};
 </script>
+{% block extra_scripts %}{% endblock %}
 <script src="/static/js/legend.js"></script>
 </body>
 </html>
