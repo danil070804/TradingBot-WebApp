@@ -237,9 +237,9 @@
     </div>
     <div id="trade-result" class="result-box"></div>
     <div class="trade-insight" id="trade-insight">
-        <div><small>{% if lang == "ru" %}Направление{% elif lang == "uk" %}Напрям{% else %}Direction{% endif %}</small><b id="insight-direction">LONG</b></div>
-        <div><small>{% if lang == "ru" %}Потенциал TP{% elif lang == "uk" %}Потенціал TP{% else %}Potential TP{% endif %}</small><b id="insight-tp">--</b></div>
-        <div><small>{% if lang == "ru" %}Потенциал SL{% elif lang == "uk" %}Потенціал SL{% else %}Potential SL{% endif %}</small><b id="insight-sl">--</b></div>
+        <div><small>{{ labels.trade_direction if labels else "Направление" }}</small><b id="insight-direction">LONG</b></div>
+        <div><small>{{ labels.trade_potential_tp if labels else "Потенциал TP" }}</small><b id="insight-tp">--</b></div>
+        <div><small>{{ labels.trade_potential_sl if labels else "Потенциал SL" }}</small><b id="insight-sl">--</b></div>
     </div>
 </section>
 <section class="card">
@@ -258,46 +258,38 @@
 <div id="trade-confirm-overlay" class="trade-confirm-overlay" hidden>
     <div class="trade-confirm-card">
         <div class="trade-confirm-head">
-            <strong id="tc-title">{% if lang == "ru" %}Подтверждение сделки{% elif lang == "uk" %}Підтвердження угоди{% else %}Confirm trade{% endif %}</strong>
+            <strong id="tc-title">{{ labels.trade_confirm_title if labels else "Подтверждение сделки" }}</strong>
             <button type="button" class="chip" id="tc-cancel-top">✕</button>
         </div>
         <div class="trade-confirm-grid">
-            <div class="trade-confirm-cell"><span>{% if lang == "ru" %}Актив{% elif lang == "uk" %}Актив{% else %}Asset{% endif %}</span><b id="tc-asset">--</b></div>
-            <div class="trade-confirm-cell"><span>{% if lang == "ru" %}Направление{% elif lang == "uk" %}Напрям{% else %}Side{% endif %}</span><b id="tc-side">--</b></div>
+            <div class="trade-confirm-cell"><span>{{ labels.trade_asset if labels else "Актив" }}</span><b id="tc-asset">--</b></div>
+            <div class="trade-confirm-cell"><span>{{ labels.trade_side if labels else "Направление" }}</span><b id="tc-side">--</b></div>
             <div class="trade-confirm-cell"><span>{% if lang == "ru" %}Сумма{% elif lang == "uk" %}Сума{% else %}Amount{% endif %}</span><b id="tc-amount">--</b></div>
             <div class="trade-confirm-cell"><span>{% if lang == "ru" %}Плечо{% elif lang == "uk" %}Плече{% else %}Leverage{% endif %}</span><b id="tc-lev">--</b></div>
             <div class="trade-confirm-cell"><span>{% if lang == "ru" %}Экспирация{% elif lang == "uk" %}Експірація{% else %}Expiration{% endif %}</span><b id="tc-exp">--</b></div>
             <div class="trade-confirm-cell"><span>Mark</span><b id="tc-mark">--</b></div>
         </div>
         <div class="trade-confirm-risk">
-            <div><small>{% if lang == "ru" %}Потенциал TP{% elif lang == "uk" %}Потенціал TP{% else %}Potential TP{% endif %}</small><b class="pos" id="tc-tp">--</b></div>
-            <div><small>{% if lang == "ru" %}Потенциал SL{% elif lang == "uk" %}Потенціал SL{% else %}Potential SL{% endif %}</small><b class="neg" id="tc-sl">--</b></div>
-            <div><small>{% if lang == "ru" %}Риск нагрузки{% elif lang == "uk" %}Ризик навантаження{% else %}Risk load{% endif %}</small><b id="tc-risk-load">--</b></div>
+            <div><small>{{ labels.trade_potential_tp if labels else "Потенциал TP" }}</small><b class="pos" id="tc-tp">--</b></div>
+            <div><small>{{ labels.trade_potential_sl if labels else "Потенциал SL" }}</small><b class="neg" id="tc-sl">--</b></div>
+            <div><small>{{ labels.trade_risk_load if labels else "Риск нагрузки" }}</small><b id="tc-risk-load">--</b></div>
         </div>
         <div class="trade-scenario-wrap">
             <div class="trade-scenario-head">
-                <small id="tc-scenario-title">{% if lang == "ru" %}Сценарий{% elif lang == "uk" %}Сценарій{% else %}Scenario Preview{% endif %}</small>
+                <small id="tc-scenario-title">{{ labels.trade_scenario_title if labels else "Сценарий" }}</small>
                 <span id="tc-scenario-exp">--</span>
             </div>
             <canvas id="tc-scenario-canvas" width="420" height="128"></canvas>
             <div class="trade-scenario-legend">
-                <span><i class="sc-line"></i><b id="tc-entry-label">{% if lang == "ru" %}Вход{% elif lang == "uk" %}Вхід{% else %}Entry{% endif %}</b></span>
-                <span><i class="sc-tp"></i><b id="tc-tp-label">{% if lang == "ru" %}TP зона{% elif lang == "uk" %}TP зона{% else %}TP zone{% endif %}</b></span>
-                <span><i class="sc-sl"></i><b id="tc-sl-label">{% if lang == "ru" %}SL зона{% elif lang == "uk" %}SL зона{% else %}SL zone{% endif %}</b></span>
+                <span><i class="sc-line"></i><b id="tc-entry-label">{{ labels.trade_entry if labels else "Вход" }}</b></span>
+                <span><i class="sc-tp"></i><b id="tc-tp-label">{{ labels.trade_tp_zone if labels else "TP зона" }}</b></span>
+                <span><i class="sc-sl"></i><b id="tc-sl-label">{{ labels.trade_sl_zone if labels else "SL зона" }}</b></span>
             </div>
         </div>
-        <div class="trade-confirm-note" id="tc-note">
-            {% if lang == "ru" %}
-            Оценка, не гарантия. Финальный результат зависит от движения рынка.
-            {% elif lang == "uk" %}
-            Оцінка, не гарантія. Фінальний результат залежить від руху ринку.
-            {% else %}
-            This estimate is not guaranteed and depends on live market conditions.
-            {% endif %}
-        </div>
+        <div class="trade-confirm-note" id="tc-note">{{ labels.trade_confirm_note if labels else "Оценка, не гарантия. Финальный результат зависит от движения рынка." }}</div>
         <div class="trade-confirm-actions">
-            <button type="button" class="chip" id="tc-cancel">{% if lang == "ru" %}Отмена{% elif lang == "uk" %}Скасувати{% else %}Cancel{% endif %}</button>
-            <button type="button" class="submit" id="tc-confirm">{% if lang == "ru" %}Подтвердить и открыть{% elif lang == "uk" %}Підтвердити та відкрити{% else %}Confirm & Open{% endif %}</button>
+            <button type="button" class="chip" id="tc-cancel">{{ labels.trade_cancel if labels else "Отмена" }}</button>
+            <button type="button" class="submit" id="tc-confirm">{{ labels.trade_confirm_open if labels else "Подтвердить и открыть" }}</button>
         </div>
     </div>
 </div>
