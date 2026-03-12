@@ -2,13 +2,41 @@
 {% block title %}{{ labels.deposit_title if labels else "Deposit" }} | Legend Trading{% endblock %}
 {% block content %}
 <section class="card hero">
-    <h1>{{ labels.deposit_title if labels else "Пополнение баланса" }}</h1>
+    <div class="deposit-hero-top">
+        <div class="deposit-hero-copy">
+            <h1>{{ labels.deposit_title if labels else "Пополнение баланса" }}</h1>
+            <strong class="deposit-hero-headline">
+                {% if lang == "ru" %}Пополняй счет быстро и выбирай удобный маршрут оплаты{% elif lang == "uk" %}Поповнюй рахунок швидко та обирай зручний маршрут оплати{% else %}Top up fast and choose the payment route that fits you{% endif %}
+            </strong>
+            <p class="deposit-hero-lead">
+                {% if lang == "ru" %}Выбери метод, отправь заявку и получи актуальные реквизиты или ссылку на оплату.{% elif lang == "uk" %}Обери метод, надішли заявку та отримай актуальні реквізити або посилання на оплату.{% else %}Pick a method, submit the request and get the latest payment details or payment link.{% endif %}
+            </p>
+        </div>
+        <a class="qa-btn deposit-hero-cta" href="/profile">{% if lang == "ru" %}К профилю{% elif lang == "uk" %}До профілю{% else %}Go To Profile{% endif %}</a>
+    </div>
     <div class="balance">{{ "%.2f"|format((user.balance if user else 0) or 0) }} {{ (user.currency if user else "USD") or "USD" }}</div>
     <div class="hint">ID: {{ tg_id }}</div>
 </section>
 
+<section class="deposit-command-bar">
+    <article class="card deposit-command-card">
+        <span>{% if lang == "ru" %}Стратегия пополнения{% elif lang == "uk" %}Стратегія поповнення{% else %}Funding strategy{% endif %}</span>
+        <strong>{% if lang == "ru" %}Выбери скорость, маршрут и удобство{% elif lang == "uk" %}Обери швидкість, маршрут і зручність{% else %}Choose speed, route and convenience{% endif %}</strong>
+        <small>{% if lang == "ru" %}Crypto bot для быстрого старта, TRC20 для прямого перевода, карта через поддержку.{% elif lang == "uk" %}Crypto bot для швидкого старту, TRC20 для прямого переказу, картка через підтримку.{% else %}Use crypto bot for the fastest start, TRC20 for direct transfer, or card via support.{% endif %}</small>
+    </article>
+    <article class="card deposit-command-actions">
+        <a class="qa-btn" href="/trade">{% if lang == "ru" %}К торговле{% elif lang == "uk" %}До торгівлі{% else %}Go To Trade{% endif %}</a>
+        <a class="qa-btn" href="/markets">{% if lang == "ru" %}Открыть рынки{% elif lang == "uk" %}Відкрити ринки{% else %}Open Markets{% endif %}</a>
+    </article>
+</section>
+
 <section class="card">
-    <div class="section-title">{{ labels.deposit_method if labels else "Метод оплаты" }}</div>
+    <div class="deposit-panel-head">
+        <div>
+            <div class="section-title">{{ labels.deposit_method if labels else "Метод оплаты" }}</div>
+            <strong class="deposit-panel-title">{% if lang == "ru" %}Выбери маршрут пополнения{% elif lang == "uk" %}Обери маршрут поповнення{% else %}Choose your funding route{% endif %}</strong>
+        </div>
+    </div>
     <p class="deposit-lead">{{ labels.get('deposit_lead', 'Choose a payment method. After you submit a request, support will provide the latest payment instructions.') if labels else "Choose a payment method. After you submit a request, support will provide the latest payment instructions." }}</p>
     <div class="deposit-method-cards" id="deposit-method-cards">
         <button type="button" class="deposit-method-card active" data-method="crypto">

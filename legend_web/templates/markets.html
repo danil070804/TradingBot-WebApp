@@ -2,9 +2,17 @@
 {% block title %}{{ labels.markets_title if labels else "Markets" }} | Legend Trading{% endblock %}
 {% block content %}
 <section class="card hero markets-hero">
-    <h1>{{ labels.markets_title if labels else "Markets" }}</h1>
-    <div class="hint">
-        {% if lang == "ru" %}Лента рынка (live){% elif lang == "uk" %}Стрічка ринку (live){% else %}Market Tape (live){% endif %}
+    <div class="markets-hero-top">
+        <div class="markets-hero-copy">
+            <h1>{{ labels.markets_title if labels else "Markets" }}</h1>
+            <strong class="markets-hero-headline">
+                {% if lang == "ru" %}Сканируй движение рынка и открывай нужный актив без лишних шагов{% elif lang == "uk" %}Скануй рух ринку та відкривай потрібний актив без зайвих кроків{% else %}Scan the market and jump into the right asset without extra steps{% endif %}
+            </strong>
+            <p class="markets-hero-lead">
+                {% if lang == "ru" %}Лидеры роста, watchlist, живые цены и быстрый переход в сделку или график в одном списке.{% elif lang == "uk" %}Лідери зростання, watchlist, живі ціни та швидкий перехід до угоди або графіка в одному списку.{% else %}Gainers, watchlist, live prices and direct jumps to trade or chart from one list.{% endif %}
+            </p>
+        </div>
+        <a class="qa-btn markets-hero-cta" href="/trade">{% if lang == "ru" %}Открыть терминал{% elif lang == "uk" %}Відкрити термінал{% else %}Open Terminal{% endif %}</a>
     </div>
     <div class="stats-grid markets-stats">
         <article class="card stat-card"><small>TOTAL</small><b id="markets-total">{{ markets|length }}</b></article>
@@ -14,8 +22,26 @@
     </div>
 </section>
 
+<section class="markets-command-bar">
+    <article class="card markets-command-card">
+        <span>{% if lang == "ru" %}Режим обзора{% elif lang == "uk" %}Режим огляду{% else %}Scan mode{% endif %}</span>
+        <strong>{% if lang == "ru" %}Live Scanner{% elif lang == "uk" %}Live Scanner{% else %}Live Scanner{% endif %}</strong>
+        <small>{% if lang == "ru" %}Отслеживай рынок по фильтрам, росту, падению и своей watchlist.{% elif lang == "uk" %}Відстежуй ринок за фільтрами, зростанням, падінням та власною watchlist.{% else %}Track the market by filters, movers and your personal watchlist.{% endif %}</small>
+    </article>
+    <article class="card markets-command-card">
+        <span>{% if lang == "ru" %}Следующий шаг{% elif lang == "uk" %}Наступний крок{% else %}Next step{% endif %}</span>
+        <strong>{% if lang == "ru" %}Выбери актив и открой trade desk{% elif lang == "uk" %}Обери актив і відкрий trade desk{% else %}Pick an asset and open the trade desk{% endif %}</strong>
+        <small>{% if lang == "ru" %}Каждая строка уже ведет в инструмент, график и быструю сделку.{% elif lang == "uk" %}Кожен рядок уже веде в інструмент, графік та швидку угоду.{% else %}Each row already leads into the instrument, chart and quick trade flow.{% endif %}</small>
+    </article>
+</section>
+
 <section class="card">
-    <div class="section-title">{{ labels.markets_title if labels else "Markets" }}</div>
+    <div class="markets-panel-head">
+        <div>
+            <div class="section-title">{{ labels.markets_title if labels else "Markets" }}</div>
+            <strong class="markets-panel-title">{% if lang == "ru" %}Рабочий список инструментов{% elif lang == "uk" %}Робочий список інструментів{% else %}Working list of instruments{% endif %}</strong>
+        </div>
+    </div>
     <div class="markets-filters">
         <button type="button" class="chip market-filter-chip active" data-filter-mode="all">{% if lang == "ru" %}Все{% elif lang == "uk" %}Усі{% else %}All{% endif %}</button>
         <button type="button" class="chip market-filter-chip" data-filter-mode="watch">{% if lang == "ru" %}Избранное{% elif lang == "uk" %}Обране{% else %}Watchlist{% endif %}</button>

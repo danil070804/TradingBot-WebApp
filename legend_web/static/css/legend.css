@@ -913,6 +913,56 @@ body[data-page="trade"] .card {
     padding: 18px;
 }
 
+.profile-command-bar,
+.markets-command-bar,
+.deposit-command-bar {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: 1.2fr .9fr;
+}
+
+.profile-command-card,
+.markets-command-card,
+.deposit-command-card {
+    display: grid;
+    gap: 6px;
+}
+
+.profile-command-card span,
+.markets-panel-head .section-title,
+.markets-command-card span,
+.deposit-command-card span,
+.deposit-panel-head .section-title {
+    margin-bottom: 0;
+}
+
+.profile-command-card strong,
+.markets-command-card strong,
+.deposit-command-card strong,
+.markets-panel-title,
+.deposit-panel-title {
+    display: block;
+    font-family: "Oxanium", sans-serif;
+    font-size: 22px;
+    line-height: 1.08;
+    color: #1e4e71;
+}
+
+.profile-command-card small,
+.markets-command-card small,
+.deposit-command-card small {
+    font-size: 12px;
+    line-height: 1.45;
+    color: #5f84a2;
+}
+
+.profile-command-actions,
+.deposit-command-actions {
+    display: grid;
+    gap: 8px;
+    align-content: stretch;
+}
+
 .profile-hero-top {
     display: flex;
     align-items: center;
@@ -1079,6 +1129,56 @@ body[data-page="trade"] .hint {
 
 .markets-hero {
     overflow: hidden;
+}
+
+.markets-hero-top,
+.deposit-hero-top {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.markets-hero-copy,
+.deposit-hero-copy {
+    display: grid;
+    gap: 8px;
+}
+
+.markets-hero-headline,
+.deposit-hero-headline {
+    max-width: 28ch;
+    font-family: "Oxanium", sans-serif;
+    font-size: 29px;
+    line-height: 1.05;
+    letter-spacing: -.03em;
+    color: #1b4767;
+}
+
+.markets-hero-lead,
+.deposit-hero-lead {
+    margin: 0;
+    max-width: 56ch;
+    color: #5f84a2;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.markets-hero-cta,
+.deposit-hero-cta {
+    min-width: 136px;
+    padding-inline: 14px;
+}
+
+.markets-panel-head,
+.deposit-panel-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 12px;
 }
 
 .markets-stats .stat-card b {
@@ -3370,6 +3470,23 @@ body[data-preloader="skip"] .app-preloader {
 }
 
 @media (max-width: 860px) {
+    .profile-command-bar,
+    .markets-command-bar,
+    .deposit-command-bar {
+        grid-template-columns: 1fr;
+    }
+    .markets-hero-top,
+    .deposit-hero-top {
+        flex-direction: column;
+    }
+    .markets-hero-headline,
+    .deposit-hero-headline {
+        font-size: 24px;
+    }
+    .markets-hero-cta,
+    .deposit-hero-cta {
+        width: 100%;
+    }
     .trade-hero-top {
         flex-direction: column;
     }
