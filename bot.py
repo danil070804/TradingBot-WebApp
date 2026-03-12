@@ -2278,6 +2278,8 @@ def _build_synthetic_tape_events(market_rows: list[dict], count: int) -> list[di
         ]
     now_ts = time.time()
     out: list[dict] = []
+    has_open = False
+    has_closed = False
     for i in range(safe_count):
         market = random.choice(rows)
         symbol = str(market.get("symbol") or "BTC")
@@ -2308,6 +2310,7 @@ def _build_synthetic_tape_events(market_rows: list[dict], count: int) -> list[di
                     "ts": ts,
                 }
             )
+            has_closed = True
         else:
             out.append(
                 {
@@ -2323,6 +2326,24 @@ def _build_synthetic_tape_events(market_rows: list[dict], count: int) -> list[di
                     "ts": ts,
                 }
             )
+            has_open = True
+
+    # Keep visual mix healthy: tape should usually contain both open and closed prints.
+    if out and safe_count >= 2:
+        if not has_open:
+            tail = out[-1]
+            tail["kind"] = "open"
+            tail.pop("pnl", None)
+            tail.pop("is_win", None)
+            tail["ref"] = f"syn-open-fix-{int(now_ts)}"
+        elif not has_closed:
+            tail = out[-1]
+            pnl = round(float(tail.get("amount") or 0.0) * random.uniform(0.01, 0.09) * (1 if random.random() > 0.45 else -1), 2)
+            tail["kind"] = "closed"
+            tail["pnl"] = pnl
+            tail["is_win"] = pnl >= 0
+            tail["ref"] = f"syn-close-fix-{int(now_ts)}"
+
     out.sort(key=lambda item: float(item.get("ts") or 0.0), reverse=True)
     return out
 
@@ -2493,6 +2514,27 @@ async def get_platform_trade_tape(limit: int = 10) -> list[dict]:
 
     events.sort(key=lambda item: float(item.get("ts") or 0.0), reverse=True)
     events = events[:safe_limit]
+
+    now_ts = time.time()
+    newest_ts = float(events[0].get("ts") or 0.0) if events else 0.0
+    open_count = sum(1 for item in events if str(item.get("kind") or "") == "open")
+    unique_assets = len({str(item.get("asset_name") or "") for item in events if item.get("asset_name")})
+    unique_users = len({str(item.get("username") or item.get("first_name") or item.get("user_tg_id") or "") for item in events})
+    stale_tape = bool(events) and (now_ts - newest_ts > 45)
+    monotonic_tape = bool(events) and (unique_assets <= 2 or unique_users <= 2 or open_count == 0)
+
+    if events and (stale_tape or monotonic_tape):
+        markets = await fetch_market_overview_rows(limit=min(8, safe_limit))
+        synth_target = max(2, safe_limit // 3)
+        if open_count == 0:
+            synth_target = max(synth_target, min(4, safe_limit - 1))
+        if stale_tape:
+            synth_target = max(synth_target, min(5, safe_limit - 1))
+        synthetic = _build_synthetic_tape_events(markets, synth_target)
+        keep_real = max(0, safe_limit - len(synthetic))
+        events = events[:keep_real] + synthetic
+        events.sort(key=lambda item: float(item.get("ts") or 0.0), reverse=True)
+        events = events[:safe_limit]
 
     # Keep the tape alive even when platform activity is low.
     if len(events) < safe_limit:
