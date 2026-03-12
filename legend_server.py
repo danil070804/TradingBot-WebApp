@@ -3759,35 +3759,12 @@ async def api_deposit_request(payload: DepositRequestPayload):
         stage="request_created",
     )
     worker_id = await bot.get_worker_for_client(payload.tg_id)
-    await execute_query(
-        "UPDATE worker_clients SET funnel_stage = ?, last_activity_at = CURRENT_TIMESTAMP WHERE client_tg_id = ?",
-        ("deposit_interest", payload.tg_id),
-    )
-
-    if method == "card":
-        support_contact = bot.support_contact_text()
-        await ensure_deposit_support_ticket(
-            client_tg_id=payload.tg_id,
-            worker_tg_id=worker_id,
-            source="web",
-            amount=payload.amount,
-            currency=currency,
-            method=method,
-        )
-        return JSONResponse(
-            {
-                "ok": True,
-                "requires_support": True,
-                "redirect_to_support": True,
-                "support_url": bot.config.support_url,
-                "support_entry_url": build_support_redirect_url(payload.amount, method),
-                "support_contact": support_contact,
-                "message": f"Для оплаты картой свяжитесь с поддержкой: {support_contact}",
-            }
-        )
-
     dep_id = await bot.create_deposit_request(payload.tg_id, payload.amount, currency, method)
     method_label = deposit_method_label(method)
+    await execute_query(
+        "UPDATE worker_clients SET funnel_stage = ?, last_activity_at = CURRENT_TIMESTAMP WHERE client_tg_id = ?",
+        ("support_wait", payload.tg_id),
+    )
     await ensure_deposit_support_ticket(
         client_tg_id=payload.tg_id,
         worker_tg_id=worker_id,
@@ -3808,9 +3785,28 @@ async def api_deposit_request(payload: DepositRequestPayload):
         first_name=user["first_name"] if user else None,
         username=user["username"] if user else None,
     )
+    await log_web_activity_for_worker(
+        client_tg_id=payload.tg_id,
+        actor_tg_id=payload.tg_id,
+        event_type="web_deposit_support_opened",
+        title="Переход в поддержку по пополнению",
+        details=f"Лохматый перешёл в поддержку по пополнению через WebApp. Метод: {method_label}.",
+        amount=payload.amount,
+        currency=currency,
+        meta={"deposit_id": dep_id, "method": method},
+    )
+    await notify_worker_deposit_event(
+        client_tg_id=payload.tg_id,
+        first_name=user["first_name"],
+        username=user["username"],
+        amount=payload.amount,
+        currency=currency,
+        method=method,
+        stage="support_opened",
+        deposit_id=dep_id,
+    )
 
     support_contact = bot.support_contact_text()
-    method_label = deposit_method_label(method)
     return JSONResponse(
         {
             "ok": True,

@@ -1241,8 +1241,9 @@ function bindDepositForm() {
                 const button = supportEntryUrl
                     ? `<div class="result-action"><a class="qa-btn" href="${supportEntryUrl}">${L("js_support_btn", "Open Support")}</a></div>`
                     : "";
-                result.innerHTML = `<span class="pos">${data.message || L("js_card_support_msg", "For bank card payment, contact support.")}</span>${button}`;
-                showToast(data.message || L("js_card_support_msg", "For bank card payment, contact support."), "info");
+                const supportMessage = data.message || L("js_deposit_support_redirect", "Deposit request created. Open support to receive payment instructions.");
+                result.innerHTML = `<span class="pos">${supportMessage}</span>${button}`;
+                showToast(supportMessage, "info");
                 if (data.redirect_to_support && supportEntryUrl) {
                     window.setTimeout(() => {
                         window.location.href = supportEntryUrl;
