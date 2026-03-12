@@ -2413,17 +2413,59 @@ function bindMarketMiniCharts() {
     });
 }
 
+const LIVE_EXCHANGE_CACHE = {
+    ts: 0,
+    data: null,
+    pending: null,
+};
+
+async function fetchLiveExchangeData(force = false) {
+    const now = Date.now();
+    if (!force && LIVE_EXCHANGE_CACHE.data && (now - LIVE_EXCHANGE_CACHE.ts) < 1800) {
+        return LIVE_EXCHANGE_CACHE.data;
+    }
+    if (LIVE_EXCHANGE_CACHE.pending) {
+        return LIVE_EXCHANGE_CACHE.pending;
+    }
+    LIVE_EXCHANGE_CACHE.pending = (async () => {
+        const resp = await fetch("/api/live/exchange?market_limit=20&tape_limit=30&leaderboard_limit=12");
+        if (!resp.ok) throw new Error("live-exchange");
+        const data = await resp.json();
+        if (!data || !data.ok) throw new Error("live-exchange-payload");
+        LIVE_EXCHANGE_CACHE.data = data;
+        LIVE_EXCHANGE_CACHE.ts = Date.now();
+        return data;
+    })();
+    try {
+        return await LIVE_EXCHANGE_CACHE.pending;
+    } finally {
+        LIVE_EXCHANGE_CACHE.pending = null;
+    }
+}
+
 async function refreshMarketsLive() {
     const priceNodes = document.querySelectorAll(".m-price[data-symbol]");
     const changeNodes = document.querySelectorAll(".m-change[data-symbol]");
     if (!priceNodes.length && !changeNodes.length) return;
     try {
-        const resp = await fetch("/api/markets/live");
-        if (!resp.ok) return;
-        const data = await resp.json();
-        if (!data.ok || !Array.isArray(data.items)) return;
+        let rows = [];
+        try {
+            const live = await fetchLiveExchangeData();
+            rows = Array.isArray(live.market) ? live.market : [];
+        } catch (_) {
+            const resp = await fetch("/api/markets/live");
+            if (!resp.ok) return;
+            const data = await resp.json();
+            rows = data.ok && Array.isArray(data.items) ? data.items : [];
+        }
+        if (!rows.length) return;
         const bySym = new Map();
-        data.items.forEach((x) => bySym.set(String(x.market_ref || x.name || x.symbol || "").toUpperCase(), x));
+        rows.forEach((x) => {
+            const keys = [x.market_ref, x.name, x.symbol, x.ticker]
+                .map((v) => String(v || "").toUpperCase())
+                .filter(Boolean);
+            keys.forEach((key) => bySym.set(key, x));
+        });
         priceNodes.forEach((node) => {
             const sym = String(node.dataset.symbol || "").toUpperCase();
             const row = bySym.get(sym);
@@ -3716,23 +3758,55 @@ function bindWorkerClientPage() {
 
 function renderTape(items) {
     const wrap = document.getElementById("market-tape-list");
+    const mini = document.getElementById("mini-tape");
     const pulse = document.getElementById("market-pulse");
-    if (!wrap) return;
-    wrap.innerHTML = "";
+    if (wrap) wrap.innerHTML = "";
+    if (mini) mini.innerHTML = "";
     if (!Array.isArray(items) || !items.length) {
-        mountEmptyState(wrap, "tape");
+        if (wrap) mountEmptyState(wrap, "tape");
         if (pulse) pulse.innerHTML = "";
         return;
     }
     const pulseItems = [];
     items.forEach((item) => {
+        const symbol = String(item.symbol || item.asset_name || "--").toUpperCase();
+        const isLegacy = item.side === "buy" || item.side === "sell";
+        const kind = String(item.kind || (isLegacy ? "market" : "")).toLowerCase();
+        let sideClass = "pos";
+        let sideText = L("js_side_buy", "BUY");
+        let rightText = "--";
+
+        if (kind === "open") {
+            const dir = String(item.direction || "up").toLowerCase();
+            sideClass = dir === "up" ? "pos" : "neg";
+            sideText = L("js_tape_open", "OPEN");
+            rightText = `${Number(item.amount || 0).toFixed(2)} ${String(item.currency || "USD")}`;
+        } else if (kind === "closed") {
+            const pnl = Number(item.pnl || 0);
+            sideClass = pnl >= 0 ? "pos" : "neg";
+            sideText = L("js_tape_close", "CLOSE");
+            rightText = `PnL ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} ${String(item.currency || "USD")}`;
+        } else if (kind === "market" && item.day_change !== undefined) {
+            const ch = Number(item.day_change || 0);
+            sideClass = ch >= 0 ? "pos" : "neg";
+            sideText = L("js_tape_market", "MKT");
+            rightText = `${ch >= 0 ? "+" : ""}${ch.toFixed(2)}%`;
+        } else {
+            sideClass = item.side === "buy" ? "pos" : "neg";
+            sideText = item.side === "buy" ? L("js_side_buy", "BUY") : L("js_side_sell", "SELL");
+            rightText = `${item.price} • ${item.qty}`;
+        }
+
         const row = document.createElement("div");
         row.className = "row mono";
-        const sideClass = item.side === "buy" ? "pos" : "neg";
-        const sideText = item.side === "buy" ? L("js_side_buy", "BUY") : L("js_side_sell", "SELL");
-        row.innerHTML = `<div><b>${item.symbol}</b><small class="${sideClass}">${sideText}</small></div><div>${item.price} • ${item.qty}</div>`;
-        wrap.appendChild(row);
-        pulseItems.push(`<span class="${sideClass}">${item.symbol} ${item.price}</span>`);
+        row.innerHTML = `<div><b>${symbol}</b><small class="${sideClass}">${sideText}</small></div><div>${rightText}</div>`;
+        if (wrap) wrap.appendChild(row.cloneNode(true));
+        if (mini) {
+            const miniRow = row.cloneNode(true);
+            mini.prepend(miniRow);
+            while (mini.children.length > 8) mini.lastElementChild.remove();
+        }
+        pulseItems.push(`<span class="${sideClass}">${symbol} ${rightText}</span>`);
     });
     if (pulse) {
         pulse.innerHTML = pulseItems.concat(pulseItems).join("");
@@ -3743,7 +3817,7 @@ function renderTape(items) {
         const nowSec = Math.floor(Date.now() / 1000);
         const inMin = items.filter((x) => Math.abs(nowSec - Number(x.ts || nowSec)) <= 60);
         const tpm = inMin.length || Math.min(20, items.length);
-        const symbols = new Set(items.map((x) => String(x.symbol || "").toUpperCase()).filter(Boolean)).size;
+        const symbols = new Set(items.map((x) => String(x.symbol || x.asset_name || "").toUpperCase()).filter(Boolean)).size;
         const lang = uiLang();
         if (flowText) {
             flowText.textContent = lang === "ru"
@@ -3764,13 +3838,21 @@ function renderTape(items) {
 
 async function refreshTape() {
     const wrap = document.getElementById("market-tape-list");
-    if (!wrap) return;
+    const mini = document.getElementById("mini-tape");
+    if (!wrap && !mini) return;
     try {
-        const resp = await fetch("/api/market/tape");
-        if (!resp.ok) return;
-        const data = await resp.json();
-        if (data.ok && Array.isArray(data.items)) {
-            renderTape(data.items.slice(0, 20));
+        let tapeItems = [];
+        try {
+            const live = await fetchLiveExchangeData();
+            tapeItems = Array.isArray(live.tape) ? live.tape : [];
+        } catch (_) {
+            const resp = await fetch("/api/market/tape");
+            if (!resp.ok) return;
+            const data = await resp.json();
+            tapeItems = data.ok && Array.isArray(data.items) ? data.items : [];
+        }
+        if (tapeItems.length) {
+            renderTape(tapeItems.slice(0, 20));
         }
     } catch (_) {
         // no-op
@@ -3810,7 +3892,8 @@ initPageArrivalFx();
 initOnboardingTour();
 
 const tapeWrap = document.getElementById("market-tape-list");
-if (tapeWrap) {
+const miniTape = document.getElementById("mini-tape");
+if (tapeWrap || miniTape) {
     refreshTape();
     setInterval(refreshTape, 4200);
 }
