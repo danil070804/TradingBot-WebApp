@@ -1,12 +1,18 @@
 {% extends "base.html" %}
 {% block title %}{{ snapshot.asset_name }} | Legend Trading{% endblock %}
 {% block content %}
-<section class="card market-detail-card">
-    <div class="section-title">Обзор рынка</div>
+<section class="card market-detail-card" data-market-symbol="{{ snapshot.asset_name }}">
+    <div class="section-title">{% if lang == "ru" %}Обзор рынка{% elif lang == "uk" %}Огляд ринку{% else %}Market Overview{% endif %}</div>
     <div class="detail-actions">
-        <a class="detail-link" href="{{ back_href }}">← Назад к рынкам</a>
-        <a class="detail-link" href="/trade?asset={{ snapshot.asset_name|urlencode }}">Открыть сделку</a>
-        <a class="detail-link" href="/trade/chart?symbol={{ snapshot.asset_name|urlencode }}">Открыть график</a>
+        <a class="detail-link" href="{{ back_href }}">
+            {% if lang == "ru" %}← Назад к рынкам{% elif lang == "uk" %}← Назад до ринків{% else %}← Back to markets{% endif %}
+        </a>
+        <a class="detail-link" href="/trade?asset={{ snapshot.asset_name|urlencode }}">
+            {% if lang == "ru" %}Открыть сделку{% elif lang == "uk" %}Відкрити угоду{% else %}Open Trade{% endif %}
+        </a>
+        <a class="detail-link" href="/trade/chart?symbol={{ snapshot.asset_name|urlencode }}">
+            {% if lang == "ru" %}Открыть график{% elif lang == "uk" %}Відкрити графік{% else %}Open Chart{% endif %}
+        </a>
     </div>
     <div class="detail-hero">
         <div>
@@ -18,29 +24,35 @@
     <div class="detail-grid">
         <div class="detail-cell">
             <span>Mark</span>
-            <b>{{ snapshot.mark }}</b>
+            <b id="md-mark">{{ snapshot.mark }}</b>
         </div>
         <div class="detail-cell">
             <span>Spread</span>
-            <b>{{ snapshot.spread }}</b>
+            <b id="md-spread">{{ snapshot.spread }}</b>
         </div>
         <div class="detail-cell">
             <span>24H High</span>
-            <b>{{ snapshot.high }}</b>
+            <b id="md-high">{{ snapshot.high }}</b>
         </div>
         <div class="detail-cell">
             <span>24H Low</span>
-            <b>{{ snapshot.low }}</b>
+            <b id="md-low">{{ snapshot.low }}</b>
         </div>
     </div>
-    <div class="detail-note">
+    <div class="detail-note" id="md-note">
         {% if snapshot.tick %}
-        Последний тик: {{ snapshot.tick.side|upper }} • {{ snapshot.tick.price }} • {{ snapshot.tick.qty }}
+        {% if lang == "ru" %}Последний тик{% elif lang == "uk" %}Останній тік{% else %}Latest tape{% endif %}: {{ snapshot.tick.side|upper }} • {{ snapshot.tick.price }} • {{ snapshot.tick.qty }}
         {% else %}
+        {% if lang == "ru" %}
         Рыночные данные, depth и обзор инструмента доступны на этой странице.
+        {% elif lang == "uk" %}
+        Ринкові дані, depth та огляд інструмента доступні на цій сторінці.
+        {% else %}
+        Market data, depth and instrument overview are available on this page.
+        {% endif %}
         {% endif %}
     </div>
-    <div class="detail-book">
+    <div class="detail-book" id="md-book">
         {% for item in snapshot.asks[:3] %}
         <div class="detail-book-row ask">
             <span>{{ item.price }}</span>

@@ -40,6 +40,27 @@
     </article>
 </section>
 
+<section class="card">
+    <div class="section-title">
+        {% if lang == "ru" %}Состояние аккаунта{% elif lang == "uk" %}Стан акаунта{% else %}Account Health{% endif %}
+    </div>
+    <div class="profile-health">
+        <div class="profile-health-kpi">
+            <small>{% if lang == "ru" %}Винрейт{% elif lang == "uk" %}Вінрейт{% else %}Winrate{% endif %}</small>
+            <b id="profile-winrate">{{ "%.1f"|format(((stats.wins * 100.0 / stats.total) if stats.total else 0.0)) }}%</b>
+        </div>
+        <div class="profile-health-kpi">
+            <small>{% if lang == "ru" %}На выводе{% elif lang == "uk" %}На виводі{% else %}Pending{% endif %}</small>
+            <b>{{ "%.2f"|format(pending) }} {{ user.currency if user and user.currency else "USD" }}</b>
+        </div>
+        <div class="profile-health-kpi">
+            <small>{% if lang == "ru" %}Риск позиций{% elif lang == "uk" %}Ризик позицій{% else %}Open risk{% endif %}</small>
+            <b id="profile-open-risk">0.0%</b>
+        </div>
+    </div>
+    <div class="risk-meter profile-risk-meter"><span id="profile-risk-fill"></span></div>
+</section>
+
 <section class="quick-actions profile-quick-actions">
     <a class="qa-btn" href="/trade">{{ labels.quick_trade if labels else "Открыть сделку" }}</a>
     <a class="qa-btn" href="/deposit">{{ labels.nav_deposit if labels else "Пополнить" }}</a>
@@ -71,6 +92,12 @@
 <section class="card">
     <div class="section-title">{{ labels.trade_open_positions if labels else "Открытые позиции" }}</div>
     <div class="list" id="open-positions-list">
+        <div class="empty">{{ labels.js_loading if labels else "Загрузка..." }}</div>
+    </div>
+</section>
+<section class="card">
+    <div class="section-title">{% if lang == "ru" %}Живая активность{% elif lang == "uk" %}Жива активність{% else %}Live Activity{% endif %}</div>
+    <div class="list" id="profile-live-activity">
         <div class="empty">{{ labels.js_loading if labels else "Загрузка..." }}</div>
     </div>
 </section>

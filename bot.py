@@ -4543,8 +4543,6 @@ async def send_profile(callback_or_msg):
     access = await get_client_access_flags(tg_user.id)
     deal_stats = await get_user_deal_stats(tg_user.id)
     pending_withdraw = await get_user_pending_withdraw_sum(tg_user.id)
-    worker_id = await get_worker_for_client(tg_user.id)
-
     text_lines = [
         t(lang, "profile_title"),
         t(lang, "profile_id", id=tg_user.id),

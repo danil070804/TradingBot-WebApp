@@ -10,6 +10,29 @@
 <section class="card">
     <div class="section-title">{{ labels.deposit_method if labels else "Метод оплаты" }}</div>
     <p class="deposit-lead">{{ labels.get('deposit_lead', 'Choose a payment method. After you submit a request, support will provide the latest payment instructions.') if labels else "Choose a payment method. After you submit a request, support will provide the latest payment instructions." }}</p>
+    <div class="deposit-method-cards" id="deposit-method-cards">
+        <button type="button" class="deposit-method-card active" data-method="crypto">
+            <strong>Crypto bot</strong>
+            <small>{% if lang == "ru" %}Быстрое подтверждение через менеджера{% elif lang == "uk" %}Швидке підтвердження через менеджера{% else %}Fast flow with manager confirmation{% endif %}</small>
+        </button>
+        <button type="button" class="deposit-method-card" data-method="trc20">
+            <strong>TRC20 USDT</strong>
+            <small>{% if lang == "ru" %}Прямой перевод на кошелек{% elif lang == "uk" %}Прямий переказ на гаманець{% else %}Direct wallet transfer route{% endif %}</small>
+        </button>
+        <button type="button" class="deposit-method-card" data-method="card">
+            <strong>{{ labels.pay_card if labels else "Банковская карта" }}</strong>
+            <small>{% if lang == "ru" %}Оплата картой через поддержку{% elif lang == "uk" %}Оплата карткою через підтримку{% else %}Card payment through support{% endif %}</small>
+        </button>
+    </div>
+    <div class="deposit-method-hint" id="deposit-method-hint">
+        {% if lang == "ru" %}
+        Выбран Crypto bot. Поддержка отправит финальные реквизиты после заявки.
+        {% elif lang == "uk" %}
+        Обрано Crypto bot. Підтримка надішле фінальні реквізити після заявки.
+        {% else %}
+        Crypto bot route is selected. Support will send final instructions after request submission.
+        {% endif %}
+    </div>
     <form id="deposit-form" class="form-grid">
         <input type="hidden" name="tg_id" value="{{ tg_id }}">
         <label>{{ labels.deposit_amount if labels else "Сумма" }}

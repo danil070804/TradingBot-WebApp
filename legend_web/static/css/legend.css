@@ -887,6 +887,39 @@ body[data-page="trade"] .card {
     grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.profile-health {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.profile-health-kpi {
+    padding: 10px 12px;
+    border-radius: 14px;
+    border: 1px solid rgba(116, 200, 244, 0.18);
+    background: rgba(248, 252, 255, 0.92);
+}
+
+.profile-health-kpi small {
+    display: block;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: #6f8ea8;
+}
+
+.profile-health-kpi b {
+    display: block;
+    margin-top: 6px;
+    font-size: 17px;
+    font-family: "Oxanium", monospace;
+    color: #1f4e6f;
+}
+
+.profile-risk-meter {
+    margin-top: 10px;
+}
+
 .section-title { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px; }
 
 body[data-page="trade"] .section-title {
@@ -1560,6 +1593,60 @@ select, input {
     margin: 0 0 12px;
     color: #4d6981;
     line-height: 1.5;
+}
+
+.deposit-method-cards {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.deposit-method-card {
+    text-align: left;
+    border: 1px solid rgba(116, 200, 244, 0.2);
+    border-radius: 14px;
+    padding: 11px 12px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(236, 247, 253, 0.92));
+    color: #345a75;
+    cursor: pointer;
+    transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+
+.deposit-method-card strong {
+    display: block;
+    font-size: 13px;
+    color: #245778;
+}
+
+.deposit-method-card small {
+    display: block;
+    margin-top: 4px;
+    font-size: 11px;
+    color: #6e8da4;
+    line-height: 1.35;
+}
+
+.deposit-method-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 24px rgba(110, 158, 191, 0.16);
+    border-color: rgba(116, 200, 244, 0.42);
+}
+
+.deposit-method-card.active {
+    border-color: rgba(116, 200, 244, 0.46);
+    background: linear-gradient(180deg, rgba(212, 239, 255, 0.92), rgba(186, 226, 249, 0.7));
+    box-shadow: inset 0 0 0 1px rgba(116, 200, 244, 0.16);
+}
+
+.deposit-method-hint {
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(116, 200, 244, 0.18);
+    background: rgba(245, 251, 255, 0.9);
+    color: #55758f;
+    font-size: 12px;
 }
 
 .support-banner {
@@ -2586,6 +2673,12 @@ body[data-preloader="skip"] .app-preloader {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
     .profile-grid {
+        grid-template-columns: 1fr;
+    }
+    .profile-health {
+        grid-template-columns: 1fr;
+    }
+    .deposit-method-cards {
         grid-template-columns: 1fr;
     }
     .chart-top {

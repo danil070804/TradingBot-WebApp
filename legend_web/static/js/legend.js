@@ -11,6 +11,11 @@ const LIVE_STATE = {
     low: null,
     mode: null,
 };
+const PROFILE_ACTIVITY_SEEN = new Set();
+
+function uiLang() {
+    return String(document.body?.dataset?.lang || "en").toLowerCase();
+}
 
 function animateNumericText(el, nextValue, options = {}) {
     if (!el || !Number.isFinite(Number(nextValue))) return;
@@ -73,12 +78,59 @@ function updateExposureWidgets(items, currency = "USD") {
     if (dashRiskFill) dashRiskFill.style.width = `${riskLoad.toFixed(1)}%`;
     if (qOpenExp) qOpenExp.textContent = `${exposure.toFixed(2)} ${currency}`;
     if (qOpenCount) qOpenCount.textContent = `${openCount} ${openCount === 1 ? "position" : "positions"}`;
+    const profileRiskLabel = document.getElementById("profile-open-risk");
+    const profileRiskFill = document.getElementById("profile-risk-fill");
+    if (profileRiskLabel) profileRiskLabel.textContent = `${riskLoad.toFixed(1)}%`;
+    if (profileRiskFill) profileRiskFill.style.width = `${riskLoad.toFixed(1)}%`;
 }
 
 function currentUiCurrency() {
     const tradeCurrencyEl = document.getElementById("live-currency");
     const homeCurrencyEl = document.getElementById("home-live-currency");
     return (tradeCurrencyEl && tradeCurrencyEl.textContent) || (homeCurrencyEl && homeCurrencyEl.textContent) || "USD";
+}
+
+function profileActivityText(deal) {
+    const lang = uiLang();
+    const isRu = lang === "ru";
+    const isUk = lang === "uk";
+    const symbol = deal.asset_name || deal.symbol || "Market";
+    const pnl = Number(deal.profit || 0);
+    const sign = pnl >= 0 ? "+" : "";
+    if (isRu) return `${symbol}: ${sign}${pnl.toFixed(2)}`;
+    if (isUk) return `${symbol}: ${sign}${pnl.toFixed(2)}`;
+    return `${symbol}: ${sign}${pnl.toFixed(2)}`;
+}
+
+function profileActivityTime(raw) {
+    if (!raw) return "--";
+    const d = new Date(raw);
+    if (!Number.isFinite(d.getTime())) return String(raw);
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function updateProfileLatestDeal(latestDeal) {
+    const wrap = document.getElementById("profile-live-activity");
+    if (!wrap || !latestDeal || !latestDeal.id) return;
+    const key = String(latestDeal.id);
+    if (PROFILE_ACTIVITY_SEEN.has(key)) return;
+    PROFILE_ACTIVITY_SEEN.add(key);
+    const row = document.createElement("div");
+    const profit = Number(latestDeal.profit || 0);
+    row.className = "row profile-row";
+    row.innerHTML = `
+        <div>
+            <b>${profileActivityText(latestDeal)}</b>
+            <small>${profileActivityTime(latestDeal.created_at)}</small>
+        </div>
+        <div><b class="${profit >= 0 ? "pos" : "neg"}">${profit >= 0 ? "+" : ""}${profit.toFixed(2)}</b></div>
+    `;
+    const empty = wrap.querySelector(".empty");
+    if (empty) empty.remove();
+    wrap.prepend(row);
+    while (wrap.children.length > 6) {
+        wrap.lastElementChild.remove();
+    }
 }
 
 function updateTradeInsight() {
@@ -580,6 +632,46 @@ function bindDepositForm() {
             result.innerHTML = `<span class="neg">${L("js_network_error", "Network error")}</span>`;
         }
     });
+}
+
+function bindDepositMethodCards() {
+    const wrap = document.getElementById("deposit-method-cards");
+    const methodSelect = document.getElementById("deposit-method");
+    const hint = document.getElementById("deposit-method-hint");
+    if (!wrap || !methodSelect) return;
+    const cards = Array.from(wrap.querySelectorAll(".deposit-method-card[data-method]"));
+    if (!cards.length) return;
+    const lang = uiLang();
+    const hints = {
+        en: {
+            crypto: "Crypto bot route is selected. Support will send final instructions after request submission.",
+            trc20: "TRC20 route selected. Verify the wallet and network in support chat before transfer.",
+            card: "Card method selected. Support will provide secure payment instructions in chat.",
+        },
+        ru: {
+            crypto: "Выбран Crypto bot. Поддержка отправит финальные реквизиты после заявки.",
+            trc20: "Выбран TRC20. Перед переводом уточните сеть и кошелёк у поддержки.",
+            card: "Выбрана банковская карта. Поддержка отправит безопасные инструкции по оплате в чате.",
+        },
+        uk: {
+            crypto: "Обрано Crypto bot. Підтримка надішле фінальні реквізити після заявки.",
+            trc20: "Обрано TRC20. Перед переказом уточніть мережу та гаманець у підтримки.",
+            card: "Обрано банківську картку. Підтримка надішле безпечні інструкції в чаті.",
+        },
+    };
+    const dict = hints[lang] || hints.en;
+
+    const sync = (method) => {
+        cards.forEach((card) => card.classList.toggle("active", card.dataset.method === method));
+        methodSelect.value = method;
+        if (hint) hint.textContent = dict[method] || dict.crypto;
+    };
+
+    cards.forEach((card) => {
+        card.addEventListener("click", () => sync(card.dataset.method || "crypto"));
+    });
+    methodSelect.addEventListener("change", () => sync(methodSelect.value || "crypto"));
+    sync(methodSelect.value || cards[0].dataset.method || "crypto");
 }
 
 function buildCandleState() {
@@ -1332,6 +1424,9 @@ function bindUserSocket() {
                 syncTradePanel(data.open_positions[0].trade_id, tgId);
             }
         }
+        if (data.latest_deal) {
+            updateProfileLatestDeal(data.latest_deal);
+        }
     });
 }
 
@@ -1661,6 +1756,67 @@ function renderMarketDetail(snapshot, sourceRow) {
         <div class="detail-book">${bookHtml}</div>
     `;
     card.hidden = false;
+}
+
+async function bindMarketDetailLive() {
+    const section = document.querySelector(".market-detail-card[data-market-symbol]");
+    const markEl = document.getElementById("md-mark");
+    const spreadEl = document.getElementById("md-spread");
+    const highEl = document.getElementById("md-high");
+    const lowEl = document.getElementById("md-low");
+    const noteEl = document.getElementById("md-note");
+    const bookEl = document.getElementById("md-book");
+    if (!section || !markEl || !spreadEl || !highEl || !lowEl || !bookEl) return;
+    const symbol = section.dataset.marketSymbol || "BTC";
+    const lang = uiLang();
+    const notePrefix = lang === "ru"
+        ? "Последний тик"
+        : lang === "uk"
+            ? "Останній тік"
+            : "Latest tape";
+    const emptyNote = lang === "ru"
+        ? "Рыночные данные обновляются в реальном времени."
+        : lang === "uk"
+            ? "Ринкові дані оновлюються в реальному часі."
+            : "Market data updates in real time.";
+
+    const drawBook = (asks, bids) => {
+        const rows = [
+            ...(Array.isArray(asks) ? asks.slice(0, 3) : []).map((item) => `<div class="detail-book-row ask"><span>${item.price}</span><b>${item.qty}</b></div>`),
+            ...(Array.isArray(bids) ? bids.slice(0, 3) : []).map((item) => `<div class="detail-book-row bid"><span>${item.price}</span><b>${item.qty}</b></div>`),
+        ];
+        if (!rows.length) return;
+        bookEl.innerHTML = rows.join("");
+    };
+
+    const patch = (data) => {
+        markEl.textContent = String(data.mark ?? "--");
+        spreadEl.textContent = String(data.spread ?? "--");
+        highEl.textContent = String(data.high ?? "--");
+        lowEl.textContent = String(data.low ?? "--");
+        drawBook(data.asks, data.bids);
+        if (!noteEl) return;
+        if (data.tick) {
+            const side = String(data.tick.side || "").toUpperCase();
+            noteEl.textContent = `${notePrefix}: ${side} • ${data.tick.price} • ${data.tick.qty}`;
+        } else {
+            noteEl.textContent = emptyNote;
+        }
+    };
+
+    const poll = async () => {
+        try {
+            const resp = await fetch(`/api/market/snapshot?symbol=${encodeURIComponent(symbol)}`);
+            if (!resp.ok) return;
+            const data = await resp.json();
+            if (data.ok) patch(data);
+        } catch (_) {
+            // no-op
+        }
+    };
+
+    await poll();
+    setInterval(poll, 3200);
 }
 
 function bindMarketCards() {
@@ -2554,11 +2710,13 @@ bindTradeControls();
 bindTradeForm();
 bindExchangeForm();
 bindDepositForm();
+bindDepositMethodCards();
 bindLangSwitch();
 bindWorkerPanel();
 bindWorkerClientPage();
 bindMarketsToolbar();
 bindMarketCards();
+bindMarketDetailLive();
 bindMarketSocket();
 bindUserSocket();
 bindOpenPositionsActions();
