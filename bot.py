@@ -2222,6 +2222,155 @@ async def get_user_deal_equity_curve(user_tg_id: int, limit: int = 20):
     return rows, points
 
 
+def _parse_db_datetime_to_ts(value: str | None) -> float:
+    if not value:
+        return 0.0
+    raw = str(value).strip()
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S.%f"):
+        with contextlib.suppress(Exception):
+            return datetime.strptime(raw, fmt).replace(tzinfo=timezone.utc).timestamp()
+    return 0.0
+
+
+async def get_platform_trade_tape(limit: int = 10) -> list[dict]:
+    safe_limit = max(1, min(60, int(limit)))
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        open_cur = await db.execute(
+            """
+            SELECT
+                a.trade_id AS ref_id,
+                a.user_tg_id,
+                u.username,
+                u.first_name,
+                a.asset_name,
+                a.direction,
+                a.amount,
+                a.currency,
+                a.opened_ts,
+                a.close_ts,
+                a.status
+            FROM active_trades a
+            LEFT JOIN users u ON u.tg_id = a.user_tg_id
+            WHERE a.status = 'open'
+            ORDER BY a.opened_ts DESC
+            LIMIT ?
+            """,
+            (safe_limit,),
+        )
+        open_rows = await open_cur.fetchall()
+
+        closed_cur = await db.execute(
+            """
+            SELECT
+                d.id AS ref_id,
+                d.user_tg_id,
+                u.username,
+                u.first_name,
+                d.asset_name,
+                d.direction,
+                d.amount,
+                d.currency,
+                d.profit,
+                d.is_win,
+                d.created_at
+            FROM deals d
+            LEFT JOIN users u ON u.tg_id = d.user_tg_id
+            ORDER BY d.id DESC
+            LIMIT ?
+            """,
+            (safe_limit,),
+        )
+        closed_rows = await closed_cur.fetchall()
+
+    events: list[dict] = []
+    for row in open_rows:
+        ts = float(row["opened_ts"] or 0.0)
+        events.append(
+            {
+                "kind": "open",
+                "ref": str(row["ref_id"]),
+                "user_tg_id": int(row["user_tg_id"]),
+                "username": row["username"],
+                "first_name": row["first_name"],
+                "asset_name": row["asset_name"],
+                "direction": row["direction"],
+                "amount": float(row["amount"] or 0.0),
+                "currency": row["currency"] or "USD",
+                "ts": ts,
+            }
+        )
+
+    for row in closed_rows:
+        ts = _parse_db_datetime_to_ts(row["created_at"])
+        events.append(
+            {
+                "kind": "closed",
+                "ref": str(row["ref_id"]),
+                "user_tg_id": int(row["user_tg_id"]),
+                "username": row["username"],
+                "first_name": row["first_name"],
+                "asset_name": row["asset_name"],
+                "direction": row["direction"],
+                "amount": float(row["amount"] or 0.0),
+                "currency": row["currency"] or "USD",
+                "pnl": float(row["profit"] or 0.0),
+                "is_win": bool(row["is_win"]),
+                "ts": ts,
+            }
+        )
+
+    events.sort(key=lambda item: float(item.get("ts") or 0.0), reverse=True)
+    events = events[:safe_limit]
+
+    # Keep the tape alive even when platform activity is low.
+    if len(events) < safe_limit:
+        markets = await fetch_market_overview_rows(limit=min(6, safe_limit))
+        now_ts = time.time()
+        for idx, market in enumerate(markets):
+            if len(events) >= safe_limit:
+                break
+            pseudo_side = "up" if float(market["day_change"]) >= 0 else "down"
+            events.append(
+                {
+                    "kind": "market",
+                    "ref": f"mk-{idx}",
+                    "user_tg_id": 0,
+                    "username": "market",
+                    "first_name": "Market",
+                    "asset_name": market["symbol"],
+                    "direction": pseudo_side,
+                    "amount": max(10.0, round(float(market["price"]) * 0.01, 2)),
+                    "currency": "USDT",
+                    "day_change": float(market["day_change"]),
+                    "ts": now_ts - idx,
+                }
+            )
+    events.sort(key=lambda item: float(item.get("ts") or 0.0), reverse=True)
+    return events[:safe_limit]
+
+
+async def get_live_exchange_payload(
+    market_limit: int = 8,
+    tape_limit: int = 10,
+    leaderboard_limit: int = 8,
+    min_deals: int = 3,
+) -> dict:
+    market_rows = await fetch_market_overview_rows(limit=market_limit)
+    tape_rows = await get_platform_trade_tape(limit=tape_limit)
+    leaderboard_rows = await get_unified_leaderboard(limit=leaderboard_limit, min_deals=min_deals)
+    return {
+        "ok": True,
+        "ts": int(time.time()),
+        "market": market_rows,
+        "tape": tape_rows,
+        "leaderboard": leaderboard_rows,
+        "market_limit": int(market_limit),
+        "tape_limit": int(tape_limit),
+        "leaderboard_limit": int(leaderboard_limit),
+    }
+
+
 async def save_referral(worker_tg_id: int, invited_tg_id: int):
     if worker_tg_id == invited_tg_id:
         return
@@ -3548,7 +3697,8 @@ async def stop_market_auto_stream(user_tg_id: int):
 
 
 async def build_market_hub_text(lang: str, interval_sec: int | None = None, auto_mode: bool = False) -> tuple[str, bool]:
-    rows = await fetch_market_overview_rows(limit=8)
+    payload = await get_live_exchange_payload(market_limit=8, tape_limit=8, leaderboard_limit=5, min_deals=3)
+    rows = list(payload.get("market") or [])
     if not rows:
         return tr(
             lang,
@@ -3572,6 +3722,32 @@ async def build_market_hub_text(lang: str, interval_sec: int | None = None, auto
             f"<code>{trend}</code>",
             compact_pct_bar(float(rows[0]["day_change"])),
         ]
+
+    tape_rows = list(payload.get("tape") or [])
+    if tape_rows:
+        lines += [
+            "",
+            tr(lang, "⚡ Лента сделок (live):", "⚡ Trades tape (live):", "⚡ Стрічка угод (live):"),
+        ]
+        for row in tape_rows[:6]:
+            kind = str(row.get("kind") or "")
+            asset = str(row.get("asset_name") or "BTC")
+            amount = float(row.get("amount") or 0.0)
+            currency = str(row.get("currency") or "USD")
+            if kind == "open":
+                side = "🟢" if str(row.get("direction") or "up") == "up" else "🔴"
+                user = (row.get("username") and f"@{row.get('username')}") or (row.get("first_name") or f"ID {row.get('user_tg_id')}")
+                lines.append(f"{side} {asset} · {amount:.2f} {currency} · {user}")
+            elif kind == "closed":
+                pnl = float(row.get("pnl") or 0.0)
+                icon = "✅" if pnl >= 0 else "❌"
+                user = (row.get("username") and f"@{row.get('username')}") or (row.get("first_name") or f"ID {row.get('user_tg_id')}")
+                lines.append(f"{icon} {asset} · PnL {pnl:+.2f} {currency} · {user}")
+            else:
+                day_change = float(row.get("day_change") or 0.0)
+                icon = "🟢" if day_change >= 0 else "🔴"
+                lines.append(f"{icon} {asset} · {day_change:+.2f}%")
+
     if auto_mode:
         safe_interval = normalize_market_refresh_interval(interval_sec)
         lines += [

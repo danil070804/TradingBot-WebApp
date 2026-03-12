@@ -4304,6 +4304,26 @@ async def api_leaderboard(limit: int = 10, min_deals: int = 3):
     return JSONResponse({"ok": True, "rows": rows, "limit": safe_limit, "min_deals": safe_min_deals})
 
 
+@app.get("/api/live/exchange", response_class=JSONResponse)
+async def api_live_exchange(
+    market_limit: int = 8,
+    tape_limit: int = 10,
+    leaderboard_limit: int = 8,
+    min_deals: int = 3,
+):
+    safe_market = max(1, min(30, int(market_limit)))
+    safe_tape = max(1, min(60, int(tape_limit)))
+    safe_leaderboard = max(1, min(50, int(leaderboard_limit)))
+    safe_min_deals = max(1, min(100, int(min_deals)))
+    payload = await bot.get_live_exchange_payload(
+        market_limit=safe_market,
+        tape_limit=safe_tape,
+        leaderboard_limit=safe_leaderboard,
+        min_deals=safe_min_deals,
+    )
+    return JSONResponse(payload)
+
+
 @app.get("/api/market/tape", response_class=JSONResponse)
 async def api_market_tape():
     return JSONResponse({"ok": True, "items": current_tape_items(25)})
