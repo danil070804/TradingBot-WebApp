@@ -1,8 +1,28 @@
 {% extends "base.html" %}
 {% block title %}{{ labels.deals_title if labels else "Deals" }} | Legend Trading{% endblock %}
 {% block content %}
+<section class="card hero">
+    <div class="markets-hero-top">
+        <div class="markets-hero-copy">
+            <h1>{{ labels.deals_title if labels else "История сделок" }}</h1>
+            <strong class="markets-hero-headline">
+                {% if lang == "ru" %}Разбирай результат каждой сделки и отслеживай общую динамику{% elif lang == "uk" %}Розбирай результат кожної угоди та відстежуй загальну динаміку{% else %}Review every result and track your overall trading rhythm{% endif %}
+            </strong>
+            <p class="markets-hero-lead">
+                {% if lang == "ru" %}Смотри PnL, направление и быстрый переход в детальный разбор по каждой позиции.{% elif lang == "uk" %}Дивись PnL, напрям і швидкий перехід у детальний розбір по кожній позиції.{% else %}See PnL, direction and jump into a full breakdown for each position.{% endif %}
+            </p>
+        </div>
+        <a class="qa-btn markets-hero-cta" href="/trade">{% if lang == "ru" %}Открыть сделку{% elif lang == "uk" %}Відкрити угоду{% else %}Open Trade{% endif %}</a>
+    </div>
+</section>
+
 <section class="card">
-    <div class="section-title">{{ labels.deals_title if labels else "История сделок" }}</div>
+    <div class="markets-panel-head">
+        <div>
+            <div class="section-title">{{ labels.deals_title if labels else "История сделок" }}</div>
+            <strong class="markets-panel-title">{% if lang == "ru" %}Журнал торговых результатов{% elif lang == "uk" %}Журнал торгових результатів{% else %}Trade result journal{% endif %}</strong>
+        </div>
+    </div>
     <div class="list">
         {% for d in deals %}
         <a

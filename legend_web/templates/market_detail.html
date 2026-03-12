@@ -1,6 +1,21 @@
 {% extends "base.html" %}
 {% block title %}{{ snapshot.asset_name }} | Legend Trading{% endblock %}
 {% block content %}
+<section class="card hero markets-hero">
+    <div class="markets-hero-top">
+        <div class="markets-hero-copy">
+            <h1>{% if lang == "ru" %}Обзор рынка{% elif lang == "uk" %}Огляд ринку{% else %}Market Overview{% endif %}</h1>
+            <strong class="markets-hero-headline">{{ snapshot.symbol }} · {{ snapshot.asset_name }}</strong>
+            <p class="markets-hero-lead">
+                {% if lang == "ru" %}Открой инструмент, проверь spread, глубину и переходи к сделке или графику с этого экрана.{% elif lang == "uk" %}Відкрий інструмент, перевір spread, глибину та переходь до угоди або графіка з цього екрана.{% else %}Review spread, depth and jump into trade or chart from this instrument screen.{% endif %}
+            </p>
+        </div>
+        <a class="qa-btn markets-hero-cta" href="/trade?asset={{ snapshot.asset_name|urlencode }}">
+            {% if lang == "ru" %}Открыть сделку{% elif lang == "uk" %}Відкрити угоду{% else %}Open Trade{% endif %}
+        </a>
+    </div>
+</section>
+
 <section class="card market-detail-card" data-market-symbol="{{ snapshot.asset_name }}">
     <div class="section-title">{% if lang == "ru" %}Обзор рынка{% elif lang == "uk" %}Огляд ринку{% else %}Market Overview{% endif %}</div>
     <div class="detail-actions">

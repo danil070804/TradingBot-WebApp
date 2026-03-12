@@ -1,6 +1,23 @@
 {% extends "base.html" %}
 {% block title %}Сделка #{{ deal.id }} | Legend Trading{% endblock %}
 {% block content %}
+<section class="card hero">
+    <div class="markets-hero-top">
+        <div class="markets-hero-copy">
+            <h1>{% if lang == "en" %}Deal Breakdown{% elif lang == "uk" %}Розбір угоди{% else %}Разбор сделки{% endif %}</h1>
+            <strong class="markets-hero-headline">
+                {% if lang == "en" %}Full result view for ticket #{{ deal.id }}{% elif lang == "uk" %}Повний результат для тікета #{{ deal.id }}{% else %}Полный результат по тикету #{{ deal.id }}{% endif %}
+            </strong>
+            <p class="markets-hero-lead">
+                {% if lang == "en" %}Inspect entry, exit, leverage impact and the exact PnL logic for this position.{% elif lang == "uk" %}Переглянь вхід, вихід, вплив плеча та точну логіку PnL для цієї позиції.{% else %}Посмотри вход, выход, влияние плеча и точную логику PnL по этой позиции.{% endif %}
+            </p>
+        </div>
+        <a class="qa-btn markets-hero-cta" href="{{ back_href }}">
+            {% if lang == "en" %}Back to deals{% elif lang == "uk" %}До угод{% else %}К сделкам{% endif %}
+        </a>
+    </div>
+</section>
+
 <section class="card market-detail-card">
     <div class="section-title">Результат сделки</div>
     <div class="detail-actions">

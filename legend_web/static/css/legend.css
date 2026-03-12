@@ -3567,6 +3567,31 @@ body[data-preloader="skip"] .app-preloader {
 }
 
 @media (max-width: 860px) {
+    .topbar {
+        padding: 12px 12px;
+        gap: 8px;
+    }
+    .topbar-center {
+        padding: 0 6px;
+    }
+    .topbar-pill {
+        padding: 7px 10px;
+        font-size: 9px;
+        letter-spacing: .1em;
+    }
+    .brand-title {
+        font-size: 18px;
+    }
+    .brand-sub {
+        font-size: 10px;
+    }
+    .lang-switch {
+        gap: 4px;
+    }
+    .lang-btn {
+        padding: 6px 6px;
+        font-size: 10px;
+    }
     .profile-command-bar,
     .markets-command-bar,
     .deposit-command-bar {
@@ -3706,6 +3731,34 @@ body[data-preloader="skip"] .app-preloader {
     }
     .skeleton-chip-row {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 520px) {
+    .topbar-center {
+        display: none;
+    }
+    .brand {
+        gap: 9px;
+    }
+    .brand-mark {
+        width: 34px;
+        height: 34px;
+        border-radius: 12px;
+    }
+    .brand-title {
+        font-size: 16px;
+    }
+    .brand-sub {
+        letter-spacing: .1em;
+    }
+    .bottom-nav a span:last-child {
+        font-size: 9px;
+    }
+    .nav-icon {
+        width: 22px;
+        height: 22px;
+        font-size: 11px;
     }
 }
 

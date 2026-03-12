@@ -1,6 +1,21 @@
 {% extends "base.html" %}
 {% block title %}{{ labels.trade_chart_title if labels else "График" }} | Legend Trading{% endblock %}
 {% block content %}
+<section class="card hero">
+    <div class="markets-hero-top">
+        <div class="markets-hero-copy">
+            <h1>{{ labels.trade_chart_title if labels else "Биржевой график" }}</h1>
+            <strong class="markets-hero-headline">
+                {% if lang == "ru" %}Полный chart desk для точного входа{% elif lang == "uk" %}Повний chart desk для точного входу{% else %}Full chart desk for precise entries{% endif %}
+            </strong>
+            <p class="markets-hero-lead">
+                {% if lang == "ru" %}Следи за mark, spread и структурой цены в одном полноэкранном рабочем режиме.{% elif lang == "uk" %}Стеж за mark, spread і структурою ціни в одному повноекранному робочому режимі.{% else %}Track mark, spread and price structure in one focused full-screen workspace.{% endif %}
+            </p>
+        </div>
+        <a class="qa-btn markets-hero-cta" href="/trade">{% if lang == "ru" %}К терминалу{% elif lang == "uk" %}До терміналу{% else %}Back To Terminal{% endif %}</a>
+    </div>
+</section>
+
 <section class="card chart-terminal-shell chart-clean">
     <div class="chart-fs-head chart-terminal-head">
         <a class="chip chart-back-btn" href="/trade">{{ labels.trade_chart_back if labels else "Назад к торговле" }}</a>
