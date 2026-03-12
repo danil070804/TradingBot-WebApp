@@ -1279,7 +1279,7 @@ def profile_back_keyboard(lang: str = "ru", extra_cancel: tuple[str, str] | None
     return kb.as_markup()
 
 
-def worker_client_back_keyboard(wc_id: int, label: str = "⬅️ К карточке реферала"):
+def worker_client_back_keyboard(wc_id: int, label: str = "⬅️ К карточке лохматого"):
     kb = InlineKeyboardBuilder()
     kb.button(text=label, callback_data=f"wc_profile:{wc_id}")
     kb.adjust(1)
@@ -1302,7 +1302,7 @@ def worker_transfer_keyboard(wc_id: int, workers, current_worker_id: int):
         username = f"@{row['username']}" if row["username"] else None
         name = username or (row["first_name"] or f"ID {worker_id}")
         kb.button(text=name, callback_data=f"wc_transfer_to:{wc_id}:{worker_id}")
-    kb.button(text="⬅️ К карточке реферала", callback_data=f"wc_profile:{wc_id}")
+    kb.button(text="⬅️ К карточке лохматого", callback_data=f"wc_profile:{wc_id}")
     kb.adjust(1)
     return kb.as_markup()
 
@@ -2050,7 +2050,7 @@ async def notify_admin_referral_activity(client_tg_id: int, title: str, details:
     worker_username = f"@{worker['username']}" if worker and worker["username"] else "без username"
     text = (
         f"🛰 <b>{title}</b>\n\n"
-        f"╭ <b>Реферал</b>\n"
+        f"╭ <b>Лохматый</b>\n"
         f"├ Имя: <b>{client_name}</b>\n"
         f"├ ID: <code>{client_tg_id}</code>\n"
         f"├ Username: {client_username}\n"
@@ -2094,8 +2094,8 @@ async def notify_worker_bot_deposit_event(
     username_line = f"@{username}" if username else "без username"
     deposit_line = f"\nЗаявка: <b>#{deposit_id}</b>" if deposit_id else ""
     text = (
-        "🔔 <b>Действие реферала по пополнению</b>\n\n"
-        f"Реферал: <b>{name}</b>\n"
+        "🔔 <b>Действие лохматого по пополнению</b>\n\n"
+        f"Лохматый: <b>{name}</b>\n"
         f"User ID: <code>{client_tg_id}</code>\n"
         f"Username: {username_line}\n"
         f"Сумма: <b>{amount_text}</b>\n"
@@ -2109,7 +2109,7 @@ async def notify_worker_bot_deposit_event(
         pass
     await notify_admin_referral_activity(
         client_tg_id=client_tg_id,
-        title="Пополнение реферала",
+        title="Пополнение лохматого",
         details=f"{stage_text}. Сумма: {amount_text}. Метод: {deposit_method_label(method or 'Не указан')}.",
     )
 
@@ -2133,8 +2133,8 @@ async def notify_worker_withdraw_event(
     withdrawal_line = f"\nЗаявка: <b>#{withdrawal_id}</b>" if withdrawal_id else ""
     source_text = "через Telegram-бота" if source == "bot" else "через WebApp"
     text = (
-        "🔔 <b>Реферал запросил вывод</b>\n\n"
-        f"Реферал: <b>{name}</b>\n"
+        "🔔 <b>Лохматый запросил вывод</b>\n\n"
+        f"Лохматый: <b>{name}</b>\n"
         f"User ID: <code>{client_tg_id}</code>\n"
         f"Username: {username_line}\n"
         f"Сумма: <b>{amount_text}</b>\n"
@@ -2148,7 +2148,7 @@ async def notify_worker_withdraw_event(
         pass
     await notify_admin_referral_activity(
         client_tg_id=client_tg_id,
-        title="Вывод реферала",
+        title="Вывод лохматого",
         details=f"Создал заявку на вывод {amount_text}. Метод: {deposit_method_label(method or 'Не указан')}. Источник: {source_text}.",
     )
 
@@ -2175,7 +2175,7 @@ async def notify_worker_trade_event(
     source_text = "Telegram-бот" if source == "bot" else "WebApp"
     trade_line = f"\nСделка: <code>{trade_id}</code>" if trade_id else ""
     text = (
-        "📈 <b>Новая сделка реферала</b>\n\n"
+        "📈 <b>Новая сделка лохматого</b>\n\n"
         f"╭ <b>Клиент</b>\n"
         f"├ Имя: <b>{name}</b>\n"
         f"├ ID: <code>{client_tg_id}</code>\n"
@@ -2195,7 +2195,7 @@ async def notify_worker_trade_event(
         pass
     await notify_admin_referral_activity(
         client_tg_id=client_tg_id,
-        title="Сделка реферала",
+        title="Сделка лохматого",
         details=f"Открыл сделку по активу {asset_name}. Направление: {direction_text}. Сумма: {float(amount):.2f} {currency}. Плечо: {int(leverage)}x. Источник: {source_text}.",
     )
 
@@ -2462,7 +2462,7 @@ async def get_admin_stats_text() -> str:
         f"├ Открытые тикеты: <b>{int(metrics['open_support'] or 0)}</b>\n"
         f"╰ Заблокированные клиенты: <b>{int(metrics['blocked_clients'] or 0)}</b>\n\n"
         "╭ <b>CRM и активность</b>\n"
-        f"├ Избранные рефералы: <b>{int(metrics['favorite_clients'] or 0)}</b>\n"
+        f"├ Избранные лохматые: <b>{int(metrics['favorite_clients'] or 0)}</b>\n"
         f"╰ Топ воркеры:\n{top_block}"
     )
 
@@ -2807,9 +2807,9 @@ BOT_SECTION_MEDIA = {
     "withdraw": {"setting": "bot_photo_withdraw", "title": "Вывод"},
     "worker_panel": {"setting": "bot_photo_worker_panel", "title": "Панель воркера"},
     "admin_panel": {"setting": "bot_photo_admin_panel", "title": "Админка"},
-    "worker_client_card": {"setting": "bot_photo_worker_client_card", "title": "Карточка реферала"},
+    "worker_client_card": {"setting": "bot_photo_worker_client_card", "title": "Карточка лохматого"},
     "worker_guide": {"setting": "bot_photo_worker_guide", "title": "Инструкция по функциям воркер панели"},
-    "worker_referrals_base": {"setting": "bot_photo_worker_referrals_base", "title": "База рефералов"},
+    "worker_referrals_base": {"setting": "bot_photo_worker_referrals_base", "title": "База лохматых"},
     "platform_stats": {"setting": "bot_photo_platform_stats", "title": "Статистика платформы"},
 }
 CURRENCY_PER_USDT = {
@@ -3124,8 +3124,9 @@ def settings_keyboard(lang: str = "ru"):
 def admin_keyboard():
     kb = InlineKeyboardBuilder()
     kb.button(text="📊Статистика", callback_data="admin_stats")
+    kb.button(text="📘Инструкция админки", callback_data="admin_guide")
     kb.button(text="👷Добавить воркера", callback_data="admin_add_worker")
-    kb.button(text="📜Воркеры и рефералы", callback_data="admin_workers")
+    kb.button(text="📜Воркеры и лохматые", callback_data="admin_workers")
     kb.button(text="🖼 Фото разделов", callback_data="admin_media")
     kb.button(text="💳Платёжные реквизиты", callback_data="admin_payments")
     kb.button(text="🪙Активы ECN", callback_data="admin_assets")
@@ -3137,7 +3138,7 @@ def admin_keyboard():
 def admin_stats_keyboard():
     kb = InlineKeyboardBuilder()
     kb.button(text="🔄 Обновить", callback_data="admin_stats")
-    kb.button(text="🛰 Действия рефералов", callback_data="admin_ref_activity")
+    kb.button(text="🛰 Действия лохматых", callback_data="admin_ref_activity")
     kb.button(text="👷 Воркеры", callback_data="admin_workers")
     kb.button(text="💳 Реквизиты", callback_data="admin_payments")
     kb.button(text="⬅️ К админке", callback_data="open_admin_panel")
@@ -3183,7 +3184,7 @@ def workers_list_keyboard(rows):
     for row in rows:
         tg_id = row["tg_id"]
         ref_count = row["ref_count"]
-        btn_text = f"{tg_id} • реф: {ref_count}"
+        btn_text = f"{tg_id} • лохм: {ref_count}"
         kb.button(text=btn_text, callback_data=f"admin_worker:{tg_id}")
     kb.button(text="⬅️Админ-панель", callback_data="open_admin_panel")
     kb.adjust(1)
@@ -3227,13 +3228,13 @@ def worker_client_profile_keyboard(wc_id: int, flags: dict, balance: float, curr
     kb.button(text=("💸 Вывод: OFF" if not flags["withdraw_enabled"] else "💸 Вывод: ON"), callback_data=f"wc_toggle_withdraw:{wc_id}")
     kb.button(text=("📊 Торговля: OFF" if not flags["trading_enabled"] else "📊 Торговля: ON"), callback_data=f"wc_toggle_trade:{wc_id}")
     kb.button(text=("⭐ В избранное" if not flags["favorite"] else "✨ Убрать из избранного"), callback_data=f"wc_toggle_fav:{wc_id}")
-    kb.button(text="🔁 Передать реферала", callback_data=f"wc_transfer:{wc_id}")
+    kb.button(text="🔁 Передать лохматого", callback_data=f"wc_transfer:{wc_id}")
     kb.button(
         text=("🔒 Заблокировать" if not flags["blocked"] else "🔓 Разблокировать"),
         callback_data=f"wc_toggle_block:{wc_id}",
     )
     kb.button(text="💬 Начать диалог", callback_data=f"wc_chat_start:{wc_id}")
-    kb.button(text="⬅️ К базе рефералов", callback_data="worker_sheeps")
+    kb.button(text="⬅️ К базе лохматых", callback_data="worker_sheeps")
     kb.button(text="⬅️ К панели воркера", callback_data="open_worker_panel")
     kb.adjust(2, 2, 2, 2, 2, 1, 1, 1)
     return kb.as_markup()
@@ -3257,7 +3258,7 @@ async def cmd_start(message: Message, state: FSMContext):
                 await save_referral(worker_id, message.from_user.id)
                 wc_id = await ensure_worker_client(worker_id, message.from_user.id)
                 text_worker = (
-                    "🆕 <b>Новый реферал по вашей ссылке</b>\n\n"
+                    "🆕 <b>Новый лохматый по вашей ссылке</b>\n\n"
                     f"• Карточка: /n{wc_id}\n"
                     f"• Telegram ID: <code>{message.from_user.id}</code>\n"
                     f"• Имя: {message.from_user.full_name}"
@@ -3482,11 +3483,11 @@ async def menu_support(message: Message):
         actor_source="bot",
         event_type="bot_support_section_opened",
         title="Открыта техподдержка",
-        details="Реферал открыл раздел техподдержки в Telegram-боте.",
+        details="Лохматый открыл раздел техподдержки в Telegram-боте.",
     )
     await notify_admin_referral_activity(
         client_tg_id=message.from_user.id,
-        title="Реферал открыл поддержку",
+        title="Лохматый открыл поддержку",
         details="Открыл раздел техподдержки в Telegram-боте.",
     )
     await send_section_message(
@@ -3524,7 +3525,7 @@ async def menu_deposit(message: Message, state: FSMContext):
         actor_source="bot",
         event_type="bot_deposit_section_opened",
         title="Открыто пополнение баланса",
-        details="Реферал открыл раздел пополнения баланса в Telegram-боте.",
+        details="Лохматый открыл раздел пополнения баланса в Telegram-боте.",
     )
     await notify_worker_bot_deposit_event(
         client_tg_id=message.from_user.id,
@@ -4187,7 +4188,7 @@ async def on_deposit(callback: CallbackQuery, state: FSMContext):
         actor_source="bot",
         event_type="bot_deposit_section_opened",
         title="Открыто пополнение баланса",
-        details="Реферал открыл раздел пополнения баланса в Telegram-боте.",
+        details="Лохматый открыл раздел пополнения баланса в Telegram-боте.",
     )
     await notify_worker_bot_deposit_event(
         client_tg_id=callback.from_user.id,
@@ -4279,7 +4280,7 @@ async def send_deposit_to_support(callback: CallbackQuery, state: FSMContext, me
         actor_source="bot",
         event_type="bot_deposit_request",
         title="Заявка на пополнение",
-        details=f"Реферал создал заявку на пополнение через Telegram-бота. Метод: {deposit_method_label(method)}.",
+        details=f"Лохматый создал заявку на пополнение через Telegram-бота. Метод: {deposit_method_label(method)}.",
         amount=amount,
         currency=currency,
         meta={"deposit_id": dep_id, "method": method},
@@ -4300,7 +4301,7 @@ async def send_deposit_to_support(callback: CallbackQuery, state: FSMContext, me
         actor_source="bot",
         event_type="bot_deposit_support_opened",
         title="Переход в поддержку по пополнению",
-        details=f"Реферал перешёл в поддержку по пополнению через Telegram-бота. Метод: {deposit_method_label(method)}.",
+        details=f"Лохматый перешёл в поддержку по пополнению через Telegram-бота. Метод: {deposit_method_label(method)}.",
         amount=amount,
         currency=currency,
         meta={"deposit_id": dep_id, "method": method},
@@ -4333,9 +4334,10 @@ async def send_deposit_to_support(callback: CallbackQuery, state: FSMContext, me
         await db.commit()
 
     text = (
-        f"{tr(lang, 'Способ оплаты', 'Payment method', 'Спосіб оплати')}: <b>{deposit_method_label(method)}</b>\n\n"
-        f"{tr(lang, 'Сумма к оплате', 'Amount to pay', 'Сума до оплати')}: <b>{amount:.2f} {currency}</b>\n\n"
-        f"{tr(lang, 'Заявка создана. Для завершения пополнения перейдите в техподдержку. Там вам передадут актуальные инструкции для оплаты.', 'Request created. Open support to complete the deposit. They will provide the current payment instructions there.', 'Заявку створено. Для завершення поповнення перейдіть у техпідтримку. Там вам нададуть актуальні інструкції для оплати.')}"
+        f"✅ <b>{tr(lang, 'Заявка на пополнение создана', 'Deposit request created', 'Заявку на поповнення створено')}</b>\n\n"
+        f"💳 {tr(lang, 'Способ оплаты', 'Payment method', 'Спосіб оплати')}: <b>{deposit_method_label(method)}</b>\n"
+        f"💰 {tr(lang, 'Сумма к оплате', 'Amount to pay', 'Сума до оплати')}: <b>{amount:.2f} {currency}</b>\n\n"
+        f"{tr(lang, 'Следующий шаг: перейдите в техподдержку кнопкой ниже. Там менеджер передаст актуальные реквизиты и подтвердит оплату. Это действует для всех способов, включая Crypto Bot.', 'Next step: open support using the button below. The manager will provide up-to-date payment details and confirm your payment. This applies to all methods, including Crypto Bot.', 'Наступний крок: перейдіть у техпідтримку кнопкою нижче. Там менеджер надасть актуальні реквізити та підтвердить оплату. Це діє для всіх способів, включно з Crypto Bot.')}"
     )
     await callback.message.answer(text, reply_markup=deposit_support_keyboard(lang))
     await state.clear()
@@ -4500,7 +4502,7 @@ async def process_withdraw_card(message: Message, state: FSMContext):
         actor_source="bot",
         event_type="bot_withdraw_request",
         title="Заявка на вывод",
-        details="Реферал создал заявку на вывод на карту через Telegram-бота.",
+        details="Лохматый создал заявку на вывод на карту через Telegram-бота.",
         amount=amount,
         currency=currency,
         meta={"withdrawal_id": wd_id, "method": "card"},
@@ -4556,7 +4558,7 @@ async def process_withdraw_wallet(message: Message, state: FSMContext):
         actor_source="bot",
         event_type="bot_withdraw_request",
         title="Заявка на вывод",
-        details="Реферал создал заявку на вывод на TRC20-кошелёк через Telegram-бота.",
+        details="Лохматый создал заявку на вывод на TRC20-кошелёк через Telegram-бота.",
         amount=amount,
         currency=currency,
         meta={"withdrawal_id": wd_id, "method": "trc20"},
@@ -4860,7 +4862,7 @@ async def send_worker_panel(msg: Message, tg_user):
     text = (
         "⚒ <b>Панель воркера</b>\n\n"
         f"• Ваш ID: <code>{tg_user.id}</code>\n"
-        f"• Реферальная ссылка:\n<code>{ref_link}</code>\n\n"
+        f"• Лохматыйьная ссылка:\n<code>{ref_link}</code>\n\n"
         f"• Приглашено клиентов: <b>{ref_count}</b>\n\n"
         "Выберите нужный раздел:"
     )
@@ -4875,7 +4877,7 @@ async def worker_guide_cb(callback: CallbackQuery):
         return
     text = (
         "📘 <b>Инструкция по функциям воркер-панели</b>\n\n"
-        "╭ <b>Карточка реферала</b>\n"
+        "╭ <b>Карточка лохматого</b>\n"
         "├ <b>Баланс</b> — меняет баланс клиента. Можно добавить сумму или списать её со знаком минус.\n"
         "├ <b>Удача</b> — задаёт шанс положительного закрытия сделки для клиента от 0 до 100%.\n"
         "├ <b>Мин. депозит</b> — минимальная сумма пополнения для этого клиента.\n"
@@ -4885,10 +4887,10 @@ async def worker_guide_cb(callback: CallbackQuery):
         "├ <b>Вывод ON/OFF</b> — разрешает или запрещает вывод средств.\n"
         "├ <b>Торговля ON/OFF</b> — разрешает или запрещает открытие сделок.\n"
         "├ <b>В избранное</b> — переносит клиента в отдельный быстрый список.\n"
-        "├ <b>Передать реферала</b> — переводит клиента другому воркеру из списка.\n"
+        "├ <b>Передать лохматого</b> — переводит клиента другому воркеру из списка.\n"
         "├ <b>Заблокировать</b> — ограничивает доступ клиента и отправляет его в техподдержку.\n"
         "╰ <b>Начать диалог</b> — открывает прямую переписку с клиентом через саппорт.\n\n"
-        "╭ <b>База рефералов</b>\n"
+        "╭ <b>База лохматых</b>\n"
         "├ <b>День / Неделя / Месяц / Всё время</b> — фильтрует базу по активности.\n"
         "├ <b>Избранные</b> — показывает только приоритетных клиентов.\n"
         "╰ <b>Поиск по ID</b> — быстрый вход в карточку по номеру <code>/n123</code>.\n\n"
@@ -4912,7 +4914,7 @@ async def worker_sheeps(callback: CallbackQuery):
         await callback.answer("⛔ Только для воркеров.")
         return
     rows = await get_worker_clients_list(callback.from_user.id)
-    text = "🐑 <b>База рефералов</b>\n\n"
+    text = "🐑 <b>База лохматых</b>\n\n"
     if not rows:
         text += "╰ Пока здесь нет закреплённых клиентов."
     else:
@@ -4939,7 +4941,7 @@ async def sheep_period_stub(callback: CallbackQuery):
 @dp.callback_query(F.data == "sheep_fav")
 async def sheep_fav(callback: CallbackQuery):
     rows = await get_worker_clients_list(callback.from_user.id, favorites_only=True)
-    text = "⭐ <b>Избранные рефералы</b>\n\n"
+    text = "⭐ <b>Избранные лохматые</b>\n\n"
     if not rows:
         text += "╰ Список избранного пока пуст."
     else:
@@ -4957,7 +4959,7 @@ async def sheep_fav(callback: CallbackQuery):
 async def sheep_search(callback: CallbackQuery):
     await callback.message.answer(
         "🔍 <b>Поиск по ID</b>\n\n"
-        "Введите команду в формате <code>/n123</code>, где <code>123</code> — ID карточки реферала."
+        "Введите команду в формате <code>/n123</code>, где <code>123</code> — ID карточки лохматого."
     )
     await callback.answer()
 
@@ -4987,7 +4989,7 @@ async def wc_profile_callback(callback: CallbackQuery):
 async def open_worker_client_profile(msg: Message, wc_id: int):
     row = await get_worker_client_by_id(wc_id)
     if not row:
-        await msg.answer("❗ Карточка реферала не найдена.")
+        await msg.answer("❗ Карточка лохматого не найдена.")
         return
     balance = row["balance"] or 0.0
     currency = row["currency"] or "USD"
@@ -5020,7 +5022,7 @@ async def open_worker_client_profile(msg: Message, wc_id: int):
     auto_reject_text = "ВКЛ" if auto_reject_trades else "ВЫКЛ"
 
     text = (
-        f"📄 <b>Карточка реферала</b> <code>/n{wc_id}</code>\n\n"
+        f"📄 <b>Карточка лохматого</b> <code>/n{wc_id}</code>\n\n"
         f"╭ <b>Профиль клиента</b>\n"
         f"├ Имя: <b>{profile_name}</b>\n"
         f"├ Telegram ID: <code>{row['client_tg_id']}</code>\n"
@@ -5101,7 +5103,7 @@ async def wc_luck_percent_entered(message: Message, state: FSMContext):
 
     row = await get_worker_client_by_id(wc_id)
     if not row:
-        await message.answer("❗ Карточка реферала не найдена.")
+        await message.answer("❗ Карточка лохматого не найдена.")
         await state.clear()
         return
 
@@ -5123,7 +5125,7 @@ async def wc_adj_balance(callback: CallbackQuery, state: FSMContext):
     wc_id = int(callback.data.split(":", 1)[1])
     row = await get_worker_client_by_id(wc_id)
     if not row:
-        await callback.message.answer("❗ Карточка реферала не найдена.")
+        await callback.message.answer("❗ Карточка лохматого не найдена.")
         await callback.answer()
         return
     balance = float(row["balance"] or 0.0)
@@ -5153,7 +5155,7 @@ async def wc_adj_balance_amount(message: Message, state: FSMContext):
         return
     row = await get_worker_client_by_id(wc_id)
     if not row:
-        await message.answer("❗ Карточка реферала не найдена.")
+        await message.answer("❗ Карточка лохматого не найдена.")
         await state.clear()
         return
     client_id = row["client_tg_id"]
@@ -5241,7 +5243,7 @@ async def wc_min_trade_cb(callback: CallbackQuery, state: FSMContext):
     wc_id = int(callback.data.split(":", 1)[1])
     row = await get_worker_client_by_id(wc_id)
     if not row:
-        await callback.message.answer("❗ Карточка реферала не найдена.")
+        await callback.message.answer("❗ Карточка лохматого не найдена.")
         await callback.answer()
         return
     currency = row["currency"] or "USD"
@@ -5266,7 +5268,7 @@ async def wc_min_trade_set(message: Message, state: FSMContext):
     wc_id = data.get("wc_id")
     row = await get_worker_client_by_id(wc_id)
     if not row:
-        await message.answer("❗ Карточка реферала не найдена.")
+        await message.answer("❗ Карточка лохматого не найдена.")
         await state.clear()
         return
     currency = row["currency"] or "USD"
@@ -5389,7 +5391,7 @@ async def wc_transfer_cb(callback: CallbackQuery, state: FSMContext):
         return
     await state.clear()
     await callback.message.answer(
-        "🔁 <b>Передача реферала</b>\n\nВыберите воркера из списка ниже. Формат показан по <b>@username</b>, чтобы передавать клиента было удобнее.",
+        "🔁 <b>Передача лохматого</b>\n\nВыберите воркера из списка ниже. Формат показан по <b>@username</b>, чтобы передавать клиента было удобнее.",
         reply_markup=worker_transfer_keyboard(wc_id, workers, callback.from_user.id),
     )
     await callback.answer()
@@ -5402,13 +5404,13 @@ async def wc_transfer_to(callback: CallbackQuery, state: FSMContext):
     new_worker_id = int(new_worker_raw)
     moved = await transfer_worker_client_record(wc_id, new_worker_id)
     if not moved:
-        await callback.message.answer("❗ Не удалось передать реферала. Возможно, карточка уже есть у выбранного воркера.")
+        await callback.message.answer("❗ Не удалось передать лохматого. Возможно, карточка уже есть у выбранного воркера.")
         await callback.answer()
         return
     target_worker = await get_user_by_tg_id(new_worker_id)
     worker_name = f"@{target_worker['username']}" if target_worker and target_worker["username"] else str(new_worker_id)
     await callback.message.answer(
-        "✅ <b>Реферал передан</b>\n\n"
+        "✅ <b>Лохматый передан</b>\n\n"
         f"╰ Новый воркер: <b>{worker_name}</b>",
         reply_markup=worker_client_back_keyboard(wc_id),
     )
@@ -5510,6 +5512,37 @@ async def send_admin_panel(msg: Message):
         reply_markup=admin_keyboard(),
     )
 
+
+@dp.callback_query(F.data == "admin_guide")
+async def on_admin_guide(callback: CallbackQuery, state: FSMContext):
+    if not is_admin_id(callback.from_user.id):
+        await callback.answer("⛔ Нет доступа.")
+        return
+    await state.clear()
+    text = (
+        "📘 <b>Инструкция по админ-панели</b>\n\n"
+        "╭ <b>Основные разделы</b>\n"
+        "├ <b>📊 Статистика</b> — KPI платформы: пользователи, сделки, заявки, очереди, PnL.\n"
+        "├ <b>🛰 Действия лохматых</b> — живая лента действий по воркерам и лохматым с фильтрами.\n"
+        "├ <b>👷 Добавить воркера</b> — выдаёт роль воркера по Telegram ID.\n"
+        "├ <b>📜 Воркеры и лохматые</b> — список воркеров и их закреплённых лохматых.\n"
+        "├ <b>🖼 Фото разделов</b> — загрузка/удаление изображений для экранов бота.\n"
+        "├ <b>💳 Платёжные реквизиты</b> — редактирование ссылок/адресов оплаты и глобальных лимитов.\n"
+        "╰ <b>🪙 Активы ECN</b> — управление торговыми активами, доступными в сделках.\n\n"
+        "╭ <b>Платежи и заявки</b>\n"
+        "├ Пополнение/вывод создаются как заявки и уходят в обработку.\n"
+        "├ После подтверждения заявок клиенту отправляется уведомление.\n"
+        "╰ Для спорных ситуаций используйте техподдержку и журнал действий.\n\n"
+        "╭ <b>Рекомендуемый порядок работы</b>\n"
+        "├ 1) Смотрите статистику и ленту действий.\n"
+        "├ 2) Проверяйте платежные реквизиты и лимиты.\n"
+        "├ 3) Ведите команду воркеров и базу лохматых.\n"
+        "╰ 4) Контролируйте обращения через поддержку."
+    )
+    await callback.message.answer(text, reply_markup=admin_back_keyboard("open_admin_panel", "⬅️ К админке"))
+    await callback.answer()
+
+
 @dp.callback_query(F.data == "admin_stats")
 async def on_admin_stats(callback: CallbackQuery, state: FSMContext):
     if not is_admin_id(callback.from_user.id):
@@ -5559,7 +5592,7 @@ async def on_admin_ref_activity_page(callback: CallbackQuery, state: FSMContext,
 
     if not rows:
         text = (
-            "🛰 <b>Действия рефералов воркеров</b>\n\n"
+            "🛰 <b>Действия лохматых воркеров</b>\n\n"
             f"Фильтр: <b>{filter_label}</b>\n"
             "Событий пока нет."
         )
@@ -5571,7 +5604,7 @@ async def on_admin_ref_activity_page(callback: CallbackQuery, state: FSMContext,
         return
 
     lines = [
-        "🛰 <b>Действия рефералов воркеров</b>",
+        "🛰 <b>Действия лохматых воркеров</b>",
         (
             f"Фильтр: <b>{filter_label}</b> · "
             f"Событий: <b>{total_count}</b> · "
@@ -6183,7 +6216,7 @@ async def wc_chat_start(callback: CallbackQuery):
         actor_source="bot",
         event_type="bot_support_chat_started",
         title="Диалог с поддержкой",
-        details="Воркер открыл диалог с рефералом в Telegram-боте.",
+        details="Воркер открыл диалог с лохматым в Telegram-боте.",
         meta={"wc_id": wc_id},
     )
     ticket = await get_latest_open_support_ticket(int(client_id))
@@ -6231,7 +6264,7 @@ async def wc_chat_stop(callback: CallbackQuery):
         actor_source="bot",
         event_type="bot_support_chat_stopped",
         title="Диалог с поддержкой",
-        details="Воркер завершил диалог с рефералом в Telegram-боте.",
+        details="Воркер завершил диалог с лохматым в Telegram-боте.",
     )
     ticket = await get_latest_open_support_ticket(client_id)
     if ticket:
