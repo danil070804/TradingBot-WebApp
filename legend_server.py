@@ -2633,27 +2633,37 @@ async def admin_process_deposit(payload: AdminProcessPayload, request: Request):
         if ticket:
             await bot.update_support_ticket_status(int(ticket["id"]), "closed", assigned_to="admin_web", last_message="Пополнение подтверждено")
         try:
-            await bot.bot.send_message(
+            section_key = "deposit_status_approved"
+            if not await bot.get_section_photo_file_id(section_key):
+                section_key = "deposit_status"
+            await bot.send_section_chat_message(
                 int(dep["user_tg_id"]),
+                section_key,
                 bot.build_deposit_status_notice(
                     client_lang,
                     True,
                     float(dep["amount"] or 0),
                     dep["currency"] or "USD",
                 ),
+                reply_markup=bot.support_section_keyboard(client_lang),
             )
         except Exception:
             pass
     else:
         try:
-            await bot.bot.send_message(
+            section_key = "deposit_status_rejected"
+            if not await bot.get_section_photo_file_id(section_key):
+                section_key = "deposit_status"
+            await bot.send_section_chat_message(
                 int(dep["user_tg_id"]),
+                section_key,
                 bot.build_deposit_status_notice(
                     client_lang,
                     False,
                     float(dep["amount"] or 0),
                     dep["currency"] or "USD",
                 ),
+                reply_markup=bot.support_section_keyboard(client_lang),
             )
         except Exception:
             pass
