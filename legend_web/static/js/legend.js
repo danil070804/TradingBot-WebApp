@@ -18,6 +18,13 @@ function uiLang() {
     return String(document.body?.dataset?.lang || "en").toLowerCase();
 }
 
+function langPick(ru, en, uk) {
+    const lang = uiLang();
+    if (lang === "ru") return ru;
+    if (lang === "uk") return uk;
+    return en;
+}
+
 function showToast(message, type = "info", timeoutMs = 2600) {
     const stack = document.getElementById("toast-stack");
     if (!stack || !message) return;
@@ -1068,6 +1075,9 @@ function bindDepositMethodCards() {
     const wrap = document.getElementById("deposit-method-cards");
     const methodSelect = document.getElementById("deposit-method");
     const hint = document.getElementById("deposit-method-hint");
+    const detailSpeed = document.getElementById("deposit-detail-speed");
+    const detailFee = document.getElementById("deposit-detail-fee");
+    const detailNote = document.getElementById("deposit-detail-note");
     if (!wrap || !methodSelect) return;
     const cards = Array.from(wrap.querySelectorAll(".deposit-method-card[data-method]"));
     if (!cards.length) return;
@@ -1090,11 +1100,33 @@ function bindDepositMethodCards() {
         },
     };
     const dict = hints[lang] || hints.en;
+    const details = {
+        en: {
+            crypto: { speed: "Speed: 1-5 min", fee: "Fee: low", note: "Recommended: quick start and instant support follow-up." },
+            trc20: { speed: "Speed: 3-15 min", fee: "Fee: blockchain network fee", note: "Use the exact TRC20 network to avoid transfer issues." },
+            card: { speed: "Speed: 5-30 min", fee: "Fee: depends on provider", note: "Best for card users, confirmation is handled by support." },
+        },
+        ru: {
+            crypto: { speed: "Скорость: 1-5 мин", fee: "Комиссия: низкая", note: "Рекомендуем для быстрого старта и моментального сопровождения." },
+            trc20: { speed: "Скорость: 3-15 мин", fee: "Комиссия: сеть блокчейна", note: "Используйте строго сеть TRC20, чтобы избежать потери перевода." },
+            card: { speed: "Скорость: 5-30 мин", fee: "Комиссия: зависит от провайдера", note: "Удобно для оплаты картой, подтверждение делает поддержка." },
+        },
+        uk: {
+            crypto: { speed: "Швидкість: 1-5 хв", fee: "Комісія: низька", note: "Рекомендуємо для швидкого старту та миттєвого супроводу." },
+            trc20: { speed: "Швидкість: 3-15 хв", fee: "Комісія: мережа блокчейну", note: "Використовуйте лише мережу TRC20, щоб уникнути втрати переказу." },
+            card: { speed: "Швидкість: 5-30 хв", fee: "Комісія: залежить від провайдера", note: "Зручно для оплати карткою, підтвердження робить підтримка." },
+        },
+    };
+    const detailsDict = details[lang] || details.en;
 
     const sync = (method) => {
         cards.forEach((card) => card.classList.toggle("active", card.dataset.method === method));
         methodSelect.value = method;
         if (hint) hint.textContent = dict[method] || dict.crypto;
+        const d = detailsDict[method] || detailsDict.crypto;
+        if (detailSpeed) detailSpeed.textContent = d.speed;
+        if (detailFee) detailFee.textContent = d.fee;
+        if (detailNote) detailNote.textContent = d.note;
     };
 
     cards.forEach((card) => {
@@ -2796,6 +2828,49 @@ function bindWorkerPanel() {
     const liveStatus = document.getElementById("worker-live-status");
     const liveMeta = document.getElementById("worker-live-meta");
     const workerId = Number(liveMeta ? liveMeta.dataset.workerId : 0);
+    const tt = {
+        value: langPick("Значение", "Value", "Значення"),
+        validNumber: langPick("Введите корректное число", "Enter a valid number", "Введіть коректне число"),
+        selectWorker: langPick("Сначала выберите воркера в верхнем списке", "Select a worker in the top list first", "Спочатку виберіть воркера у верхньому списку"),
+        updateFail: langPick("Не удалось обновить данные", "Failed to update data", "Не вдалося оновити дані"),
+        saved: langPick("Сохранено", "Saved", "Збережено"),
+        noReferrals: L("worker_empty", langPick("У вас пока нет рефералов.", "No referrals yet.", "У вас поки немає рефералів.")),
+        noEvents: langPick("Событий пока нет.", "No events yet.", "Подій поки немає."),
+        noTickets: langPick("Открытых тикетов пока нет.", "No open tickets yet.", "Відкритих тікетів поки немає."),
+        user: langPick("Пользователь", "User", "Користувач"),
+        event: langPick("Событие", "Event", "Подія"),
+        ticket: langPick("Тикет", "Ticket", "Тікет"),
+        noComment: langPick("Без комментария", "No comment", "Без коментаря"),
+        noDetails: langPick("Без деталей", "No details", "Без деталей"),
+        active: langPick("Активный", "Active", "Активний"),
+        blocked: langPick("Заблокирован", "Blocked", "Заблокований"),
+        favorite: langPick("Избранный", "Favorite", "Обраний"),
+        balance: langPick("Баланс", "Balance", "Баланс"),
+        minDeposit: langPick("Мин. пополнение", "Min deposit", "Мін. поповнення"),
+        minWithdraw: langPick("Мин. вывод", "Min withdraw", "Мін. вивід"),
+        minTrade: langPick("Мин. сделка", "Min trade", "Мін. угода"),
+        coeff: langPick("Коэфф.", "Coeff", "Коеф."),
+        autoReject: langPick("Авто-отклонение", "Auto-reject", "Автовідхилення"),
+        luck: langPick("Удача", "Luck", "Удача"),
+        stage: langPick("Этап", "Stage", "Етап"),
+        tags: langPick("Теги", "Tags", "Теги"),
+        trade: L("nav_trade", langPick("Торговля", "Trade", "Торгівля")),
+        withdraw: langPick("Вывод", "Withdraw", "Вивід"),
+        kyc: "KYC",
+        blockBtn: langPick("Блок", "Block", "Блок"),
+        unblockBtn: langPick("Разблок", "Unblock", "Розблок"),
+        transferBtn: langPick("Передать", "Transfer", "Передати"),
+        cardBtn: langPick("Карточка", "Card", "Картка"),
+        noteBtn: langPick("Заметка", "Note", "Нотатка"),
+        minDepBtn: langPick("Мин. деп", "Min dep", "Мін. деп"),
+        minWdBtn: langPick("Мин. выд", "Min wd", "Мін. вив"),
+        setBalBtn: langPick("Уст. бал", "Set bal", "Вст. бал"),
+        balanceAddLabel: langPick("Добавить баланс", "Add balance", "Додати баланс"),
+        balanceSubLabel: langPick("Снять с баланса", "Subtract balance", "Зняти з балансу"),
+        tagsLabel: langPick("Теги через запятую", "Tags comma-separated", "Теги через кому"),
+        noteLabel: langPick("Заметка клиента", "Client note", "Нотатка клієнта"),
+        stageLabel: langPick("Этап воронки", "Funnel stage", "Етап воронки"),
+    };
 
     const patchRowState = (row, action, value) => {
         if (!row) return;
@@ -2822,12 +2897,12 @@ function bindWorkerPanel() {
             btn.onclick = async () => {
                 const row = btn.closest(".worker-row");
                 if (!row) return;
-                const label = btn.dataset.label || "Value";
+                const label = btn.dataset.label || tt.value;
                 const valRaw = prompt(`${label}:`);
                 if (valRaw === null) return;
                 const val = Number(valRaw);
                 if (Number.isNaN(val)) {
-                    showToast("Enter a valid number", "error");
+                    showToast(tt.validNumber, "error");
                     return;
                 }
                 await doUpdate(row.dataset.wcId, btn.dataset.action, val);
@@ -2838,7 +2913,7 @@ function bindWorkerPanel() {
             btn.onclick = async () => {
                 const row = btn.closest(".worker-row");
                 if (!row) return;
-                const label = btn.dataset.label || "Value";
+                const label = btn.dataset.label || tt.value;
                 const val = prompt(`${label}:`);
                 if (val === null) return;
                 await doUpdate(row.dataset.wcId, btn.dataset.action, val);
@@ -2851,7 +2926,7 @@ function bindWorkerPanel() {
                 if (!row) return;
                 const target = transferTarget ? transferTarget.value : "";
                 if (!target) {
-                    showToast("Select a worker in the top list first", "error");
+                    showToast(tt.selectWorker, "error");
                     return;
                 }
                 await doUpdate(row.dataset.wcId, "transfer_worker", Number(target));
@@ -2885,10 +2960,10 @@ function bindWorkerPanel() {
         });
         const data = await resp.json();
         if (!resp.ok || !data.ok) {
-            showToast(data.error || "Failed to update data", "error");
+            showToast(data.error || tt.updateFail, "error");
             return false;
         }
-        showToast(data.details || "Saved", "success", 1300);
+        showToast(data.details || tt.saved, "success", 1300);
         patchRowState(wrap.querySelector(`.worker-row[data-wc-id="${wcId}"]`), action, value);
         await pollWorkerDashboard();
         return true;
@@ -2897,14 +2972,14 @@ function bindWorkerPanel() {
     const renderClients = (items) => {
         wrap.innerHTML = "";
         if (!items || !items.length) {
-            wrap.innerHTML = '<div class="empty">No referrals yet.</div>';
+            wrap.innerHTML = `<div class="empty">${tt.noReferrals}</div>`;
             return;
         }
         items.forEach((c) => {
             const row = document.createElement("div");
             row.className = "row worker-row";
             row.dataset.wcId = c.id;
-            row.dataset.search = `#${c.id} ${c.first_name || "User"} ${c.client_tg_id} ${c.username || ""}`;
+            row.dataset.search = `#${c.id} ${c.first_name || tt.user} ${c.client_tg_id} ${c.username || ""}`;
             row.dataset.favorite = c.favorite ? "1" : "0";
             row.dataset.blocked = c.blocked ? "1" : "0";
             row.dataset.verified = c.verified ? "1" : "0";
@@ -2916,43 +2991,43 @@ function bindWorkerPanel() {
             row.innerHTML = `
                 <a class="worker-card-link worker-card-main" href="/worker/client/${c.id}">
                     <div class="worker-head">
-                        <b>#${c.id} ${c.first_name || "User"}</b>
-                        <span class="worker-badge ${c.blocked ? "blocked" : c.favorite ? "favorite" : "active"}">${c.blocked ? "Blocked" : c.favorite ? "Favorite" : "Active"}</span>
+                        <b>#${c.id} ${c.first_name || tt.user}</b>
+                        <span class="worker-badge ${c.blocked ? "blocked" : c.favorite ? "favorite" : "active"}">${c.blocked ? tt.blocked : c.favorite ? tt.favorite : tt.active}</span>
                     </div>
                     <small>ID ${c.client_tg_id} · @${c.username || "-"}</small>
-                    <small>Balance: ${Number(c.balance || 0).toFixed(2)} ${c.currency || "USD"}</small>
+                    <small>${tt.balance}: ${Number(c.balance || 0).toFixed(2)} ${c.currency || "USD"}</small>
                     <div class="worker-meta">
-                        <span>Min deposit: ${Number(c.min_deposit || 0).toFixed(2)}</span>
-                        <span>Min withdraw: ${Number(c.min_withdraw || 0).toFixed(2)}</span>
-                        <span>Min trade: ${Number(c.min_trade_amount || 100).toFixed(2)}</span>
-                        <span>Coeff: ${Number(c.trade_coefficient || 1).toFixed(2)}</span>
-                        <span>${c.auto_reject_trades ? "Auto-reject: ON" : "Auto-reject: OFF"}</span>
-                        <span>Luck: ${Number(c.luck_percent || 0).toFixed(2)}%</span>
-                        <span>Stage: ${c.funnel_stage || "new"}</span>
-                        ${c.tags ? `<span>Tags: ${c.tags}</span>` : ""}
+                        <span>${tt.minDeposit}: ${Number(c.min_deposit || 0).toFixed(2)}</span>
+                        <span>${tt.minWithdraw}: ${Number(c.min_withdraw || 0).toFixed(2)}</span>
+                        <span>${tt.minTrade}: ${Number(c.min_trade_amount || 100).toFixed(2)}</span>
+                        <span>${tt.coeff}: ${Number(c.trade_coefficient || 1).toFixed(2)}</span>
+                        <span>${tt.autoReject}: ${c.auto_reject_trades ? "ON" : "OFF"}</span>
+                        <span>${tt.luck}: ${Number(c.luck_percent || 0).toFixed(2)}%</span>
+                        <span>${tt.stage}: ${c.funnel_stage || "new"}</span>
+                        ${c.tags ? `<span>${tt.tags}: ${c.tags}</span>` : ""}
                     </div>
                     ${c.crm_note ? `<div class="crm-note-preview">${c.crm_note}</div>` : ""}
                 </a>
                 <div class="worker-actions">
-                    <button class="chip worker-act ${c.trading_enabled ? "state-on" : "state-off"}" data-action="toggle_trade">Trade</button>
-                    <button class="chip worker-act ${c.withdraw_enabled ? "state-on" : "state-off"}" data-action="toggle_withdraw">Withdraw</button>
-                    <button class="chip worker-act ${c.verified ? "state-on" : "state-off"}" data-action="toggle_verified">KYC</button>
-                    <button class="chip worker-act ${c.favorite ? "state-fav" : "state-off"}" data-action="toggle_favorite">Favorite</button>
-                    <button class="chip worker-act ${c.blocked ? "state-block" : "state-on"}" data-action="toggle_block">${c.blocked ? "Unblock" : "Block"}</button>
-                    <button class="chip worker-prompt" data-action="set_luck" data-label="Luck 0-100">Luck</button>
-                    <button class="chip worker-prompt" data-action="set_min_deposit" data-label="Minimum deposit">Min dep</button>
-                    <button class="chip worker-prompt" data-action="set_min_withdraw" data-label="Minimum withdraw">Min wd</button>
-                    <button class="chip worker-prompt" data-action="add_balance" data-label="Add balance">Balance+</button>
-                    <button class="chip worker-prompt" data-action="subtract_balance" data-label="Subtract balance">Balance-</button>
-                    <button class="chip worker-prompt" data-action="set_balance" data-label="Set balance">Set bal</button>
-                    <button class="chip worker-prompt" data-action="set_min_trade_amount" data-label="Minimum trade amount">Min trade</button>
-                    <button class="chip worker-prompt" data-action="set_trade_coefficient" data-label="Trade coefficient">Coeff</button>
-                    <button class="chip worker-act ${c.auto_reject_trades ? "state-block" : "state-on"}" data-action="toggle_auto_reject_trades">Auto-reject</button>
-                    <button class="chip worker-text" data-action="set_funnel_stage" data-label="Funnel stage">Stage</button>
-                    <button class="chip worker-text" data-action="set_tags" data-label="Tags comma-separated">Tags</button>
-                    <button class="chip worker-text" data-action="set_note" data-label="Client note">Note</button>
-                    <button class="chip worker-transfer">Transfer</button>
-                    <a class="chip worker-open" href="/worker/client/${c.id}">Card</a>
+                    <button class="chip worker-act ${c.trading_enabled ? "state-on" : "state-off"}" data-action="toggle_trade">${tt.trade}</button>
+                    <button class="chip worker-act ${c.withdraw_enabled ? "state-on" : "state-off"}" data-action="toggle_withdraw">${tt.withdraw}</button>
+                    <button class="chip worker-act ${c.verified ? "state-on" : "state-off"}" data-action="toggle_verified">${tt.kyc}</button>
+                    <button class="chip worker-act ${c.favorite ? "state-fav" : "state-off"}" data-action="toggle_favorite">${tt.favorite}</button>
+                    <button class="chip worker-act ${c.blocked ? "state-block" : "state-on"}" data-action="toggle_block">${c.blocked ? tt.unblockBtn : tt.blockBtn}</button>
+                    <button class="chip worker-prompt" data-action="set_luck" data-label="${tt.luck} 0-100">${tt.luck}</button>
+                    <button class="chip worker-prompt" data-action="set_min_deposit" data-label="${tt.minDeposit}">${tt.minDepBtn}</button>
+                    <button class="chip worker-prompt" data-action="set_min_withdraw" data-label="${tt.minWithdraw}">${tt.minWdBtn}</button>
+                    <button class="chip worker-prompt" data-action="add_balance" data-label="${tt.balanceAddLabel}">Balance+</button>
+                    <button class="chip worker-prompt" data-action="subtract_balance" data-label="${tt.balanceSubLabel}">Balance-</button>
+                    <button class="chip worker-prompt" data-action="set_balance" data-label="${langPick("Установить баланс", "Set balance", "Встановити баланс")}">${tt.setBalBtn}</button>
+                    <button class="chip worker-prompt" data-action="set_min_trade_amount" data-label="${tt.minTrade}">${tt.minTrade}</button>
+                    <button class="chip worker-prompt" data-action="set_trade_coefficient" data-label="${langPick("Торговый коэффициент", "Trade coefficient", "Торговий коефіцієнт")}">${tt.coeff}</button>
+                    <button class="chip worker-act ${c.auto_reject_trades ? "state-block" : "state-on"}" data-action="toggle_auto_reject_trades">${tt.autoReject}</button>
+                    <button class="chip worker-text" data-action="set_funnel_stage" data-label="${tt.stageLabel}">${tt.stage}</button>
+                    <button class="chip worker-text" data-action="set_tags" data-label="${tt.tagsLabel}">${tt.tags}</button>
+                    <button class="chip worker-text" data-action="set_note" data-label="${tt.noteLabel}">${tt.noteBtn}</button>
+                    <button class="chip worker-transfer">${tt.transferBtn}</button>
+                    <a class="chip worker-open" href="/worker/client/${c.id}">${tt.cardBtn}</a>
                 </div>
             `;
             wrap.appendChild(row);
@@ -2976,7 +3051,7 @@ function bindWorkerPanel() {
         if (!box) return;
         box.innerHTML = "";
         if (!items || !items.length) {
-            box.innerHTML = '<div class="empty">No events yet.</div>';
+            box.innerHTML = `<div class="empty">${tt.noEvents}</div>`;
             return;
         }
         items.forEach((item) => {
@@ -2985,11 +3060,11 @@ function bindWorkerPanel() {
             row.innerHTML = `
                 <div class="worker-event-main">
                     <div class="worker-event-top">
-                        <b>${item.title || "Event"}</b>
+                        <b>${item.title || tt.event}</b>
                         <span class="worker-event-time">${item.created_at || ""}</span>
                     </div>
-                    <small>${item.first_name || "User"} · ID ${item.client_tg_id || "-"} · @${item.username || "-"}</small>
-                    <small>${item.details || "No details"}</small>
+                    <small>${item.first_name || tt.user} · ID ${item.client_tg_id || "-"} · @${item.username || "-"}</small>
+                    <small>${item.details || tt.noDetails}</small>
                 </div>
                 ${item.amount !== null && item.amount !== undefined ? `<div class="worker-event-amount">${Number(item.amount).toFixed(2)} ${item.currency || ""}</div>` : ""}
             `;
@@ -3002,7 +3077,7 @@ function bindWorkerPanel() {
         if (!box) return;
         box.innerHTML = "";
         if (!items || !items.length) {
-            box.innerHTML = '<div class="empty">No open tickets yet.</div>';
+            box.innerHTML = `<div class="empty">${tt.noTickets}</div>`;
             return;
         }
         items.forEach((item) => {
@@ -3012,11 +3087,11 @@ function bindWorkerPanel() {
             row.innerHTML = `
                 <div class="worker-event-main">
                     <div class="worker-event-top">
-                        <b>#${item.id} ${item.subject || "Ticket"}</b>
+                        <b>#${item.id} ${item.subject || tt.ticket}</b>
                         <span class="worker-event-time">${item.updated_at || ""}</span>
                     </div>
-                    <small>${item.first_name || "User"} · ID ${item.client_tg_id || "-"} · @${item.username || "-"}</small>
-                    <small>${item.last_message || "No comment"}</small>
+                    <small>${item.first_name || tt.user} · ID ${item.client_tg_id || "-"} · @${item.username || "-"}</small>
+                    <small>${item.last_message || tt.noComment}</small>
                 </div>
                 <div class="worker-badge ${badgeClass}">${item.status || "new"}</div>
             `;

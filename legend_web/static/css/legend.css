@@ -1819,6 +1819,7 @@ select, input {
 }
 
 .deposit-method-card {
+    position: relative;
     text-align: left;
     border: 1px solid rgba(116, 200, 244, 0.2);
     border-radius: 14px;
@@ -1827,6 +1828,18 @@ select, input {
     color: #345a75;
     cursor: pointer;
     transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+
+.deposit-method-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 9px;
+    display: inline-grid;
+    place-items: center;
+    background: rgba(116, 200, 244, 0.18);
+    border: 1px solid rgba(116, 200, 244, 0.24);
+    margin-bottom: 6px;
+    font-size: 15px;
 }
 
 .deposit-method-card strong {
@@ -1843,6 +1856,20 @@ select, input {
     line-height: 1.35;
 }
 
+.deposit-method-card em {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: #5d84a2;
+    background: rgba(222, 240, 250, 0.92);
+    border: 1px solid rgba(116, 200, 244, 0.14);
+    font-style: normal;
+}
+
 .deposit-method-card:hover {
     transform: translateY(-1px);
     box-shadow: 0 12px 24px rgba(110, 158, 191, 0.16);
@@ -1853,6 +1880,21 @@ select, input {
     border-color: rgba(116, 200, 244, 0.46);
     background: linear-gradient(180deg, rgba(212, 239, 255, 0.92), rgba(186, 226, 249, 0.7));
     box-shadow: inset 0 0 0 1px rgba(116, 200, 244, 0.16);
+}
+
+.deposit-method-details {
+    margin-bottom: 10px;
+    display: grid;
+    gap: 6px;
+}
+
+.deposit-method-detail {
+    border-radius: 11px;
+    border: 1px solid rgba(116, 200, 244, 0.16);
+    background: rgba(246, 252, 255, 0.9);
+    padding: 8px 10px;
+    font-size: 12px;
+    color: #52738d;
 }
 
 .deposit-method-hint {

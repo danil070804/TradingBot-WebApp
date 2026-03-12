@@ -12,17 +12,28 @@
     <p class="deposit-lead">{{ labels.get('deposit_lead', 'Choose a payment method. After you submit a request, support will provide the latest payment instructions.') if labels else "Choose a payment method. After you submit a request, support will provide the latest payment instructions." }}</p>
     <div class="deposit-method-cards" id="deposit-method-cards">
         <button type="button" class="deposit-method-card active" data-method="crypto">
+            <span class="deposit-method-icon">🤖</span>
             <strong>Crypto bot</strong>
             <small>{% if lang == "ru" %}Быстрое подтверждение через менеджера{% elif lang == "uk" %}Швидке підтвердження через менеджера{% else %}Fast flow with manager confirmation{% endif %}</small>
+            <em>{% if lang == "ru" %}Время: 1-5 мин{% elif lang == "uk" %}Час: 1-5 хв{% else %}ETA: 1-5 min{% endif %}</em>
         </button>
         <button type="button" class="deposit-method-card" data-method="trc20">
+            <span class="deposit-method-icon">🟢</span>
             <strong>TRC20 USDT</strong>
             <small>{% if lang == "ru" %}Прямой перевод на кошелек{% elif lang == "uk" %}Прямий переказ на гаманець{% else %}Direct wallet transfer route{% endif %}</small>
+            <em>{% if lang == "ru" %}Комиссия сети{% elif lang == "uk" %}Комісія мережі{% else %}Network fee{% endif %}</em>
         </button>
         <button type="button" class="deposit-method-card" data-method="card">
+            <span class="deposit-method-icon">💳</span>
             <strong>{{ labels.pay_card if labels else "Банковская карта" }}</strong>
             <small>{% if lang == "ru" %}Оплата картой через поддержку{% elif lang == "uk" %}Оплата карткою через підтримку{% else %}Card payment through support{% endif %}</small>
+            <em>{% if lang == "ru" %}Подтверждение оператором{% elif lang == "uk" %}Підтвердження оператором{% else %}Manual approval{% endif %}</em>
         </button>
+    </div>
+    <div class="deposit-method-details" id="deposit-method-details">
+        <div class="deposit-method-detail"><span id="deposit-detail-speed">{% if lang == "ru" %}Скорость: мгновенно{% elif lang == "uk" %}Швидкість: миттєво{% else %}Speed: instant{% endif %}</span></div>
+        <div class="deposit-method-detail"><span id="deposit-detail-fee">{% if lang == "ru" %}Комиссия: минимальная{% elif lang == "uk" %}Комісія: мінімальна{% else %}Fee: low{% endif %}</span></div>
+        <div class="deposit-method-detail"><span id="deposit-detail-note">{% if lang == "ru" %}Рекомендация: для быстрого старта{% elif lang == "uk" %}Рекомендація: для швидкого старту{% else %}Recommended: quick start{% endif %}</span></div>
     </div>
     <div class="deposit-method-hint" id="deposit-method-hint">
         {% if lang == "ru" %}
