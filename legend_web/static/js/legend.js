@@ -493,6 +493,95 @@ function bindDirectionButtons() {
     });
 }
 
+function formatExpiration(seconds) {
+    const sec = Number(seconds || 0);
+    const lang = uiLang();
+    if (lang === "ru") {
+        if (sec >= 60 && sec % 60 === 0) return `${sec / 60} мин`;
+        return `${sec} сек`;
+    }
+    if (lang === "uk") {
+        if (sec >= 60 && sec % 60 === 0) return `${sec / 60} хв`;
+        return `${sec} с`;
+    }
+    if (sec >= 60 && sec % 60 === 0) return `${sec / 60} min`;
+    return `${sec}s`;
+}
+
+async function showTradeConfirmSheet(payload) {
+    const overlay = document.getElementById("trade-confirm-overlay");
+    if (!overlay) {
+        const side = payload.direction === "up" ? "LONG" : "SHORT";
+        return window.confirm(`${payload.asset} ${side} ${payload.amount.toFixed(2)} ${payload.currency}`);
+    }
+    const lang = uiLang();
+    const isRu = lang === "ru";
+    const isUk = lang === "uk";
+    const mapText = {
+        title: isRu ? "Подтверждение сделки" : isUk ? "Підтвердження угоди" : "Confirm Trade",
+        sideUp: isRu ? "ЛОНГ" : isUk ? "ЛОНГ" : "LONG",
+        sideDown: isRu ? "ШОРТ" : isUk ? "ШОРТ" : "SHORT",
+        risk: isRu ? "Оценка, не гарантия. Финальный результат зависит от движения рынка." : isUk ? "Оцінка, не гарантія. Фінальний результат залежить від руху ринку." : "Estimate only, not guaranteed. Final result depends on live market movement.",
+        confirm: isRu ? "Подтвердить и открыть" : isUk ? "Підтвердити та відкрити" : "Confirm & Open",
+        cancel: isRu ? "Отмена" : isUk ? "Скасувати" : "Cancel",
+    };
+    const set = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = value;
+    };
+    const sideLabel = payload.direction === "up" ? mapText.sideUp : mapText.sideDown;
+    set("tc-title", mapText.title);
+    set("tc-asset", payload.asset);
+    set("tc-side", sideLabel);
+    set("tc-amount", `${payload.amount.toFixed(2)} ${payload.currency}`);
+    set("tc-lev", `${payload.leverage}x`);
+    set("tc-exp", formatExpiration(payload.seconds));
+    set("tc-mark", payload.mark > 0 ? payload.mark.toFixed(4) : "--");
+    set("tc-tp", payload.tpValue > 0 ? `+${payload.tpValue.toFixed(2)} ${payload.currency}` : "--");
+    set("tc-sl", payload.slValue > 0 ? `-${payload.slValue.toFixed(2)} ${payload.currency}` : "--");
+    set("tc-risk-load", `${payload.riskLoad.toFixed(1)}%`);
+    set("tc-note", mapText.risk);
+    const confirmBtn = document.getElementById("tc-confirm");
+    const cancelBtn = document.getElementById("tc-cancel");
+    const cancelTopBtn = document.getElementById("tc-cancel-top");
+    if (confirmBtn) confirmBtn.textContent = mapText.confirm;
+    if (cancelBtn) cancelBtn.textContent = mapText.cancel;
+
+    overlay.hidden = false;
+    requestAnimationFrame(() => overlay.classList.add("show"));
+    try {
+        window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.("medium");
+    } catch (_) {
+        // no-op
+    }
+
+    return new Promise((resolve) => {
+        let settled = false;
+        const finish = (ok) => {
+            if (settled) return;
+            settled = true;
+            overlay.classList.remove("show");
+            window.setTimeout(() => {
+                overlay.hidden = true;
+            }, 220);
+            confirmBtn?.removeEventListener("click", onConfirm);
+            cancelBtn?.removeEventListener("click", onCancel);
+            cancelTopBtn?.removeEventListener("click", onCancel);
+            overlay.removeEventListener("click", onOverlay);
+            resolve(ok);
+        };
+        const onConfirm = () => finish(true);
+        const onCancel = () => finish(false);
+        const onOverlay = (event) => {
+            if (event.target === overlay) finish(false);
+        };
+        confirmBtn?.addEventListener("click", onConfirm, { once: true });
+        cancelBtn?.addEventListener("click", onCancel, { once: true });
+        cancelTopBtn?.addEventListener("click", onCancel, { once: true });
+        overlay.addEventListener("click", onOverlay);
+    });
+}
+
 function bindTradeForm() {
     const form = document.getElementById("trade-form");
     const result = document.getElementById("trade-result");
@@ -511,6 +600,39 @@ function bindTradeForm() {
     form.addEventListener("submit", async (e) => {
         e.preventDefault();
         if (busy) return;
+        if (form.dataset.confirmPass !== "1") {
+            const pre = Object.fromEntries(new FormData(form).entries());
+            const amount = Number(pre.amount || 0);
+            const seconds = Number(pre.seconds || 0);
+            const leverage = Number(pre.leverage || 10);
+            const tpPercent = Number(pre.tp_percent || 0);
+            const slPercent = Number(pre.sl_percent || 0);
+            const currency = currentUiCurrency();
+            const balance = Number((document.getElementById("live-balance") || {}).textContent || (document.getElementById("home-live-balance") || {}).textContent || 0);
+            const riskLoad = balance > 0 ? Math.min(100, (amount / balance) * 100) : 0;
+            const mark = Number((document.getElementById("stat-mark") || {}).textContent || (document.getElementById("orderbook-mark") || {}).textContent || 0);
+            const ok = await showTradeConfirmSheet({
+                asset: pre.asset_name || "Market",
+                direction: pre.direction || "up",
+                amount,
+                seconds,
+                leverage,
+                currency,
+                mark,
+                tpValue: tpPercent > 0 ? (amount * tpPercent) / 100 : 0,
+                slValue: slPercent > 0 ? (amount * slPercent) / 100 : 0,
+                riskLoad,
+            });
+            if (!ok) return;
+            form.dataset.confirmPass = "1";
+            if (typeof form.requestSubmit === "function") {
+                form.requestSubmit();
+            } else {
+                form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+            }
+            return;
+        }
+        form.dataset.confirmPass = "0";
         busy = true;
         if (submitBtn) submitBtn.disabled = true;
         result.textContent = L("js_trade_opening", "Opening trade...");

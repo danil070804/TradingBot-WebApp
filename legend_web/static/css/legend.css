@@ -1589,6 +1589,128 @@ select, input {
     justify-content: flex-end;
 }
 
+.trade-confirm-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2200;
+    display: grid;
+    place-items: end center;
+    background: rgba(12, 34, 52, 0.52);
+    backdrop-filter: blur(8px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .22s ease;
+    padding: 18px 12px calc(88px + env(safe-area-inset-bottom, 0px));
+}
+
+.trade-confirm-overlay.show {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.trade-confirm-card {
+    width: min(470px, calc(100vw - 20px));
+    border-radius: 22px;
+    border: 1px solid rgba(116, 200, 244, 0.28);
+    background:
+        radial-gradient(220px 120px at 0% 0%, rgba(167, 227, 255, 0.32), transparent 72%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(231, 245, 253, 0.93));
+    box-shadow: 0 30px 66px rgba(21, 54, 79, 0.28);
+    padding: 14px;
+    transform: translateY(16px) scale(.985);
+    opacity: 0;
+    transition: transform .24s cubic-bezier(.2,.8,.2,1), opacity .24s ease;
+}
+
+.trade-confirm-overlay.show .trade-confirm-card {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+}
+
+.trade-confirm-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.trade-confirm-head strong {
+    font-family: "Oxanium", sans-serif;
+    color: #245879;
+    font-size: 20px;
+}
+
+.trade-confirm-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.trade-confirm-cell {
+    border: 1px solid rgba(116, 200, 244, 0.18);
+    border-radius: 13px;
+    background: rgba(248, 252, 255, 0.9);
+    padding: 9px 10px;
+}
+
+.trade-confirm-cell span {
+    display: block;
+    font-size: 10px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: #6f8ea8;
+}
+
+.trade-confirm-cell b {
+    display: block;
+    margin-top: 5px;
+    color: #214f6f;
+    font-size: 14px;
+}
+
+.trade-confirm-risk {
+    margin-top: 10px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.trade-confirm-risk > div {
+    border-radius: 12px;
+    border: 1px solid rgba(116, 200, 244, 0.18);
+    background: rgba(245, 251, 255, 0.9);
+    padding: 8px 10px;
+}
+
+.trade-confirm-risk small {
+    display: block;
+    font-size: 10px;
+    color: #6d8ca4;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+}
+
+.trade-confirm-risk b {
+    display: block;
+    margin-top: 4px;
+    font-size: 14px;
+}
+
+.trade-confirm-note {
+    margin-top: 10px;
+    color: #5f8099;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.trade-confirm-actions {
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: 1fr 1.3fr;
+    gap: 8px;
+}
+
 .deposit-lead {
     margin: 0 0 12px;
     color: #4d6981;
@@ -2906,6 +3028,15 @@ body[data-preloader="skip"] .app-preloader {
     .chart-back-btn {
         width: 100%;
         justify-content: center;
+    }
+    .trade-confirm-grid {
+        grid-template-columns: 1fr;
+    }
+    .trade-confirm-risk {
+        grid-template-columns: 1fr;
+    }
+    .trade-confirm-actions {
+        grid-template-columns: 1fr;
     }
     .page-intro-actions {
         flex-direction: column;

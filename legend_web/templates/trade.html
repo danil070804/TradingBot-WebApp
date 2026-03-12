@@ -190,6 +190,33 @@
         <div class="empty">{{ labels.js_loading if labels else "Загрузка..." }}</div>
     </div>
 </section>
+
+<div id="trade-confirm-overlay" class="trade-confirm-overlay" hidden>
+    <div class="trade-confirm-card">
+        <div class="trade-confirm-head">
+            <strong id="tc-title">Confirm trade</strong>
+            <button type="button" class="chip" id="tc-cancel-top">✕</button>
+        </div>
+        <div class="trade-confirm-grid">
+            <div class="trade-confirm-cell"><span>Asset</span><b id="tc-asset">--</b></div>
+            <div class="trade-confirm-cell"><span>Side</span><b id="tc-side">--</b></div>
+            <div class="trade-confirm-cell"><span>Amount</span><b id="tc-amount">--</b></div>
+            <div class="trade-confirm-cell"><span>Leverage</span><b id="tc-lev">--</b></div>
+            <div class="trade-confirm-cell"><span>Expiration</span><b id="tc-exp">--</b></div>
+            <div class="trade-confirm-cell"><span>Mark</span><b id="tc-mark">--</b></div>
+        </div>
+        <div class="trade-confirm-risk">
+            <div><small>Potential TP</small><b class="pos" id="tc-tp">--</b></div>
+            <div><small>Potential SL</small><b class="neg" id="tc-sl">--</b></div>
+            <div><small>Risk load</small><b id="tc-risk-load">--</b></div>
+        </div>
+        <div class="trade-confirm-note" id="tc-note">This estimate is not guaranteed and depends on live market conditions.</div>
+        <div class="trade-confirm-actions">
+            <button type="button" class="chip" id="tc-cancel">Cancel</button>
+            <button type="button" class="submit" id="tc-confirm">Confirm & Open</button>
+        </div>
+    </div>
+</div>
 {% endblock %}
 {% block extra_scripts %}
 <script src="https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
