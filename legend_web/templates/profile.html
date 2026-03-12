@@ -66,9 +66,7 @@
     <a class="qa-btn" href="/deposit">{{ labels.nav_deposit if labels else "Пополнить" }}</a>
     <a class="qa-btn" href="/withdraw">{{ labels.nav_withdraw if labels else "Вывести" }}</a>
     <a class="qa-btn" href="/markets">{{ labels.nav_markets if labels else "Рынки" }}</a>
-    <a class="qa-btn" href="/support">{{ labels.js_support_btn if labels else "Перейти в поддержку" }}</a>
     <a class="qa-btn" href="/deals">{{ labels.nav_deals if labels else "Сделки" }}</a>
-    <a class="qa-btn" href="/verify">{{ labels.quick_verify if labels else "Пройти верификацию" }}</a>
     {% if user and user.is_worker %}
     <a class="qa-btn" href="/worker">{{ labels.quick_worker if labels else "Панель воркера" }}</a>
     {% endif %}
