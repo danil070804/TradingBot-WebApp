@@ -1207,20 +1207,20 @@ function renderMarketDetail(snapshot, sourceRow) {
                 <strong>${snapshot.symbol || "—"}</strong>
                 <small>${snapshot.asset_name || sourceRow?.dataset.marketName || "Market"}</small>
             </div>
-            <span class="detail-badge ${snapshot.market_mode === "live" ? "pos" : ""}">${snapshot.market_mode === "live" ? "Live" : "Synthetic"}</span>
+            <span class="detail-badge ${snapshot.market_mode === "live" ? "pos" : ""}">${snapshot.market_mode === "live" ? L("market_mode_live", "Live") : L("market_mode_synthetic", "Synthetic")}</span>
         </div>
         <div class="detail-grid">
-            <div class="detail-cell"><span>Mark</span><b>${snapshot.mark}</b></div>
-            <div class="detail-cell"><span>Spread</span><b>${snapshot.spread}</b></div>
-            <div class="detail-cell"><span>24H High</span><b>${snapshot.high}</b></div>
-            <div class="detail-cell"><span>24H Low</span><b>${snapshot.low}</b></div>
+            <div class="detail-cell"><span>${L("market_mark", "Mark")}</span><b>${snapshot.mark}</b></div>
+            <div class="detail-cell"><span>${L("market_spread", "Spread")}</span><b>${snapshot.spread}</b></div>
+            <div class="detail-cell"><span>${L("market_high", "24H High")}</span><b>${snapshot.high}</b></div>
+            <div class="detail-cell"><span>${L("market_low", "24H Low")}</span><b>${snapshot.low}</b></div>
         </div>
         <div class="detail-actions">
-            <a class="detail-link" href="/trade?asset=${marketRef}">Open Trade</a>
+            <a class="detail-link" href="/trade?asset=${marketRef}">${L("quick_trade", "Open Trade")}</a>
             <a class="detail-link" href="/trade/chart?symbol=${marketRef}">${(window.LEGEND_LABELS && window.LEGEND_LABELS.trade_open_chart) || "Open Chart"}</a>
         </div>
         <div class="detail-note">
-            ${snapshot.tick ? `Latest tape: ${(snapshot.tick.side || "").toUpperCase()} • ${snapshot.tick.price} • ${snapshot.tick.qty}` : "Open the chart or trade directly from this market card."}
+            ${snapshot.tick ? `${L("market_latest_tape", "Latest tape")}: ${(snapshot.tick.side || "").toUpperCase()} • ${snapshot.tick.price} • ${snapshot.tick.qty}` : L("market_open_from_card", "Open the chart or trade directly from this market card.")}
         </div>
         <div class="detail-book">${bookHtml}</div>
     `;
@@ -1513,9 +1513,9 @@ function bindWorkerPanel() {
             renderSummary(data.summary);
             renderActivity(data.activity);
             renderSupport(data.tickets);
-            if (liveStatus) liveStatus.textContent = "CRM feed: online";
+            if (liveStatus) liveStatus.textContent = L("worker_feed_online", "CRM feed: online");
         } catch (err) {
-            if (liveStatus) liveStatus.textContent = "CRM feed: reconnect";
+            if (liveStatus) liveStatus.textContent = L("worker_feed_reconnect", "CRM feed: reconnect");
         }
     };
 
@@ -1547,15 +1547,15 @@ function bindWorkerPanel() {
                 renderSummary(data.summary);
                 renderActivity(data.activity);
                 renderSupport(data.tickets);
-                if (liveStatus) liveStatus.textContent = "CRM feed: live";
+                if (liveStatus) liveStatus.textContent = L("worker_feed_live", "CRM feed: live");
             } catch (_) {}
         });
         ws.addEventListener("close", () => {
-            if (liveStatus) liveStatus.textContent = "CRM feed: polling";
+            if (liveStatus) liveStatus.textContent = L("worker_feed_polling", "CRM feed: polling");
             startFallback();
         });
         ws.addEventListener("error", () => {
-            if (liveStatus) liveStatus.textContent = "CRM feed: reconnect";
+            if (liveStatus) liveStatus.textContent = L("worker_feed_reconnect", "CRM feed: reconnect");
             startFallback();
         });
     } else {
@@ -1693,9 +1693,9 @@ function bindWorkerClientPage() {
             if (favoriteBox) favoriteBox.textContent = `Избранное: ${client.favorite ? "ДА" : "НЕТ"}`;
             const blockedBox = document.getElementById("worker-client-blocked");
             if (blockedBox) blockedBox.textContent = `Блок: ${client.blocked ? "ДА" : "НЕТ"}`;
-            if (liveStatus) liveStatus.textContent = "Client feed: online";
+            if (liveStatus) liveStatus.textContent = L("client_feed_online", "Client feed: online");
         } catch (err) {
-            if (liveStatus) liveStatus.textContent = "Client feed: reconnect";
+            if (liveStatus) liveStatus.textContent = L("client_feed_reconnect", "Client feed: reconnect");
         }
     };
 
@@ -1775,15 +1775,15 @@ function bindWorkerClientPage() {
             if (favoriteBox) favoriteBox.textContent = `Избранное: ${client.favorite ? "ДА" : "НЕТ"}`;
             const blockedBox = document.getElementById("worker-client-blocked");
             if (blockedBox) blockedBox.textContent = `Блок: ${client.blocked ? "ДА" : "НЕТ"}`;
-            if (liveStatus) liveStatus.textContent = "Client feed: live";
+            if (liveStatus) liveStatus.textContent = L("client_feed_live", "Client feed: live");
         } catch (_) {}
     });
     ws.addEventListener("close", () => {
-        if (liveStatus) liveStatus.textContent = "Client feed: polling";
+        if (liveStatus) liveStatus.textContent = L("client_feed_polling", "Client feed: polling");
         startFallback();
     });
     ws.addEventListener("error", () => {
-        if (liveStatus) liveStatus.textContent = "Client feed: reconnect";
+        if (liveStatus) liveStatus.textContent = L("client_feed_reconnect", "Client feed: reconnect");
         startFallback();
     });
     bindClientControls();

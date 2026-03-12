@@ -14,13 +14,17 @@
                     <span class="deal-ticket">#{{ d.id }}</span>
                     <b>{{ d.asset_name }}</b>
                     <span class="deal-side {{ 'is-up' if d.direction == 'up' else 'is-down' }}">
-                        {{ "UP" if d.direction == "up" else "DOWN" }}
+                        {% if d.direction == "up" %}
+                            {{ labels.deal_up if labels else "ВВЕРХ" }}
+                        {% else %}
+                            {{ labels.deal_down if labels else "ВНИЗ" }}
+                        {% endif %}
                     </span>
                 </div>
                 <small>{{ "%.2f"|format(d.amount) }} {{ d.currency }} · {{ d.created_at }}</small>
             </div>
             <div class="deal-history-pnl {{ 'profit' if d.is_win else 'loss' }}">
-                <span class="deal-pnl-label">{{ "Profit" if d.is_win else "Loss" }}</span>
+                <span class="deal-pnl-label">{{ labels.deal_profit if d.is_win else labels.deal_loss }}</span>
                 <strong class="{{ 'pos' if d.is_win else 'neg' }}">{{ "%+.2f"|format(d.profit) }}</strong>
             </div>
         </a>
