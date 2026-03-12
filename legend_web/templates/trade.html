@@ -33,11 +33,6 @@
 </section>
 
 <section class="trade-command-bar">
-    <article class="card trade-command-card">
-        <span>{{ labels.trade_market_label if labels else "Рынок" }}</span>
-        <strong id="command-mark">{% if lang == "ru" %}Текущая цена{% elif lang == "uk" %}Поточна ціна{% else %}Current Mark{% endif %}</strong>
-        <small>{{ labels.trade_feed_booting if labels else "Рынок: подключение" }}</small>
-    </article>
     <article class="card trade-command-actions">
         <a class="qa-btn" href="/deposit">{{ labels.quick_deposit if labels else "Пополнить баланс" }}</a>
         <a class="qa-btn" href="/withdraw">{{ labels.nav_withdraw if labels else "Вывести" }}</a>

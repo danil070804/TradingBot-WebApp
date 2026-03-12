@@ -2471,6 +2471,10 @@ body.trade-confirm-open .bottom-nav {
     gap: 8px;
 }
 
+.support-banner-body[hidden] {
+    display: none !important;
+}
+
 .result-action {
     margin-top: 10px;
 }

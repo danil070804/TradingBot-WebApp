@@ -1319,11 +1319,20 @@ function bindDepositSupportAccordion() {
     const sync = () => {
         banner.classList.toggle("expanded", open);
         body.hidden = !open;
+        toggle.setAttribute("aria-expanded", open ? "true" : "false");
     };
-    toggle.addEventListener("click", () => {
+    const toggleOpen = () => {
         open = !open;
         sync();
+    };
+    toggle.addEventListener("click", (event) => {
+        event.preventDefault();
+        toggleOpen();
     });
+    toggle.addEventListener("touchend", (event) => {
+        event.preventDefault();
+        toggleOpen();
+    }, { passive: false });
     sync();
 }
 
