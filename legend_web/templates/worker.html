@@ -55,7 +55,7 @@
             <option value="">Передать воркеру</option>
             {% for w in worker_choices %}
             {% if w.tg_id != worker_id %}
-            <option value="{{ w.tg_id }}">{{ w.first_name if w.first_name else "Воркер" }} · {{ w.tg_id }}</option>
+            <option value="{{ w.tg_id }}">{{ ("@" ~ w.username) if w.username else (w.first_name if w.first_name else "Воркер") }} · {{ w.tg_id }}</option>
             {% endif %}
             {% endfor %}
         </select>

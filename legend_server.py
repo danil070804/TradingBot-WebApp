@@ -503,7 +503,7 @@ async def is_admin_request(request: Request) -> bool:
     if not tg_id:
         return False
     user = await fetch_one("SELECT is_admin FROM users WHERE tg_id = ?", (tg_id,))
-    is_admin = bool(user["is_admin"]) if user else bool(tg_id in bot.config.admin_ids)
+    is_admin = bool(tg_id in bot.config.admin_ids) or (bool(user["is_admin"]) if user else False)
     if is_admin:
         request.session["is_admin"] = True
     return is_admin
@@ -2025,21 +2025,45 @@ async def api_worker_client_update(payload: WorkerClientUpdatePayload, request: 
     activity_title = "Изменение реферала"
     activity_details = ""
     activity_amount = None
+    client_user = await fetch_one(
+        "SELECT tg_id, language, currency, balance FROM users WHERE tg_id = ?",
+        (int(wc["client_tg_id"]),),
+    )
+    client_lang = bot.normalize_lang(client_user["language"] if client_user else "ru")
+    support_markup = bot.support_section_keyboard(client_lang)
     if action == "toggle_verified":
         new_val = 0 if wc["verified"] else 1
         await bot.update_worker_client_field(payload.wc_id, "verified", new_val)
         activity_title = "KYC реферала"
         activity_details = "Верификация включена" if new_val else "Верификация отключена"
+        await bot.notify_client_setting_change(
+            int(wc["client_tg_id"]),
+            "🛂 <b>Статус верификации обновлён</b>\n\n"
+            + ("Ваш аккаунт отмечен как <b>верифицированный</b>." if new_val else "Статус верификации был <b>снят</b>. Для уточнения деталей обратитесь в поддержку."),
+            reply_markup=support_markup if not new_val else None,
+        )
     elif action == "toggle_withdraw":
         new_val = 0 if wc["withdraw_enabled"] else 1
         await bot.update_worker_client_field(payload.wc_id, "withdraw_enabled", new_val)
         activity_title = "Вывод реферала"
         activity_details = "Вывод разрешён" if new_val else "Вывод отключён"
+        await bot.notify_client_setting_change(
+            int(wc["client_tg_id"]),
+            "💸 <b>Настройка вывода обновлена</b>\n\n"
+            + ("Вывод средств для вашего аккаунта <b>включён</b>." if new_val else "Вывод средств для вашего аккаунта <b>временно отключён</b>. Для уточнения причин обратитесь в поддержку."),
+            reply_markup=support_markup if not new_val else None,
+        )
     elif action == "toggle_trade":
         new_val = 0 if wc["trading_enabled"] else 1
         await bot.update_worker_client_field(payload.wc_id, "trading_enabled", new_val)
         activity_title = "Торговля реферала"
         activity_details = "Торговля разрешена" if new_val else "Торговля отключена"
+        await bot.notify_client_setting_change(
+            int(wc["client_tg_id"]),
+            "📊 <b>Настройка торговли обновлена</b>\n\n"
+            + ("Торговля для вашего аккаунта <b>включена</b>." if new_val else "Торговля для вашего аккаунта <b>временно отключена</b>. Для уточнения причин обратитесь в поддержку."),
+            reply_markup=support_markup if not new_val else None,
+        )
     elif action == "toggle_favorite":
         new_val = 0 if wc["favorite"] else 1
         await bot.update_worker_client_field(payload.wc_id, "favorite", new_val)
@@ -2050,6 +2074,12 @@ async def api_worker_client_update(payload: WorkerClientUpdatePayload, request: 
         await bot.update_worker_client_field(payload.wc_id, "blocked", new_val)
         activity_title = "Блокировка реферала"
         activity_details = "Реферал заблокирован" if new_val else "Реферал разблокирован"
+        await bot.notify_client_setting_change(
+            int(wc["client_tg_id"]),
+            "⛔ <b>Статус аккаунта обновлён</b>\n\n"
+            + ("Ваш аккаунт временно <b>заблокирован</b>. Обратитесь в техподдержку для решения проблемы." if new_val else "Ограничение с аккаунта <b>снято</b>. Доступ к функциям восстановлен."),
+            reply_markup=support_markup if new_val else None,
+        )
     elif action == "set_min_deposit":
         val = float(payload.value or 0)
         if val < 0:
@@ -2101,6 +2131,13 @@ async def api_worker_client_update(payload: WorkerClientUpdatePayload, request: 
         activity_title = "Пополнение баланса"
         activity_details = f"Воркер добавил баланс {val:.2f}"
         activity_amount = val
+        new_balance = await bot.get_user_balance(int(wc["client_tg_id"]))
+        await bot.notify_client_setting_change(
+            int(wc["client_tg_id"]),
+            "💰 <b>Баланс обновлён</b>\n\n"
+            f"├ Изменение: <b>+{val:.2f} {(client_user['currency'] if client_user else 'USD')}</b>\n"
+            f"╰ Текущий баланс: <b>{new_balance:.2f} {(client_user['currency'] if client_user else 'USD')}</b>",
+        )
     elif action == "subtract_balance":
         val = float(payload.value or 0)
         if val <= 0:
@@ -2109,6 +2146,13 @@ async def api_worker_client_update(payload: WorkerClientUpdatePayload, request: 
         activity_title = "Списание баланса"
         activity_details = f"Воркер списал баланс {val:.2f}"
         activity_amount = -val
+        new_balance = await bot.get_user_balance(int(wc["client_tg_id"]))
+        await bot.notify_client_setting_change(
+            int(wc["client_tg_id"]),
+            "💰 <b>Баланс обновлён</b>\n\n"
+            f"├ Изменение: <b>-{val:.2f} {(client_user['currency'] if client_user else 'USD')}</b>\n"
+            f"╰ Текущий баланс: <b>{new_balance:.2f} {(client_user['currency'] if client_user else 'USD')}</b>",
+        )
     elif action == "set_balance":
         target = await fetch_one("SELECT balance, currency FROM users WHERE tg_id = ?", (int(wc["client_tg_id"]),))
         new_balance = float(payload.value or 0)
@@ -2118,6 +2162,11 @@ async def api_worker_client_update(payload: WorkerClientUpdatePayload, request: 
         activity_title = "Установка баланса"
         activity_details = f"Баланс установлен на {new_balance:.2f}"
         activity_amount = new_balance
+        await bot.notify_client_setting_change(
+            int(wc["client_tg_id"]),
+            "💰 <b>Баланс установлен вручную</b>\n\n"
+            f"╰ Текущий баланс: <b>{new_balance:.2f} {(target['currency'] if target else 'USD')}</b>",
+        )
     elif action == "set_note":
         note = str(payload.value or "").strip()
         await bot.update_worker_client_field(payload.wc_id, "crm_note", note)
@@ -2173,7 +2222,9 @@ async def api_worker_client_update(payload: WorkerClientUpdatePayload, request: 
         if not moved:
             return JSONResponse({"ok": False, "error": "Не удалось передать реферала"}, status_code=400)
         activity_title = "Передача реферала"
-        activity_details = f"Реферал передан воркеру {new_worker_id}"
+        target_worker_row = await fetch_one("SELECT username, first_name FROM users WHERE tg_id = ?", (new_worker_id,))
+        worker_label = f"@{target_worker_row['username']}" if target_worker_row and target_worker_row["username"] else (target_worker_row["first_name"] if target_worker_row and target_worker_row["first_name"] else str(new_worker_id))
+        activity_details = f"Реферал передан воркеру {worker_label}"
     else:
         return JSONResponse({"ok": False, "error": "Unsupported action"}, status_code=400)
 
@@ -2230,7 +2281,7 @@ async def admin_logout(request: Request):
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_dashboard(request: Request):
     if not await is_admin_request(request):
-        return RedirectResponse(url="/admin/login", status_code=302)
+        return templates.TemplateResponse("admin_login.html", {"request": request, "title": "Legend Trading Admin"})
     settings_map = await get_settings_map()
     assets = await fetch_all("SELECT id, name FROM ecn_assets ORDER BY id ASC LIMIT 200")
     users_rows = await fetch_all(
@@ -2263,7 +2314,7 @@ async def admin_dashboard(request: Request):
 @app.get("/admin/user/{tg_id}", response_class=HTMLResponse)
 async def admin_user_page(request: Request, tg_id: int):
     if not await is_admin_request(request):
-        return RedirectResponse(url="/admin/login", status_code=302)
+        return templates.TemplateResponse("admin_login.html", {"request": request, "title": "Legend Trading Admin"})
     user = await fetch_one(
         "SELECT tg_id, first_name, username, language, currency, balance, is_admin, is_worker, created_at FROM users WHERE tg_id = ?",
         (tg_id,),
@@ -2872,6 +2923,9 @@ async def api_deposit_request(payload: DepositRequestPayload):
     user = await fetch_one("SELECT currency, first_name, username FROM users WHERE tg_id = ?", (payload.tg_id,))
     if not user:
         return JSONResponse({"ok": False, "error": "Пользователь не найден"}, status_code=404)
+    wc_cfg = await bot.get_client_trade_settings(payload.tg_id)
+    if wc_cfg and bool(wc_cfg["blocked"]):
+        return JSONResponse({"ok": False, "error": "Аккаунт временно заблокирован. Обратитесь в поддержку."}, status_code=403)
     if payload.amount <= 0:
         return JSONResponse({"ok": False, "error": "Сумма должна быть больше 0"}, status_code=400)
 

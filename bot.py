@@ -1072,6 +1072,31 @@ async def send_section_message(target: Message, section_key: str, text: str, rep
     return await target.answer(text, reply_markup=reply_markup, disable_web_page_preview=True)
 
 
+async def notify_client_setting_change(client_tg_id: int, text: str, reply_markup=None):
+    with contextlib.suppress(Exception):
+        await bot.send_message(client_tg_id, text, reply_markup=reply_markup)
+
+
+async def get_client_access_flags(client_tg_id: int):
+    row = await get_client_trade_settings(client_tg_id)
+    return {
+        "blocked": bool(row["blocked"]) if row else False,
+        "verified": bool(row["verified"]) if row else False,
+        "withdraw_enabled": bool(row["withdraw_enabled"]) if row else True,
+        "trading_enabled": bool(row["trading_enabled"]) if row else True,
+    }
+
+
+async def send_blocked_notice(target: Message, lang: str):
+    text = tr(
+        lang,
+        "⛔ <b>Доступ к разделу ограничен</b>\n\nВаш аккаунт временно заблокирован. Обратитесь в техподдержку для решения вопроса.",
+        "⛔ <b>Access restricted</b>\n\nYour account is temporarily blocked. Contact support to resolve the issue.",
+        "⛔ <b>Доступ до розділу обмежено</b>\n\nВаш акаунт тимчасово заблоковано. Зверніться в техпідтримку для вирішення питання.",
+    )
+    await send_section_message(target, "support", text, reply_markup=support_section_keyboard(lang))
+
+
 def bot_section_media_keyboard():
     kb = InlineKeyboardBuilder()
     for section_key, meta in BOT_SECTION_MEDIA.items():
@@ -1118,6 +1143,20 @@ def profile_back_keyboard(lang: str = "ru", extra_cancel: tuple[str, str] | None
 def worker_client_back_keyboard(wc_id: int, label: str = "⬅️ К карточке реферала"):
     kb = InlineKeyboardBuilder()
     kb.button(text=label, callback_data=f"wc_profile:{wc_id}")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def worker_transfer_keyboard(wc_id: int, workers, current_worker_id: int):
+    kb = InlineKeyboardBuilder()
+    for row in workers:
+        worker_id = int(row["tg_id"])
+        if worker_id == current_worker_id:
+            continue
+        username = f"@{row['username']}" if row["username"] else None
+        name = username or (row["first_name"] or f"ID {worker_id}")
+        kb.button(text=name, callback_data=f"wc_transfer_to:{wc_id}:{worker_id}")
+    kb.button(text="⬅️ К карточке реферала", callback_data=f"wc_profile:{wc_id}")
     kb.adjust(1)
     return kb.as_markup()
 
@@ -2484,6 +2523,8 @@ BOT_SECTION_MEDIA = {
     "withdraw": {"setting": "bot_photo_withdraw", "title": "Вывод"},
     "worker_panel": {"setting": "bot_photo_worker_panel", "title": "Панель воркера"},
     "admin_panel": {"setting": "bot_photo_admin_panel", "title": "Админка"},
+    "worker_client_card": {"setting": "bot_photo_worker_client_card", "title": "Карточка реферала"},
+    "platform_stats": {"setting": "bot_photo_platform_stats", "title": "Статистика платформы"},
 }
 CURRENCY_PER_USDT = {
     "USD": 1.0,
@@ -3079,6 +3120,12 @@ def ecn_leverage_keyboard(lang: str = "ru", current: int = 10):
 
 @dp.message(F.text.in_({"📁 Портфель", "📁 Portfolio", "📁 Портфель"}))
 async def menu_portfolio(message: Message):
+    user_row = await get_user_row(message.from_user)
+    lang = normalize_lang(user_row["language"])
+    access = await get_client_access_flags(message.from_user.id)
+    if access["blocked"]:
+        await send_blocked_notice(message, lang)
+        return
     await send_profile(message)
 
 
@@ -3131,6 +3178,12 @@ async def menu_support(message: Message):
 
 @dp.message(F.text.in_({"📈 Открыть сделку", "📈 Открыть ECN", "📈 Open ECN", "📈 Відкрити ECN"}))
 async def menu_open_ecn(message: Message, state: FSMContext):
+    user_row = await get_user_row(message.from_user)
+    lang = normalize_lang(user_row["language"])
+    access = await get_client_access_flags(message.from_user.id)
+    if access["blocked"]:
+        await send_blocked_notice(message, lang)
+        return
     await start_ecn_flow(message, state)
 
 
@@ -3622,6 +3675,7 @@ async def send_profile(callback_or_msg):
     balance = user_row["balance"] or 0.0
     is_admin = bool(user_row["is_admin"]) or is_admin_id(tg_user.id)
     is_worker = bool(user_row["is_worker"])
+    access = await get_client_access_flags(tg_user.id)
     deal_stats = await get_user_deal_stats(tg_user.id)
     pending_withdraw = await get_user_pending_withdraw_sum(tg_user.id)
     worker_id = await get_worker_for_client(tg_user.id)
@@ -3632,7 +3686,12 @@ async def send_profile(callback_or_msg):
         t(lang, "profile_username", username=tg_user.username) if tg_user.username else t(lang, "profile_username_none"),
         t(lang, "profile_language", lang_value=lang.upper()),
         t(lang, "profile_currency", currency=currency),
-        t(lang, "profile_verification"),
+        tr(
+            lang,
+            f"• Верификация: {'пройдена' if access['verified'] else 'не пройдена'}",
+            f"└ Verification: {'Yes' if access['verified'] else 'No'}",
+            f"└ Верифікація: {'Так' if access['verified'] else 'Ні'}",
+        ),
         t(lang, "profile_worker", worker=worker_id) if worker_id else t(lang, "profile_worker_none"),
         "",
         t(lang, "profile_deals_title"),
@@ -3655,6 +3714,11 @@ async def on_deposit(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     user_row = await get_user_row(callback.from_user)
     lang = normalize_lang(user_row["language"])
+    access = await get_client_access_flags(callback.from_user.id)
+    if access["blocked"]:
+        await send_blocked_notice(callback.message, lang)
+        await callback.answer()
+        return
     currency = user_row["currency"] or "USD"
     await send_section_message(
         callback.message,
@@ -3854,6 +3918,25 @@ async def on_withdraw(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     user_row = await get_user_row(callback.from_user)
     lang = normalize_lang(user_row["language"])
+    access = await get_client_access_flags(callback.from_user.id)
+    if access["blocked"]:
+        await send_blocked_notice(callback.message, lang)
+        await callback.answer()
+        return
+    if not access["withdraw_enabled"]:
+        await send_section_message(
+            callback.message,
+            "withdraw",
+            tr(
+                lang,
+                "⛔ <b>Вывод средств временно отключён</b>\n\nДля уточнения причин обратитесь в техподдержку.",
+                "⛔ <b>Withdrawals are temporarily disabled</b>\n\nContact support for details.",
+                "⛔ <b>Виведення коштів тимчасово вимкнено</b>\n\nДля деталей зверніться в підтримку.",
+            ),
+            reply_markup=support_section_keyboard(lang),
+        )
+        await callback.answer()
+        return
     currency = user_row["currency"] or "USD"
     await send_section_message(
         callback.message,
@@ -4185,10 +4268,23 @@ async def reject_deposit(callback: CallbackQuery):
 @dp.callback_query(F.data == "verify")
 async def on_verify(callback: CallbackQuery, state: FSMContext):
     await state.clear()
-    text = (
-        "🔐 <b>Верификация ещё не пройдена</b>\n\n"
-        "Чтобы пройти проверку, откройте поддержку, сообщите свой ID и следуйте инструкциям менеджера."
-    )
+    user_row = await get_user_row(callback.from_user)
+    lang = normalize_lang(user_row["language"])
+    access = await get_client_access_flags(callback.from_user.id)
+    if access["verified"]:
+        text = tr(
+            lang,
+            "✅ <b>Верификация подтверждена</b>\n\nВаш аккаунт уже прошёл проверку. Если потребуется обновить данные, откройте техподдержку.",
+            "✅ <b>Verification completed</b>\n\nYour account is already verified. If you need to update any details, open support.",
+            "✅ <b>Верифікацію підтверджено</b>\n\nВаш акаунт уже пройшов перевірку. Якщо потрібно оновити дані, відкрийте підтримку.",
+        )
+    else:
+        text = tr(
+            lang,
+            "🔐 <b>Верификация ещё не пройдена</b>\n\nЧтобы пройти проверку, откройте поддержку, сообщите свой ID и следуйте инструкциям менеджера.",
+            "🔐 <b>Verification is not completed yet</b>\n\nTo pass verification, open support, send your ID and follow the manager instructions.",
+            "🔐 <b>Верифікацію ще не пройдено</b>\n\nЩоб пройти перевірку, відкрийте підтримку, повідомте свій ID і дотримуйтесь інструкцій менеджера.",
+        )
     await send_section_message(callback.message, "verification", text, reply_markup=verification_keyboard())
     await callback.answer()
 
@@ -4418,7 +4514,9 @@ async def open_worker_client_profile(msg: Message, wc_id: int):
         f"╰ Блокировка: <b>{status_block}</b>\n\n"
         f"Выберите действие ниже, чтобы обновить лимиты, статусы или перевести клиента."
     )
-    await msg.answer(
+    await send_section_message(
+        msg,
+        "worker_client_card",
         text,
         reply_markup=worker_client_profile_keyboard(wc_id, flags, balance, currency, min_dep, min_wd, min_trade),
     )
@@ -4494,11 +4592,20 @@ async def wc_luck_percent_entered(message: Message, state: FSMContext):
 @dp.callback_query(F.data.startswith("wc_adj_balance:"))
 async def wc_adj_balance(callback: CallbackQuery, state: FSMContext):
     wc_id = int(callback.data.split(":", 1)[1])
+    row = await get_worker_client_by_id(wc_id)
+    if not row:
+        await callback.message.answer("❗ Карточка реферала не найдена.")
+        await callback.answer()
+        return
+    balance = float(row["balance"] or 0.0)
+    currency = row["currency"] or "USD"
     await state.update_data(wc_id=wc_id)
     await state.set_state(WorkerClientStates.waiting_balance_amount)
     await callback.message.answer(
         "💰 <b>Корректировка баланса</b>\n\n"
-        "Укажите сумму, на которую нужно увеличить баланс клиента.",
+        f"Текущий баланс клиента: <b>{balance:.2f} {currency}</b>\n"
+        "Отправьте сумму изменения.\n"
+        "Используйте <b>плюс</b> для пополнения и <b>минус</b> для списания, например: <code>250</code> или <code>-125</code>.",
         reply_markup=worker_client_back_keyboard(wc_id),
     )
     await callback.answer()
@@ -4510,10 +4617,10 @@ async def wc_adj_balance_amount(message: Message, state: FSMContext):
     wc_id = data.get("wc_id")
     try:
         amount = float(message.text.replace(",", "."))
-        if amount <= 0:
+        if amount == 0:
             raise ValueError
     except ValueError:
-        await message.answer("❗ Введите корректную положительную сумму.")
+        await message.answer("❗ Введите корректную сумму изменения. Можно использовать отрицательное значение.")
         return
     row = await get_worker_client_by_id(wc_id)
     if not row:
@@ -4522,14 +4629,19 @@ async def wc_adj_balance_amount(message: Message, state: FSMContext):
         return
     client_id = row["client_tg_id"]
     await change_balance(client_id, amount)
+    new_balance = await get_user_balance(client_id)
     await message.answer(
-        f"✅ Баланс клиента увеличен на <b>{amount:.2f}</b>.",
+        "✅ <b>Баланс клиента обновлён</b>\n\n"
+        f"├ Изменение: <b>{amount:+.2f} {row['currency'] or 'USD'}</b>\n"
+        f"╰ Новый баланс: <b>{new_balance:.2f} {row['currency'] or 'USD'}</b>",
         reply_markup=worker_client_back_keyboard(wc_id),
     )
-    try:
-        await bot.send_message(client_id, f"💰 Ваш баланс пополнен на <b>{amount:.2f}</b>.")
-    except Exception:
-        pass
+    await notify_client_setting_change(
+        client_id,
+        "💰 <b>Баланс обновлён</b>\n\n"
+        f"├ Изменение: <b>{amount:+.2f} {row['currency'] or 'USD'}</b>\n"
+        f"╰ Текущий баланс: <b>{new_balance:.2f} {row['currency'] or 'USD'}</b>",
+    )
     await state.clear()
 
 @dp.callback_query(F.data.startswith("wc_min_dep:"))
@@ -4659,6 +4771,12 @@ async def wc_toggle_verif(callback: CallbackQuery):
         return
     new_val = 0 if row["verified"] else 1
     await update_worker_client_field(wc_id, "verified", new_val)
+    await notify_client_setting_change(
+        int(row["client_tg_id"]),
+        "🛂 <b>Статус верификации обновлён</b>\n\n"
+        + ("Ваш аккаунт отмечен как <b>верифицированный</b>." if new_val else "Статус верификации был <b>снят</b>. Для уточнения деталей обратитесь в поддержку."),
+        reply_markup=support_section_keyboard(normalize_lang(row["language"] or "ru")) if not new_val else None,
+    )
     await open_worker_client_profile(callback.message, wc_id)
     await callback.answer("Статус верификации обновлён.")
 
@@ -4672,6 +4790,12 @@ async def wc_toggle_withdraw(callback: CallbackQuery):
         return
     new_val = 0 if row["withdraw_enabled"] else 1
     await update_worker_client_field(wc_id, "withdraw_enabled", new_val)
+    await notify_client_setting_change(
+        int(row["client_tg_id"]),
+        "💸 <b>Настройка вывода обновлена</b>\n\n"
+        + ("Вывод средств для вашего аккаунта <b>включён</b>." if new_val else "Вывод средств для вашего аккаунта <b>временно отключён</b>. Для уточнения причин обратитесь в поддержку."),
+        reply_markup=support_section_keyboard(normalize_lang(row["language"] or "ru")) if not new_val else None,
+    )
     await open_worker_client_profile(callback.message, wc_id)
     await callback.answer("Настройка вывода обновлена.")
 
@@ -4685,6 +4809,12 @@ async def wc_toggle_trade(callback: CallbackQuery):
         return
     new_val = 0 if row["trading_enabled"] else 1
     await update_worker_client_field(wc_id, "trading_enabled", new_val)
+    await notify_client_setting_change(
+        int(row["client_tg_id"]),
+        "📊 <b>Настройка торговли обновлена</b>\n\n"
+        + ("Торговля для вашего аккаунта <b>включена</b>." if new_val else "Торговля для вашего аккаунта <b>временно отключена</b>. Для уточнения причин обратитесь в поддержку."),
+        reply_markup=support_section_keyboard(normalize_lang(row["language"] or "ru")) if not new_val else None,
+    )
     await open_worker_client_profile(callback.message, wc_id)
     await callback.answer("Настройка торговли обновлена.")
 
@@ -4711,35 +4841,51 @@ async def wc_toggle_block(callback: CallbackQuery):
         return
     new_val = 0 if row["blocked"] else 1
     await update_worker_client_field(wc_id, "blocked", new_val)
+    await notify_client_setting_change(
+        int(row["client_tg_id"]),
+        "⛔ <b>Статус аккаунта обновлён</b>\n\n"
+        + ("Ваш аккаунт временно <b>заблокирован</b>. Обратитесь в техподдержку для решения проблемы." if new_val else "Ограничение с аккаунта <b>снято</b>. Доступ к функциям восстановлен."),
+        reply_markup=support_section_keyboard(normalize_lang(row["language"] or "ru")) if new_val else None,
+    )
     await open_worker_client_profile(callback.message, wc_id)
     await callback.answer("Статус блокировки обновлён.")
 
 @dp.callback_query(F.data.startswith("wc_transfer:"))
 async def wc_transfer_cb(callback: CallbackQuery, state: FSMContext):
     wc_id = int(callback.data.split(":", 1)[1])
-    await state.update_data(wc_id=wc_id)
-    await state.set_state(WorkerClientStates.waiting_transfer_worker)
-    await callback.message.answer("📤 Укажите Telegram ID воркера, которому нужно передать клиента:")
+    workers = await get_workers_with_ref_counts()
+    available = [row for row in workers if int(row["tg_id"]) != int(callback.from_user.id)]
+    if not available:
+        await callback.message.answer("❗ Для передачи нужен хотя бы ещё один воркер.")
+        await callback.answer()
+        return
+    await state.clear()
+    await callback.message.answer(
+        "🔁 <b>Передача реферала</b>\n\nВыберите воркера из списка ниже. Формат показан по <b>@username</b>, чтобы передавать клиента было удобнее.",
+        reply_markup=worker_transfer_keyboard(wc_id, workers, callback.from_user.id),
+    )
     await callback.answer()
 
 
-@dp.message(WorkerClientStates.waiting_transfer_worker)
-async def wc_transfer_set(message: Message, state: FSMContext):
-    data = await state.get_data()
-    wc_id = data.get("wc_id")
-    try:
-        new_worker_id = int(message.text.strip())
-    except ValueError:
-        await message.answer("❗ Введите корректный числовой ID воркера.")
+@dp.callback_query(F.data.startswith("wc_transfer_to:"))
+async def wc_transfer_to(callback: CallbackQuery, state: FSMContext):
+    _, wc_id_raw, new_worker_raw = callback.data.split(":")
+    wc_id = int(wc_id_raw)
+    new_worker_id = int(new_worker_raw)
+    moved = await transfer_worker_client_record(wc_id, new_worker_id)
+    if not moved:
+        await callback.message.answer("❗ Не удалось передать реферала. Возможно, карточка уже есть у выбранного воркера.")
+        await callback.answer()
         return
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute(
-            "UPDATE worker_clients SET worker_tg_id = ? WHERE id = ?",
-            (new_worker_id, wc_id),
-        )
-        await db.commit()
-    await message.answer(f"✅ Клиент передан воркеру <code>{new_worker_id}</code>.")
+    target_worker = await get_user_by_tg_id(new_worker_id)
+    worker_name = f"@{target_worker['username']}" if target_worker and target_worker["username"] else str(new_worker_id)
+    await callback.message.answer(
+        "✅ <b>Реферал передан</b>\n\n"
+        f"╰ Новый воркер: <b>{worker_name}</b>",
+        reply_markup=worker_client_back_keyboard(wc_id),
+    )
     await state.clear()
+    await callback.answer()
 
 # ---------- WORKER SERVICE SETTINGS ----------
 
@@ -4843,7 +4989,7 @@ async def on_admin_stats(callback: CallbackQuery, state: FSMContext):
         return
     await state.clear()
     text = await get_admin_stats_text()
-    await callback.message.answer(text, reply_markup=admin_stats_keyboard())
+    await send_section_message(callback.message, "platform_stats", text, reply_markup=admin_stats_keyboard())
     await callback.answer()
 
 
