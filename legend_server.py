@@ -2088,8 +2088,7 @@ async def api_worker_client_update(payload: WorkerClientUpdatePayload, request: 
         activity_details = "Верификация включена" if new_val else "Верификация отключена"
         await bot.notify_client_setting_change(
             int(wc["client_tg_id"]),
-            "🛂 <b>Статус верификации обновлён</b>\n\n"
-            + ("Ваш аккаунт отмечен как <b>верифицированный</b>." if new_val else "Статус верификации был <b>снят</b>. Для уточнения деталей обратитесь в поддержку."),
+            bot.build_verification_status_notice(client_lang, bool(new_val)),
             reply_markup=support_markup if not new_val else None,
         )
     elif action == "toggle_withdraw":
@@ -2099,8 +2098,7 @@ async def api_worker_client_update(payload: WorkerClientUpdatePayload, request: 
         activity_details = "Вывод разрешён" if new_val else "Вывод отключён"
         await bot.notify_client_setting_change(
             int(wc["client_tg_id"]),
-            "💸 <b>Настройка вывода обновлена</b>\n\n"
-            + ("Вывод средств для вашего аккаунта <b>включён</b>." if new_val else "Вывод средств для вашего аккаунта <b>временно отключён</b>. Для уточнения причин обратитесь в поддержку."),
+            bot.build_withdraw_status_notice(client_lang, bool(new_val)),
             reply_markup=support_markup if not new_val else None,
         )
     elif action == "toggle_trade":
@@ -2110,8 +2108,7 @@ async def api_worker_client_update(payload: WorkerClientUpdatePayload, request: 
         activity_details = "Торговля разрешена" if new_val else "Торговля отключена"
         await bot.notify_client_setting_change(
             int(wc["client_tg_id"]),
-            "📊 <b>Настройка торговли обновлена</b>\n\n"
-            + ("Торговля для вашего аккаунта <b>включена</b>." if new_val else "Торговля для вашего аккаунта <b>временно отключена</b>. Для уточнения причин обратитесь в поддержку."),
+            bot.build_trade_status_notice(client_lang, bool(new_val)),
             reply_markup=support_markup if not new_val else None,
         )
     elif action == "toggle_favorite":
@@ -2126,8 +2123,7 @@ async def api_worker_client_update(payload: WorkerClientUpdatePayload, request: 
         activity_details = "Реферал заблокирован" if new_val else "Реферал разблокирован"
         await bot.notify_client_setting_change(
             int(wc["client_tg_id"]),
-            "⛔ <b>Статус аккаунта обновлён</b>\n\n"
-            + ("Ваш аккаунт временно <b>заблокирован</b>. Обратитесь в техподдержку для решения проблемы." if new_val else "Ограничение с аккаунта <b>снято</b>. Доступ к функциям восстановлен."),
+            bot.build_block_status_notice(client_lang, bool(new_val)),
             reply_markup=support_markup if new_val else None,
         )
     elif action == "set_min_deposit":
@@ -2184,9 +2180,7 @@ async def api_worker_client_update(payload: WorkerClientUpdatePayload, request: 
         new_balance = await bot.get_user_balance(int(wc["client_tg_id"]))
         await bot.notify_client_setting_change(
             int(wc["client_tg_id"]),
-            "💰 <b>Баланс обновлён</b>\n\n"
-            f"├ Изменение: <b>+{val:.2f} {(client_user['currency'] if client_user else 'USD')}</b>\n"
-            f"╰ Текущий баланс: <b>{new_balance:.2f} {(client_user['currency'] if client_user else 'USD')}</b>",
+            bot.build_balance_update_notice(client_lang, val, new_balance, client_user["currency"] if client_user else "USD"),
         )
     elif action == "subtract_balance":
         val = float(payload.value or 0)
@@ -2199,9 +2193,7 @@ async def api_worker_client_update(payload: WorkerClientUpdatePayload, request: 
         new_balance = await bot.get_user_balance(int(wc["client_tg_id"]))
         await bot.notify_client_setting_change(
             int(wc["client_tg_id"]),
-            "💰 <b>Баланс обновлён</b>\n\n"
-            f"├ Изменение: <b>-{val:.2f} {(client_user['currency'] if client_user else 'USD')}</b>\n"
-            f"╰ Текущий баланс: <b>{new_balance:.2f} {(client_user['currency'] if client_user else 'USD')}</b>",
+            bot.build_balance_update_notice(client_lang, -val, new_balance, client_user["currency"] if client_user else "USD"),
         )
     elif action == "set_balance":
         target = await fetch_one("SELECT balance, currency FROM users WHERE tg_id = ?", (int(wc["client_tg_id"]),))
@@ -2214,8 +2206,7 @@ async def api_worker_client_update(payload: WorkerClientUpdatePayload, request: 
         activity_amount = new_balance
         await bot.notify_client_setting_change(
             int(wc["client_tg_id"]),
-            "💰 <b>Баланс установлен вручную</b>\n\n"
-            f"╰ Текущий баланс: <b>{new_balance:.2f} {(target['currency'] if target else 'USD')}</b>",
+            bot.build_balance_update_notice(client_lang, delta, new_balance, target["currency"] if target else "USD"),
         )
     elif action == "set_note":
         note = str(payload.value or "").strip()
@@ -2569,6 +2560,8 @@ async def admin_process_deposit(payload: AdminProcessPayload, request: Request):
     if action not in {"approve", "reject"}:
         return JSONResponse({"ok": False, "error": "Unsupported action"}, status_code=400)
     new_status = "approved" if action == "approve" else "rejected"
+    client_user = await fetch_one("SELECT language FROM users WHERE tg_id = ?", (int(dep["user_tg_id"]),))
+    client_lang = bot.normalize_lang(client_user["language"] if client_user else "ru")
     await execute_query(
         "UPDATE deposit_requests SET status = ?, processed_by = ? WHERE id = ?",
         (new_status, "admin_web", payload.entity_id),
@@ -2585,7 +2578,12 @@ async def admin_process_deposit(payload: AdminProcessPayload, request: Request):
         try:
             await bot.bot.send_message(
                 int(dep["user_tg_id"]),
-                f"✅ <b>Пополнение подтверждено</b>\n\nНа баланс зачислено <b>+{float(dep['amount'] or 0):.2f} {dep['currency'] or 'USD'}</b>.",
+                bot.build_deposit_status_notice(
+                    client_lang,
+                    True,
+                    float(dep["amount"] or 0),
+                    dep["currency"] or "USD",
+                ),
             )
         except Exception:
             pass
@@ -2593,7 +2591,12 @@ async def admin_process_deposit(payload: AdminProcessPayload, request: Request):
         try:
             await bot.bot.send_message(
                 int(dep["user_tg_id"]),
-                "❌ <b>Пополнение отклонено</b>\n\nЕсли вы уже оплатили заявку, свяжитесь с поддержкой и приложите подтверждение.",
+                bot.build_deposit_status_notice(
+                    client_lang,
+                    False,
+                    float(dep["amount"] or 0),
+                    dep["currency"] or "USD",
+                ),
             )
         except Exception:
             pass

@@ -1077,6 +1077,102 @@ async def notify_client_setting_change(client_tg_id: int, text: str, reply_marku
         await bot.send_message(client_tg_id, text, reply_markup=reply_markup)
 
 
+def convert_amount_between_currencies(amount: float, source_currency: str | None, target_currency: str | None) -> float:
+    source = (source_currency or "USD").upper()
+    target = (target_currency or "USD").upper()
+    if source == target:
+        return round(float(amount or 0.0), 2)
+    usdt_value = convert_currency_to_usdt(float(amount or 0.0), source)
+    return convert_usdt_to_currency(usdt_value, target)
+
+
+def build_verification_status_notice(lang: str, verified: bool) -> str:
+    return tr(
+        lang,
+        "🛂 <b>Статус верификации обновлён</b>\n\n"
+        + ("Ваш аккаунт отмечен как <b>верифицированный</b>." if verified else "Статус верификации был <b>снят</b>. Для уточнения деталей обратитесь в поддержку."),
+        "🛂 <b>Verification status updated</b>\n\n"
+        + ("Your account is now marked as <b>verified</b>." if verified else "Your verification status was <b>removed</b>. Contact support for details."),
+        "🛂 <b>Статус верифікації оновлено</b>\n\n"
+        + ("Ваш акаунт позначено як <b>верифікований</b>." if verified else "Статус верифікації було <b>знято</b>. Для деталей зверніться в підтримку."),
+    )
+
+
+def build_withdraw_status_notice(lang: str, enabled: bool) -> str:
+    return tr(
+        lang,
+        "💸 <b>Настройка вывода обновлена</b>\n\n"
+        + ("Вывод средств для вашего аккаунта <b>включён</b>." if enabled else "Вывод средств для вашего аккаунта <b>временно отключён</b>. Для уточнения причин обратитесь в поддержку."),
+        "💸 <b>Withdrawal settings updated</b>\n\n"
+        + ("Withdrawals are now <b>enabled</b> for your account." if enabled else "Withdrawals are <b>temporarily disabled</b> for your account. Contact support for details."),
+        "💸 <b>Налаштування виведення оновлено</b>\n\n"
+        + ("Виведення коштів для вашого акаунта <b>увімкнено</b>." if enabled else "Виведення коштів для вашого акаунта <b>тимчасово вимкнено</b>. Для деталей зверніться в підтримку."),
+    )
+
+
+def build_trade_status_notice(lang: str, enabled: bool) -> str:
+    return tr(
+        lang,
+        "📊 <b>Настройка торговли обновлена</b>\n\n"
+        + ("Торговля для вашего аккаунта <b>включена</b>." if enabled else "Торговля для вашего аккаунта <b>временно отключена</b>. Для уточнения причин обратитесь в поддержку."),
+        "📊 <b>Trading settings updated</b>\n\n"
+        + ("Trading is now <b>enabled</b> for your account." if enabled else "Trading is <b>temporarily disabled</b> for your account. Contact support for details."),
+        "📊 <b>Налаштування торгівлі оновлено</b>\n\n"
+        + ("Торгівлю для вашого акаунта <b>увімкнено</b>." if enabled else "Торгівлю для вашого акаунта <b>тимчасово вимкнено</b>. Для деталей зверніться в підтримку."),
+    )
+
+
+def build_block_status_notice(lang: str, blocked: bool) -> str:
+    return tr(
+        lang,
+        "⛔ <b>Статус аккаунта обновлён</b>\n\n"
+        + ("Ваш аккаунт временно <b>заблокирован</b>. Обратитесь в техподдержку для решения проблемы." if blocked else "Ограничение с аккаунта <b>снято</b>. Доступ к функциям восстановлен."),
+        "⛔ <b>Account status updated</b>\n\n"
+        + ("Your account has been <b>temporarily blocked</b>. Contact support to resolve the issue." if blocked else "The restriction has been <b>removed</b>. Access to account functions is restored."),
+        "⛔ <b>Статус акаунта оновлено</b>\n\n"
+        + ("Ваш акаунт тимчасово <b>заблоковано</b>. Зверніться в підтримку для вирішення проблеми." if blocked else "Обмеження з акаунта <b>знято</b>. Доступ до функцій відновлено."),
+    )
+
+
+def build_balance_update_notice(lang: str, delta: float, balance: float, currency: str) -> str:
+    return tr(
+        lang,
+        "💰 <b>Баланс обновлён</b>\n\n"
+        f"├ Изменение: <b>{delta:+.2f} {currency}</b>\n"
+        f"╰ Текущий баланс: <b>{balance:.2f} {currency}</b>",
+        "💰 <b>Balance updated</b>\n\n"
+        f"├ Change: <b>{delta:+.2f} {currency}</b>\n"
+        f"╰ Current balance: <b>{balance:.2f} {currency}</b>",
+        "💰 <b>Баланс оновлено</b>\n\n"
+        f"├ Зміна: <b>{delta:+.2f} {currency}</b>\n"
+        f"╰ Поточний баланс: <b>{balance:.2f} {currency}</b>",
+    )
+
+
+def build_deposit_status_notice(lang: str, approved: bool, amount: float, currency: str) -> str:
+    return tr(
+        lang,
+        (
+            "✅ <b>Пополнение подтверждено</b>\n\n"
+            f"На баланс зачислено <b>+{amount:.2f} {currency}</b>."
+            if approved
+            else "❌ <b>Пополнение отклонено</b>\n\nЕсли вы уже оплатили заявку, свяжитесь с поддержкой и приложите подтверждение."
+        ),
+        (
+            "✅ <b>Deposit approved</b>\n\n"
+            f"Your balance has been credited with <b>+{amount:.2f} {currency}</b>."
+            if approved
+            else "❌ <b>Deposit rejected</b>\n\nIf you have already paid, contact support and attach your payment confirmation."
+        ),
+        (
+            "✅ <b>Поповнення підтверджено</b>\n\n"
+            f"На баланс зараховано <b>+{amount:.2f} {currency}</b>."
+            if approved
+            else "❌ <b>Поповнення відхилено</b>\n\nЯкщо ви вже оплатили заявку, зверніться в підтримку та додайте підтвердження платежу."
+        ),
+    )
+
+
 async def get_client_access_flags(client_tg_id: int):
     row = await get_client_trade_settings(client_tg_id)
     return {
@@ -1608,7 +1704,54 @@ async def set_language(tg_id: int, lang: str):
 
 async def set_currency(tg_id: int, currency: str):
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("UPDATE users SET currency = ? WHERE tg_id = ?", (currency, tg_id))
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute("SELECT currency, balance FROM users WHERE tg_id = ?", (tg_id,))
+        user_row = await cur.fetchone()
+        if not user_row:
+            return
+        old_currency = (user_row["currency"] or "USD").upper()
+        new_currency = (currency or "USD").upper()
+        if old_currency == new_currency:
+            await db.execute("UPDATE users SET currency = ? WHERE tg_id = ?", (new_currency, tg_id))
+            await db.commit()
+            return
+
+        new_balance = convert_amount_between_currencies(float(user_row["balance"] or 0.0), old_currency, new_currency)
+        await db.execute("UPDATE users SET currency = ?, balance = ? WHERE tg_id = ?", (new_currency, new_balance, tg_id))
+
+        for table in ("deals", "withdrawals", "deposit_requests"):
+            cur = await db.execute(f"SELECT id, amount, currency FROM {table} WHERE user_tg_id = ?", (tg_id,))
+            rows = await cur.fetchall()
+            for row in rows:
+                row_currency = (row["currency"] or old_currency).upper()
+                converted_amount = convert_amount_between_currencies(float(row["amount"] or 0.0), row_currency, new_currency)
+                await db.execute(f"UPDATE {table} SET amount = ?, currency = ? WHERE id = ?", (converted_amount, new_currency, int(row["id"])))
+
+        cur = await db.execute("SELECT id, profit, currency FROM deals WHERE user_tg_id = ?", (tg_id,))
+        deal_rows = await cur.fetchall()
+        for row in deal_rows:
+            row_currency = (row["currency"] or old_currency).upper()
+            converted_profit = convert_amount_between_currencies(float(row["profit"] or 0.0), row_currency, new_currency)
+            await db.execute("UPDATE deals SET profit = ? WHERE id = ?", (converted_profit, int(row["id"])))
+
+        cur = await db.execute("SELECT id, amount, currency FROM active_trades WHERE user_tg_id = ? AND status = 'open'", (tg_id,))
+        active_rows = await cur.fetchall()
+        for row in active_rows:
+            row_currency = (row["currency"] or old_currency).upper()
+            converted_amount = convert_amount_between_currencies(float(row["amount"] or 0.0), row_currency, new_currency)
+            await db.execute("UPDATE active_trades SET amount = ?, currency = ? WHERE id = ?", (converted_amount, new_currency, int(row["id"])))
+
+        cur = await db.execute("SELECT id, min_deposit, min_withdraw, min_trade_amount FROM worker_clients WHERE client_tg_id = ?", (tg_id,))
+        wc_rows = await cur.fetchall()
+        for row in wc_rows:
+            min_deposit = convert_amount_between_currencies(float(row["min_deposit"] or 0.0), old_currency, new_currency)
+            min_withdraw = convert_amount_between_currencies(float(row["min_withdraw"] or 0.0), old_currency, new_currency)
+            min_trade_amount = convert_amount_between_currencies(float(row["min_trade_amount"] or 0.0), old_currency, new_currency)
+            await db.execute(
+                "UPDATE worker_clients SET min_deposit = ?, min_withdraw = ?, min_trade_amount = ? WHERE id = ?",
+                (min_deposit, min_withdraw, min_trade_amount, int(row["id"])),
+            )
+
         await db.commit()
 
 
@@ -4221,6 +4364,8 @@ async def approve_deposit(callback: CallbackQuery):
     user_id = int(dep["user_tg_id"])
     amount = float(dep["amount"])
     currency = dep["currency"]
+    user = await get_user_by_tg_id(user_id)
+    lang = normalize_lang(user["language"] if user else "ru")
     await change_balance(user_id, amount)
     await set_deposit_request_status(dep_id, "approved")
     await log_activity_for_worker_client(
@@ -4235,7 +4380,7 @@ async def approve_deposit(callback: CallbackQuery):
         meta={"deposit_id": dep_id},
     )
     try:
-        await bot.send_message(user_id, f"✅ Пополнение подтверждено.\n\nНа баланс зачислено <b>+{amount:.2f} {currency}</b>.")
+        await bot.send_message(user_id, build_deposit_status_notice(lang, True, amount, currency))
     except Exception:
         pass
     await callback.message.answer(f"✅ Пополнение <b>#{dep_id}</b> подтверждено.")
@@ -4252,6 +4397,8 @@ async def reject_deposit(callback: CallbackQuery):
     if not dep or dep["status"] != "pending":
         await callback.answer("Заявка не найдена или уже обработана.")
         return
+    user = await get_user_by_tg_id(int(dep["user_tg_id"]))
+    lang = normalize_lang(user["language"] if user else "ru")
     await set_deposit_request_status(dep_id, "rejected")
     await log_activity_for_worker_client(
         client_tg_id=int(dep["user_tg_id"]),
@@ -4265,7 +4412,10 @@ async def reject_deposit(callback: CallbackQuery):
         meta={"deposit_id": dep_id},
     )
     try:
-        await bot.send_message(int(dep["user_tg_id"]), "❌ Заявка на пополнение отклонена администратором.")
+        await bot.send_message(
+            int(dep["user_tg_id"]),
+            build_deposit_status_notice(lang, False, float(dep["amount"] or 0.0), dep["currency"] or "USD"),
+        )
     except Exception:
         pass
     await callback.message.answer(f"❌ Пополнение <b>#{dep_id}</b> отклонено.")
@@ -4672,6 +4822,7 @@ async def wc_adj_balance_amount(message: Message, state: FSMContext):
     client_id = row["client_tg_id"]
     await change_balance(client_id, amount)
     new_balance = await get_user_balance(client_id)
+    client_lang = normalize_lang(row["language"] or "ru")
     await message.answer(
         "✅ <b>Баланс клиента обновлён</b>\n\n"
         f"├ Изменение: <b>{amount:+.2f} {row['currency'] or 'USD'}</b>\n"
@@ -4680,9 +4831,7 @@ async def wc_adj_balance_amount(message: Message, state: FSMContext):
     )
     await notify_client_setting_change(
         client_id,
-        "💰 <b>Баланс обновлён</b>\n\n"
-        f"├ Изменение: <b>{amount:+.2f} {row['currency'] or 'USD'}</b>\n"
-        f"╰ Текущий баланс: <b>{new_balance:.2f} {row['currency'] or 'USD'}</b>",
+        build_balance_update_notice(client_lang, amount, new_balance, row["currency"] or "USD"),
     )
     await state.clear()
 
@@ -4813,11 +4962,11 @@ async def wc_toggle_verif(callback: CallbackQuery):
         return
     new_val = 0 if row["verified"] else 1
     await update_worker_client_field(wc_id, "verified", new_val)
+    client_lang = normalize_lang(row["language"] or "ru")
     await notify_client_setting_change(
         int(row["client_tg_id"]),
-        "🛂 <b>Статус верификации обновлён</b>\n\n"
-        + ("Ваш аккаунт отмечен как <b>верифицированный</b>." if new_val else "Статус верификации был <b>снят</b>. Для уточнения деталей обратитесь в поддержку."),
-        reply_markup=support_section_keyboard(normalize_lang(row["language"] or "ru")) if not new_val else None,
+        build_verification_status_notice(client_lang, bool(new_val)),
+        reply_markup=support_section_keyboard(client_lang) if not new_val else None,
     )
     await open_worker_client_profile(callback.message, wc_id)
     await callback.answer("Статус верификации обновлён.")
@@ -4832,11 +4981,11 @@ async def wc_toggle_withdraw(callback: CallbackQuery):
         return
     new_val = 0 if row["withdraw_enabled"] else 1
     await update_worker_client_field(wc_id, "withdraw_enabled", new_val)
+    client_lang = normalize_lang(row["language"] or "ru")
     await notify_client_setting_change(
         int(row["client_tg_id"]),
-        "💸 <b>Настройка вывода обновлена</b>\n\n"
-        + ("Вывод средств для вашего аккаунта <b>включён</b>." if new_val else "Вывод средств для вашего аккаунта <b>временно отключён</b>. Для уточнения причин обратитесь в поддержку."),
-        reply_markup=support_section_keyboard(normalize_lang(row["language"] or "ru")) if not new_val else None,
+        build_withdraw_status_notice(client_lang, bool(new_val)),
+        reply_markup=support_section_keyboard(client_lang) if not new_val else None,
     )
     await open_worker_client_profile(callback.message, wc_id)
     await callback.answer("Настройка вывода обновлена.")
@@ -4851,11 +5000,11 @@ async def wc_toggle_trade(callback: CallbackQuery):
         return
     new_val = 0 if row["trading_enabled"] else 1
     await update_worker_client_field(wc_id, "trading_enabled", new_val)
+    client_lang = normalize_lang(row["language"] or "ru")
     await notify_client_setting_change(
         int(row["client_tg_id"]),
-        "📊 <b>Настройка торговли обновлена</b>\n\n"
-        + ("Торговля для вашего аккаунта <b>включена</b>." if new_val else "Торговля для вашего аккаунта <b>временно отключена</b>. Для уточнения причин обратитесь в поддержку."),
-        reply_markup=support_section_keyboard(normalize_lang(row["language"] or "ru")) if not new_val else None,
+        build_trade_status_notice(client_lang, bool(new_val)),
+        reply_markup=support_section_keyboard(client_lang) if not new_val else None,
     )
     await open_worker_client_profile(callback.message, wc_id)
     await callback.answer("Настройка торговли обновлена.")
@@ -4883,11 +5032,11 @@ async def wc_toggle_block(callback: CallbackQuery):
         return
     new_val = 0 if row["blocked"] else 1
     await update_worker_client_field(wc_id, "blocked", new_val)
+    client_lang = normalize_lang(row["language"] or "ru")
     await notify_client_setting_change(
         int(row["client_tg_id"]),
-        "⛔ <b>Статус аккаунта обновлён</b>\n\n"
-        + ("Ваш аккаунт временно <b>заблокирован</b>. Обратитесь в техподдержку для решения проблемы." if new_val else "Ограничение с аккаунта <b>снято</b>. Доступ к функциям восстановлен."),
-        reply_markup=support_section_keyboard(normalize_lang(row["language"] or "ru")) if new_val else None,
+        build_block_status_notice(client_lang, bool(new_val)),
+        reply_markup=support_section_keyboard(client_lang) if new_val else None,
     )
     await open_worker_client_profile(callback.message, wc_id)
     await callback.answer("Статус блокировки обновлён.")
