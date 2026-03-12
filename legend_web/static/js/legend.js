@@ -20,14 +20,14 @@ function initAppPreloader() {
         return;
     }
     const startedAt = Date.now();
-    const minVisibleMs = 1300;
-    const steps = [18, 36, 58, 78, 92];
+    const minVisibleMs = 3600;
+    const steps = [8, 16, 24, 33, 41, 52, 63, 72, 81, 89, 95];
     let idx = 0;
     const t = setInterval(() => {
         fill.style.width = `${steps[Math.min(idx, steps.length - 1)]}%`;
         idx += 1;
         if (idx >= steps.length) clearInterval(t);
-    }, 90);
+    }, 240);
 
     const close = () => {
         try {
@@ -41,7 +41,7 @@ function initAppPreloader() {
         window.setTimeout(() => overlay.classList.add("done"), waitMore + 120);
     };
     window.addEventListener("load", close, { once: true });
-    window.setTimeout(close, 2200);
+    window.setTimeout(close, 5200);
 }
 
 function applyRuntimeProfile() {
@@ -115,7 +115,7 @@ function initInteractiveFeedback() {
             // no-op
         }
     };
-    const candidates = document.querySelectorAll("button, .chip, .dir-btn, .qa-btn, .bottom-nav a, .market-card, .deal-history-row, .row.position-row");
+    const candidates = document.querySelectorAll("button, .chip, .dir-btn, .qa-btn, .bottom-nav a, .lang-btn, .submit");
     candidates.forEach((node) => {
         node.classList.add("interactive");
         node.addEventListener("click", (event) => {
