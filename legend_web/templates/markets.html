@@ -67,19 +67,4 @@
         {% endfor %}
     </div>
 </section>
-
-<section class="card">
-    <div class="section-title">{% if lang == "ru" %}Сводка{% elif lang == "uk" %}Зведення{% else %}Summary{% endif %}</div>
-    <div class="stats-grid" id="markets-insights">
-        <article class="card stat-card"><small>{% if lang == "ru" %}ТОП АКТИВ{% elif lang == "uk" %}ТОП АКТИВ{% else %}TOP SYMBOL{% endif %}</small><b id="insight-top-symbol">--</b></article>
-        <article class="card stat-card"><small>{% if lang == "ru" %}ТОП ДВИЖЕНИЕ{% elif lang == "uk" %}ТОП РУХ{% else %}TOP MOVE{% endif %}</small><b id="insight-top-move">--</b></article>
-        <article class="card stat-card"><small>{% if lang == "ru" %}СПОКОЙНЫЙ АКТИВ{% elif lang == "uk" %}СПОКІЙНИЙ АКТИВ{% else %}CALM SYMBOL{% endif %}</small><b id="insight-calm-symbol">--</b></article>
-        <article class="card stat-card"><small>{% if lang == "ru" %}СПОКОЙНОЕ ДВИЖЕНИЕ{% elif lang == "uk" %}СПОКІЙНИЙ РУХ{% else %}CALM MOVE{% endif %}</small><b id="insight-calm-move">--</b></article>
-    </div>
-</section>
-
-<section class="card" id="market-detail-card" hidden>
-    <div class="section-title">{{ labels.markets_instrument_drawer if labels else "Панель инструмента" }}</div>
-    <div id="market-detail-content"></div>
-</section>
 {% endblock %}
