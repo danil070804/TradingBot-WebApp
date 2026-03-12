@@ -5,6 +5,26 @@ let LIVE_TRADE_PANEL_ID = null;
 const INITIAL_OPEN_POSITIONS = Array.isArray(window.LEGEND_INITIAL_OPEN_POSITIONS) ? window.LEGEND_INITIAL_OPEN_POSITIONS : [];
 const INITIAL_TRADE_STATUS = window.LEGEND_INITIAL_TRADE_STATUS || null;
 
+function initAppPreloader() {
+    const overlay = document.getElementById("app-preloader");
+    const fill = document.getElementById("preloader-bar-fill");
+    if (!overlay || !fill) return;
+    const steps = [18, 36, 58, 78, 92];
+    let idx = 0;
+    const t = setInterval(() => {
+        fill.style.width = `${steps[Math.min(idx, steps.length - 1)]}%`;
+        idx += 1;
+        if (idx >= steps.length) clearInterval(t);
+    }, 90);
+
+    const close = () => {
+        fill.style.width = "100%";
+        window.setTimeout(() => overlay.classList.add("done"), 90);
+    };
+    window.addEventListener("load", close, { once: true });
+    window.setTimeout(close, 850);
+}
+
 function applyRuntimeProfile() {
     const body = document.body;
     if (!body) return;
@@ -65,6 +85,33 @@ async function syncTradePanel(tradeId, tgId) {
     } catch (_) {
         // no-op
     }
+}
+
+function initInteractiveFeedback() {
+    const wa = window.Telegram && window.Telegram.WebApp;
+    const tapBuzz = () => {
+        try {
+            wa?.HapticFeedback?.impactOccurred?.("light");
+        } catch (_) {
+            // no-op
+        }
+    };
+    const candidates = document.querySelectorAll("button, .chip, .dir-btn, .qa-btn, .bottom-nav a, .market-card, .deal-history-row, .row.position-row");
+    candidates.forEach((node) => {
+        node.classList.add("interactive");
+        node.addEventListener("click", (event) => {
+            const rect = node.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            node.style.setProperty("--rip-x", `${x}px`);
+            node.style.setProperty("--rip-y", `${y}px`);
+            node.classList.remove("pulse");
+            // restart animation
+            void node.offsetWidth;
+            node.classList.add("pulse");
+            tapBuzz();
+        });
+    });
 }
 
 function bindDirectionButtons() {
@@ -1026,7 +1073,7 @@ function renderOpenPositions(items, tgId) {
         .map((p) => {
             const side = p.direction === "up" ? L("trade_long", "LONG") : L("trade_short", "SHORT");
             return `
-            <div class="row position-row">
+            <div class="row position-row" data-trade-id="${p.trade_id}" data-tg-id="${tgId}">
                 <div>
                     <b>${p.asset_name} ${side}</b>
                     <small>${p.amount} · ${p.remaining}s</small>
@@ -1043,6 +1090,16 @@ function bindOpenPositionsActions() {
     const wrap = document.getElementById("open-positions-list");
     if (!wrap) return;
     wrap.addEventListener("click", async (e) => {
+        const row = e.target.closest(".position-row");
+        const clickedClose = e.target.closest(".pos-close-btn");
+        if (row && !clickedClose) {
+            const tradeId = row.dataset.tradeId;
+            const tgId = Number(row.dataset.tgId || 0);
+            if (tradeId && tgId) {
+                LIVE_TRADE_PANEL_ID = tradeId;
+                syncTradePanel(tradeId, tgId);
+            }
+        }
         const btn = e.target.closest(".pos-close-btn");
         if (!btn) return;
         const tradeId = btn.dataset.tradeId;
@@ -1081,6 +1138,52 @@ function hydrateInitialTradeState() {
     if (INITIAL_TRADE_STATUS && INITIAL_TRADE_STATUS.ok) {
         LIVE_TRADE_PANEL_ID = INITIAL_TRADE_STATUS.trade_id || null;
         updateTradePanelFromStatus(INITIAL_TRADE_STATUS);
+    }
+}
+
+function bindTradeQuickActions() {
+    const symbolSelect = document.querySelector('select[name="asset_name"]');
+    const chartSymbolSelect = document.getElementById("chart-symbol-select");
+    const tfSelect = document.getElementById("chart-tf");
+    const openChartBtn = document.getElementById("open-chart-btn");
+    const statMark = document.getElementById("stat-mark");
+    const statHigh = document.getElementById("stat-high");
+    const statLow = document.getElementById("stat-low");
+    const statSpread = document.getElementById("stat-spread");
+
+    const openChart = () => {
+        const sym = encodeURIComponent((chartSymbolSelect && chartSymbolSelect.value) || (symbolSelect && symbolSelect.value) || "Bitcoin");
+        window.location.href = `/trade/chart?symbol=${sym}`;
+    };
+
+    [statMark, statHigh, statLow].forEach((el) => {
+        if (!el) return;
+        const card = el.closest(".stat-card");
+        if (!card) return;
+        card.title = "Открыть график выбранного актива";
+        card.style.cursor = "pointer";
+        card.addEventListener("click", openChart);
+    });
+
+    if (statSpread) {
+        const card = statSpread.closest(".stat-card");
+        if (card && tfSelect) {
+            card.title = "Сменить таймфрейм";
+            card.style.cursor = "pointer";
+            card.addEventListener("click", () => {
+                const order = ["60", "300", "900", "3600"];
+                const idx = order.indexOf(String(tfSelect.value || "60"));
+                const next = order[(idx + 1) % order.length];
+                tfSelect.value = next;
+                tfSelect.dispatchEvent(new Event("change"));
+            });
+        }
+    }
+
+    if (openChartBtn) {
+        openChartBtn.addEventListener("mouseenter", () => {
+            openChartBtn.textContent = L("trade_open_chart", "Открыть график");
+        });
     }
 }
 
@@ -1910,6 +2013,7 @@ async function refreshTape() {
 }
 
 applyRuntimeProfile();
+initAppPreloader();
 initTelegramAuth();
 bindDirectionButtons();
 bindTradeControls();
@@ -1925,6 +2029,8 @@ bindUserSocket();
 bindOpenPositionsActions();
 bindMarketMiniCharts();
 hydrateInitialTradeState();
+bindTradeQuickActions();
+initInteractiveFeedback();
 
 const tapeWrap = document.getElementById("market-tape-list");
 if (tapeWrap) {

@@ -11,6 +11,14 @@
 </head>
 <body data-lang="{{ lang if lang else 'ru' }}" data-page="{{ page if page else '' }}">
 <div class="page-bg"></div>
+<div id="app-preloader" class="app-preloader" aria-hidden="true">
+    <div class="preloader-core">
+        <div class="preloader-mark">L</div>
+        <div class="preloader-title">Legend Trading</div>
+        <div class="preloader-sub">BOT WEBAPP</div>
+        <div class="preloader-bar"><span id="preloader-bar-fill"></span></div>
+    </div>
+</div>
 <div class="app-shell">
     <header class="topbar">
         <div class="brand">
