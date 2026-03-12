@@ -1325,14 +1325,20 @@ function bindDepositSupportAccordion() {
         open = !open;
         sync();
     };
-    toggle.addEventListener("click", (event) => {
+    const onActivate = (event) => {
         event.preventDefault();
         toggleOpen();
+    };
+    if (window.PointerEvent) {
+        toggle.addEventListener("pointerup", onActivate);
+    } else {
+        toggle.addEventListener("click", onActivate);
+    }
+    toggle.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+            onActivate(event);
+        }
     });
-    toggle.addEventListener("touchend", (event) => {
-        event.preventDefault();
-        toggleOpen();
-    }, { passive: false });
     sync();
 }
 
