@@ -9,15 +9,11 @@
     <div class="trade-hero-top">
         <div class="trade-hero-copy">
             <h1>{{ labels.trade_title if labels else "Futures Terminal" }}</h1>
-            <strong class="trade-hero-headline">
-                {% if lang == "ru" %}Открой сделку быстро и контролируй риск в одном окне{% elif lang == "uk" %}Відкрий угоду швидко та контролюй ризик в одному екрані{% else %}Open a position fast and control risk in one screen{% endif %}
-            </strong>
-            <p class="trade-hero-lead">
-                {% if lang == "ru" %}Живой рынок, быстрый вход, контроль экспозиции и результат сделки без прыжков между разделами.{% elif lang == "uk" %}Живий ринок, швидкий вхід, контроль експозиції та результат угоди без стрибків між розділами.{% else %}Live market, fast execution, exposure control and result tracking without jumping between screens.{% endif %}
-            </p>
+            <strong class="trade-hero-headline">{{ labels.trade_hero_title if labels else "Открой сделку быстро и контролируй риск в одном окне" }}</strong>
+            <p class="trade-hero-lead">{{ labels.trade_hero_text if labels else "Живой рынок, быстрый вход, контроль экспозиции и результат сделки без прыжков между разделами." }}</p>
         </div>
         <a id="hero-open-chart" class="qa-btn trade-hero-cta" href="/trade/chart">
-            {% if lang == "ru" %}Полный график{% elif lang == "uk" %}Повний графік{% else %}Full Chart{% endif %}
+            {{ labels.trade_full_chart if labels else "Полный график" }}
         </a>
     </div>
     <div class="trade-hero-kpis">
@@ -33,30 +29,26 @@
     <div class="activity-strip">
         <span id="market-live-dot" class="activity-dot"></span>
         <strong id="market-live-text">{{ labels.trade_feed_booting if labels else "Рынок: подключение" }}</strong>
-        <span id="market-flow">
-            {% if lang == "ru" %}0 сделок/мин{% elif lang == "uk" %}0 угод/хв{% else %}0 trades/min{% endif %}
-        </span>
-        <span id="market-participants">
-            {% if lang == "ru" %}0 активных символов{% elif lang == "uk" %}0 активних символів{% else %}0 symbols active{% endif %}
-        </span>
+        <span id="market-flow">{{ labels.trade_flow_rate if labels else "0 сделок/мин" }}</span>
+        <span id="market-participants">{{ labels.trade_symbols_active if labels else "0 активных символов" }}</span>
     </div>
     <div class="pulse-wrap"><div id="market-pulse" class="pulse-track"></div></div>
 </section>
 
 <section class="trade-command-bar">
     <article class="card trade-command-card">
-        <span>{% if lang == "ru" %}Активный режим{% elif lang == "uk" %}Активний режим{% else %}Active mode{% endif %}</span>
-        <strong>{% if lang == "ru" %}Турбо-фьючерсы{% elif lang == "uk" %}Турбо-ф'ючерси{% else %}Turbo Futures{% endif %}</strong>
-        <small>{% if lang == "ru" %}Быстрый вход с таймером и live-панелью{% elif lang == "uk" %}Швидкий вхід з таймером і live-панеллю{% else %}Fast execution with timer and live panel{% endif %}</small>
+        <span>{{ labels.trade_active_mode if labels else "Активный режим" }}</span>
+        <strong>{{ labels.trade_turbo_futures if labels else "Турбо-фьючерсы" }}</strong>
+        <small>{{ labels.trade_turbo_text if labels else "Быстрый вход с таймером и live-панелью" }}</small>
     </article>
     <article class="card trade-command-card">
-        <span>{% if lang == "ru" %}Рынок{% elif lang == "uk" %}Ринок{% else %}Market{% endif %}</span>
-        <strong id="command-mark">{% if lang == "ru" %}Текущий mark в столе{% elif lang == "uk" %}Поточний mark у столі{% else %}Live mark via desk{% endif %}</strong>
-        <small>{% if lang == "ru" %}Книга цен, лента и chart preview синхронизированы{% elif lang == "uk" %}Книга цін, стрічка та chart preview синхронізовані{% else %}Order book, tape and chart preview stay in sync{% endif %}</small>
+        <span>{{ labels.trade_market_label if labels else "Рынок" }}</span>
+        <strong id="command-mark">{{ labels.trade_market_mark if labels else "Текущий mark в столе" }}</strong>
+        <small>{{ labels.trade_market_sync if labels else "Книга цен, лента и chart preview синхронизированы" }}</small>
     </article>
     <article class="card trade-command-actions">
-        <a class="qa-btn" href="/markets">{% if lang == "ru" %}Открыть рынки{% elif lang == "uk" %}Відкрити ринки{% else %}Open Markets{% endif %}</a>
-        <a class="qa-btn" href="/deposit">{% if lang == "ru" %}Пополнить баланс{% elif lang == "uk" %}Поповнити баланс{% else %}Top Up Balance{% endif %}</a>
+        <a class="qa-btn" href="/markets">{{ labels.deposit_open_markets if labels else "Открыть рынки" }}</a>
+        <a class="qa-btn" href="/deposit">{{ labels.quick_deposit if labels else "Пополнить баланс" }}</a>
     </article>
 </section>
 
@@ -67,14 +59,14 @@
         <span id="q-risk-amt">0.00</span>
     </article>
     <article class="card quickdeck-card">
-        <small>{% if lang == "ru" %}Режим рынка{% elif lang == "uk" %}Режим ринку{% else %}Market mode{% endif %}</small>
+        <small>{{ labels.trade_market_mode if labels else "Режим рынка" }}</small>
         <b id="q-market-mode">--</b>
-        <span id="q-market-signal">{% if lang == "ru" %}Ожидание потока{% elif lang == "uk" %}Очікування потоку{% else %}Awaiting feed{% endif %}</span>
+        <span id="q-market-signal">{{ labels.trade_awaiting_feed if labels else "Ожидание потока" }}</span>
     </article>
     <article class="card quickdeck-card">
         <small>{% if lang == "ru" %}Экспозиция{% elif lang == "uk" %}Експозиція{% else %}Exposure{% endif %}</small>
         <b id="q-open-exp">0.00</b>
-        <span id="q-open-count">{% if lang == "ru" %}0 позиций{% elif lang == "uk" %}0 позицій{% else %}0 positions{% endif %}</span>
+        <span id="q-open-count">{{ labels.trade_zero_positions if labels else "0 позиций" }}</span>
     </article>
 </section>
 
@@ -125,17 +117,17 @@
     <div class="trade-left trade-form-panel">
         <div class="trade-panel-head">
             <div>
-                <div class="section-title">{% if lang == "ru" %}Торговый стол{% elif lang == "uk" %}Торговий стіл{% else %}Execution desk{% endif %}</div>
-                <strong class="trade-panel-title">{% if lang == "ru" %}Собери параметры сделки{% elif lang == "uk" %}Збери параметри угоди{% else %}Build your trade setup{% endif %}</strong>
+                <div class="section-title">{{ labels.trade_execution_desk if labels else "Торговый стол" }}</div>
+                <strong class="trade-panel-title">{{ labels.trade_build_setup if labels else "Собери параметры сделки" }}</strong>
             </div>
-            <div class="trade-panel-badge">{% if lang == "ru" %}готово{% elif lang == "uk" %}готово{% else %}ready{% endif %}</div>
+            <div class="trade-panel-badge">{{ labels.trade_ready if labels else "готово" }}</div>
         </div>
         <form id="trade-form" class="form-grid trade-form-grid">
             <input type="hidden" name="tg_id" value="{{ tg_id }}">
             <input type="hidden" id="balance-raw" value="{{ "%.4f"|format((user.balance if user else 0) or 0) }}">
             <div class="trade-form-section">
                 <div class="trade-form-section-head">
-                    <span>{% if lang == "ru" %}База позиции{% elif lang == "uk" %}База позиції{% else %}Position base{% endif %}</span>
+                    <span>{{ labels.trade_position_base if labels else "База позиции" }}</span>
                 </div>
                 <div class="trade-field-grid">
                     <label>{{ labels.trade_pair if labels else "Пара" }}
@@ -148,7 +140,7 @@
                     <label>{{ labels.trade_amount if labels else "Сумма" }}
                         <input id="trade-amount-input" type="number" step="0.01" min="100" name="amount" value="100">
                     </label>
-                    <label>{% if lang == "ru" %}Риск %{% elif lang == "uk" %}Ризик %{% else %}Risk %{% endif %}
+                    <label>{{ labels.trade_risk_percent if labels else "Риск %" }}
                         <input id="risk-input" type="number" step="0.1" min="0" max="100" name="risk_percent" value="0">
                     </label>
                 </div>
@@ -174,7 +166,7 @@
 
             <div class="trade-form-section">
                 <div class="trade-form-section-head">
-                    <span>{% if lang == "ru" %}Плечо и время{% elif lang == "uk" %}Плече та час{% else %}Leverage and timing{% endif %}</span>
+                    <span>{{ labels.trade_leverage_timing if labels else "Плечо и время" }}</span>
                 </div>
                 <label>{{ labels.trade_leverage if labels else "Плечо" }}: <span id="lev-val">10x</span>
                     <input id="lev-range" type="range" min="1" max="50" value="10">
@@ -192,7 +184,7 @@
 
             <div class="trade-form-section">
                 <div class="trade-form-section-head">
-                    <span>{% if lang == "ru" %}Управление выходом{% elif lang == "uk" %}Керування виходом{% else %}Exit control{% endif %}</span>
+                    <span>{{ labels.trade_exit_control if labels else "Управление выходом" }}</span>
                 </div>
                 <div class="direction-group">
                     <label>{% if lang == "ru" %}TP %{% elif lang == "uk" %}TP %{% else %}TP %{% endif %}
@@ -206,15 +198,13 @@
 
             <div class="trade-form-section trade-form-section-accent">
                 <div class="trade-form-section-head">
-                    <span>{% if lang == "ru" %}Направление сделки{% elif lang == "uk" %}Напрям угоди{% else %}Trade direction{% endif %}</span>
+                    <span>{{ labels.trade_direction_title if labels else "Направление сделки" }}</span>
                 </div>
                 <div class="direction-group">
                     <button type="button" class="dir-btn long active" data-dir="up">{{ labels.trade_long if labels else "ЛОНГ" }}</button>
                     <button type="button" class="dir-btn short" data-dir="down">{{ labels.trade_short if labels else "ШОРТ" }}</button>
                 </div>
-                <div class="trade-submit-note">
-                    {% if lang == "ru" %}Перед открытием ты увидишь финальное подтверждение с оценкой сценария.{% elif lang == "uk" %}Перед відкриттям ти побачиш фінальне підтвердження з оцінкою сценарію.{% else %}Before execution you will see a final confirmation with a scenario preview.{% endif %}
-                </div>
+                <div class="trade-submit-note">{{ labels.trade_preview_note if labels else "Перед открытием ты увидишь финальное подтверждение с оценкой сценария." }}</div>
             </div>
             <input type="hidden" name="direction" id="direction-input" value="up">
             <button class="submit" type="submit">{{ labels.trade_create if labels else "Создать сделку" }}</button>

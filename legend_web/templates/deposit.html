@@ -5,14 +5,10 @@
     <div class="deposit-hero-top">
         <div class="deposit-hero-copy">
             <h1>{{ labels.deposit_title if labels else "Пополнение баланса" }}</h1>
-            <strong class="deposit-hero-headline">
-                {% if lang == "ru" %}Пополняй счет быстро и выбирай удобный маршрут оплаты{% elif lang == "uk" %}Поповнюй рахунок швидко та обирай зручний маршрут оплати{% else %}Top up fast and choose the payment route that fits you{% endif %}
-            </strong>
-            <p class="deposit-hero-lead">
-                {% if lang == "ru" %}Выбери метод, отправь заявку и получи актуальные реквизиты или ссылку на оплату.{% elif lang == "uk" %}Обери метод, надішли заявку та отримай актуальні реквізити або посилання на оплату.{% else %}Pick a method, submit the request and get the latest payment details or payment link.{% endif %}
-            </p>
+            <strong class="deposit-hero-headline">{{ labels.deposit_hero_title if labels else "Пополняй счет быстро и выбирай удобный маршрут оплаты" }}</strong>
+            <p class="deposit-hero-lead">{{ labels.deposit_hero_text if labels else "Выбери метод, отправь заявку и получи актуальные реквизиты или ссылку на оплату." }}</p>
         </div>
-        <a class="qa-btn deposit-hero-cta" href="/profile">{% if lang == "ru" %}К профилю{% elif lang == "uk" %}До профілю{% else %}Go To Profile{% endif %}</a>
+        <a class="qa-btn deposit-hero-cta" href="/profile">{{ labels.deposit_to_profile if labels else "К профилю" }}</a>
     </div>
     <div class="balance">{{ "%.2f"|format((user.balance if user else 0) or 0) }} {{ (user.currency if user else "USD") or "USD" }}</div>
     <div class="hint">ID: {{ tg_id }}</div>
@@ -20,13 +16,13 @@
 
 <section class="deposit-command-bar">
     <article class="card deposit-command-card">
-        <span>{% if lang == "ru" %}Стратегия пополнения{% elif lang == "uk" %}Стратегія поповнення{% else %}Funding strategy{% endif %}</span>
-        <strong>{% if lang == "ru" %}Выбери скорость, маршрут и удобство{% elif lang == "uk" %}Обери швидкість, маршрут і зручність{% else %}Choose speed, route and convenience{% endif %}</strong>
-        <small>{% if lang == "ru" %}Crypto bot для быстрого старта, TRC20 для прямого перевода, карта через поддержку.{% elif lang == "uk" %}Crypto bot для швидкого старту, TRC20 для прямого переказу, картка через підтримку.{% else %}Use crypto bot for the fastest start, TRC20 for direct transfer, or card via support.{% endif %}</small>
+        <span>{{ labels.deposit_strategy if labels else "Стратегия пополнения" }}</span>
+        <strong>{{ labels.deposit_strategy_title if labels else "Выбери скорость, маршрут и удобство" }}</strong>
+        <small>{{ labels.deposit_strategy_text if labels else "Crypto bot для быстрого старта, TRC20 для прямого перевода, карта через поддержку." }}</small>
     </article>
     <article class="card deposit-command-actions">
-        <a class="qa-btn" href="/trade">{% if lang == "ru" %}К торговле{% elif lang == "uk" %}До торгівлі{% else %}Go To Trade{% endif %}</a>
-        <a class="qa-btn" href="/markets">{% if lang == "ru" %}Открыть рынки{% elif lang == "uk" %}Відкрити ринки{% else %}Open Markets{% endif %}</a>
+        <a class="qa-btn" href="/trade">{{ labels.deposit_go_trade if labels else "К торговле" }}</a>
+        <a class="qa-btn" href="/markets">{{ labels.deposit_open_markets if labels else "Открыть рынки" }}</a>
     </article>
 </section>
 
@@ -34,34 +30,34 @@
     <div class="deposit-panel-head">
         <div>
             <div class="section-title">{{ labels.deposit_method if labels else "Метод оплаты" }}</div>
-            <strong class="deposit-panel-title">{% if lang == "ru" %}Выбери маршрут пополнения{% elif lang == "uk" %}Обери маршрут поповнення{% else %}Choose your funding route{% endif %}</strong>
+            <strong class="deposit-panel-title">{{ labels.deposit_choose_route if labels else "Выбери маршрут пополнения" }}</strong>
         </div>
     </div>
-    <p class="deposit-lead">{{ labels.get('deposit_lead', 'Choose a payment method. After you submit a request, support will provide the latest payment instructions.') if labels else "Choose a payment method. After you submit a request, support will provide the latest payment instructions." }}</p>
+    <p class="deposit-lead">{{ labels.deposit_lead if labels else "Choose a payment method. After you submit a request, support will provide the latest payment instructions." }}</p>
     <div class="deposit-method-cards" id="deposit-method-cards">
         <button type="button" class="deposit-method-card active" data-method="crypto">
             <span class="deposit-method-icon">🤖</span>
             <strong>Crypto bot</strong>
-            <small>{% if lang == "ru" %}Быстрое подтверждение через менеджера{% elif lang == "uk" %}Швидке підтвердження через менеджера{% else %}Fast flow with manager confirmation{% endif %}</small>
-            <em>{% if lang == "ru" %}Время: 1-5 мин{% elif lang == "uk" %}Час: 1-5 хв{% else %}ETA: 1-5 min{% endif %}</em>
+            <small>{{ labels.deposit_crypto_fast if labels else "Быстрое подтверждение через менеджера" }}</small>
+            <em>{{ labels.deposit_eta if labels else "Время: 1-5 мин" }}</em>
         </button>
         <button type="button" class="deposit-method-card" data-method="trc20">
             <span class="deposit-method-icon">🟢</span>
             <strong>TRC20 USDT</strong>
-            <small>{% if lang == "ru" %}Прямой перевод на кошелек{% elif lang == "uk" %}Прямий переказ на гаманець{% else %}Direct wallet transfer route{% endif %}</small>
-            <em>{% if lang == "ru" %}Комиссия сети{% elif lang == "uk" %}Комісія мережі{% else %}Network fee{% endif %}</em>
+            <small>{{ labels.deposit_trc20_text if labels else "Прямой перевод на кошелек" }}</small>
+            <em>{{ labels.deposit_network_fee if labels else "Комиссия сети" }}</em>
         </button>
         <button type="button" class="deposit-method-card" data-method="card">
             <span class="deposit-method-icon">💳</span>
             <strong>{{ labels.pay_card if labels else "Банковская карта" }}</strong>
-            <small>{% if lang == "ru" %}Оплата картой через поддержку{% elif lang == "uk" %}Оплата карткою через підтримку{% else %}Card payment through support{% endif %}</small>
-            <em>{% if lang == "ru" %}Подтверждение оператором{% elif lang == "uk" %}Підтвердження оператором{% else %}Manual approval{% endif %}</em>
+            <small>{{ labels.deposit_card_text if labels else "Оплата картой через поддержку" }}</small>
+            <em>{{ labels.deposit_manual_approval if labels else "Подтверждение оператором" }}</em>
         </button>
     </div>
     <div class="deposit-method-details" id="deposit-method-details">
-        <div class="deposit-method-detail"><span id="deposit-detail-speed">{% if lang == "ru" %}Скорость: мгновенно{% elif lang == "uk" %}Швидкість: миттєво{% else %}Speed: instant{% endif %}</span></div>
-        <div class="deposit-method-detail"><span id="deposit-detail-fee">{% if lang == "ru" %}Комиссия: минимальная{% elif lang == "uk" %}Комісія: мінімальна{% else %}Fee: low{% endif %}</span></div>
-        <div class="deposit-method-detail"><span id="deposit-detail-note">{% if lang == "ru" %}Рекомендация: для быстрого старта{% elif lang == "uk" %}Рекомендація: для швидкого старту{% else %}Recommended: quick start{% endif %}</span></div>
+        <div class="deposit-method-detail"><span id="deposit-detail-speed">{{ labels.deposit_speed_instant if labels else "Скорость: мгновенно" }}</span></div>
+        <div class="deposit-method-detail"><span id="deposit-detail-fee">{{ labels.deposit_fee_low if labels else "Комиссия: минимальная" }}</span></div>
+        <div class="deposit-method-detail"><span id="deposit-detail-note">{{ labels.deposit_recommended_fast if labels else "Рекомендация: для быстрого старта" }}</span></div>
     </div>
     <form id="deposit-form" class="form-grid">
         <input type="hidden" name="tg_id" value="{{ tg_id }}">
@@ -73,25 +69,13 @@
     </form>
     <div class="support-banner" id="deposit-support-banner">
         <button type="button" class="support-banner-toggle" id="deposit-support-toggle">
-            <span>
-                {% if lang == "ru" %}Нужна помощь с пополнением?{% elif lang == "uk" %}Потрібна допомога з поповненням?{% else %}Need help with deposit?{% endif %}
-            </span>
+            <span>{{ labels.deposit_help if labels else "Нужна помощь с пополнением?" }}</span>
             <i id="deposit-support-arrow">▾</i>
         </button>
         <div class="support-banner-body" id="deposit-support-body" hidden>
             <div>
-                <b>
-                    {% if lang == "ru" %}Пополнение через поддержку{% elif lang == "uk" %}Поповнення через підтримку{% else %}Deposit via support{% endif %}
-                </b>
-                <small>
-                    {% if lang == "ru" %}
-                    Менеджер пришлет реквизиты или ссылку на оплату после выбора метода.
-                    {% elif lang == "uk" %}
-                    Менеджер надішле реквізити або посилання на оплату після вибору методу.
-                    {% else %}
-                    A manager will send payment details or a payment link after you select a method.
-                    {% endif %}
-                </small>
+                <b>{{ labels.deposit_support_title if labels else "Пополнение через поддержку" }}</b>
+                <small>{{ labels.deposit_support_text if labels else "Менеджер пришлет реквизиты или ссылку на оплату после выбора метода." }}</small>
             </div>
             <small>{{ support_contact }}</small>
             {% if support_url %}<a class="qa-btn" href="{{ support_entry_url }}">{{ labels.js_support_btn if labels else "Перейти в поддержку" }}</a>{% endif %}
