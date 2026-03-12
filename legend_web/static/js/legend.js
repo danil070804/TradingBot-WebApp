@@ -1145,9 +1145,14 @@ function renderDealDetailFromRow(row) {
     const card = document.getElementById("deal-detail-card");
     const content = document.getElementById("deal-detail-content");
     if (!card || !content || !row) return;
+    const lang = document.body?.dataset?.lang || "ru";
+    const isRu = lang === "ru";
+    const isUk = lang === "uk";
     const id = row.dataset.dealId || "—";
     const asset = row.dataset.asset || "—";
-    const direction = row.dataset.direction === "up" ? "UP / LONG" : "DOWN / SHORT";
+    const direction = row.dataset.direction === "up"
+        ? (isRu ? "ВВЕРХ / ЛОНГ" : isUk ? "ВГОРУ / ЛОНГ" : "UP / LONG")
+        : (isRu ? "ВНИЗ / ШОРТ" : isUk ? "ВНИЗ / ШОРТ" : "DOWN / SHORT");
     const amount = Number(row.dataset.amount || 0);
     const currency = row.dataset.currency || "USD";
     const profit = Number(row.dataset.profit || 0);
@@ -1159,16 +1164,18 @@ function renderDealDetailFromRow(row) {
                 <strong>#${id}</strong>
                 <small>${asset} · ${direction}</small>
             </div>
-            <span class="detail-badge ${isWin ? "pos" : "neg"}">${isWin ? "Profit" : "Loss"}</span>
+            <span class="detail-badge ${isWin ? "pos" : "neg"}">${isWin ? (isRu ? "ПРИБЫЛЬ" : isUk ? "ПРИБУТОК" : "PROFIT") : (isRu ? "УБЫТОК" : isUk ? "ЗБИТОК" : "LOSS")}</span>
         </div>
         <div class="detail-grid">
-            <div class="detail-cell"><span>Amount</span><b>${amount.toFixed(2)} ${currency}</b></div>
+            <div class="detail-cell"><span>${isRu ? "Сумма" : isUk ? "Сума" : "Amount"}</span><b>${amount.toFixed(2)} ${currency}</b></div>
             <div class="detail-cell"><span>PnL</span><b class="${profit >= 0 ? "pos" : "neg"}">${profit >= 0 ? "+" : ""}${profit.toFixed(2)}</b></div>
-            <div class="detail-cell"><span>Opened</span><b>${createdAt}</b></div>
-            <div class="detail-cell"><span>Status</span><b>${isWin ? "Closed in plus" : "Closed in minus"}</b></div>
+            <div class="detail-cell"><span>${isRu ? "Открыта" : isUk ? "Відкрито" : "Opened"}</span><b>${createdAt}</b></div>
+            <div class="detail-cell"><span>${isRu ? "Статус" : isUk ? "Статус" : "Status"}</span><b>${isWin ? (isRu ? "Закрыта в плюс" : isUk ? "Закрита в плюс" : "Closed in profit") : (isRu ? "Закрыта в минус" : isUk ? "Закрита в мінус" : "Closed in loss")}</b></div>
         </div>
         <div class="detail-note">
-            ${isWin ? "This position closed in profit and the result was credited to the account balance." : "This position closed with a negative result according to the final market movement."}
+            ${isWin
+                ? (isRu ? "Эта сделка закрылась в плюс, и результат был зачислен на баланс." : isUk ? "Ця угода закрилася в плюс, і результат було зараховано на баланс." : "This position closed in profit and the result was credited to the account balance.")
+                : (isRu ? "Эта сделка закрылась в минус по итоговому движению рынка." : isUk ? "Ця угода закрилася в мінус за підсумковим рухом ринку." : "This position closed with a negative result according to the final market movement.")}
         </div>
     `;
     card.hidden = false;

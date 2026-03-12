@@ -4,22 +4,37 @@
 <section class="card market-detail-card">
     <div class="section-title">Результат сделки</div>
     <div class="detail-actions">
-        <a class="detail-link" href="{{ back_href }}">← Назад к сделкам</a>
+        <a class="detail-link" href="{{ back_href }}">
+            {% if lang == "en" %}← Back to deals{% elif lang == "uk" %}← Назад до угод{% else %}← Назад к сделкам{% endif %}
+        </a>
     </div>
     <div class="detail-hero">
         <div>
             <strong>#{{ deal.id }}</strong>
-            <small>{{ deal.asset_name }} · {{ "UP / LONG" if deal.direction == "up" else "DOWN / SHORT" }}</small>
+            <small>
+                {{ deal.asset_name }} ·
+                {% if deal.direction == "up" %}
+                    {% if lang == "en" %}UP / LONG{% elif lang == "uk" %}ВГОРУ / ЛОНГ{% else %}ВВЕРХ / ЛОНГ{% endif %}
+                {% else %}
+                    {% if lang == "en" %}DOWN / SHORT{% elif lang == "uk" %}ВНИЗ / ШОРТ{% else %}ВНИЗ / ШОРТ{% endif %}
+                {% endif %}
+            </small>
         </div>
-        <span class="detail-badge {{ 'pos' if deal.is_win else 'neg' }}">{{ "PROFIT" if deal.is_win else "LOSS" }}</span>
+        <span class="detail-badge {{ 'pos' if deal.is_win else 'neg' }}">
+            {% if deal.is_win %}
+                {% if lang == "en" %}PROFIT{% elif lang == "uk" %}ПРИБУТОК{% else %}ПРИБЫЛЬ{% endif %}
+            {% else %}
+                {% if lang == "en" %}LOSS{% elif lang == "uk" %}ЗБИТОК{% else %}УБЫТОК{% endif %}
+            {% endif %}
+        </span>
     </div>
     <div class="detail-grid">
         <div class="detail-cell">
-            <span>Amount</span>
+            <span>{% if lang == "en" %}Amount{% elif lang == "uk" %}Сума{% else %}Сумма{% endif %}</span>
             <b>{{ "%.2f"|format(deal.amount) }} {{ deal.currency }}</b>
         </div>
         <div class="detail-cell">
-            <span>Leverage</span>
+            <span>{% if lang == "en" %}Leverage{% elif lang == "uk" %}Плече{% else %}Плечо{% endif %}</span>
             <b>{{ deal.leverage if deal.leverage else 10 }}x</b>
         </div>
         <div class="detail-cell">
@@ -27,36 +42,61 @@
             <b class="{{ 'pos' if deal.profit >= 0 else 'neg' }}">{{ "%+.2f"|format(deal.profit) }}</b>
         </div>
         <div class="detail-cell">
-            <span>Opened</span>
+            <span>{% if lang == "en" %}Opened{% elif lang == "uk" %}Відкрито{% else %}Открыта{% endif %}</span>
             <b>{{ deal.created_at }}</b>
         </div>
         <div class="detail-cell">
-            <span>Status</span>
-            <b>{{ "Closed in plus" if deal.is_win else "Closed in minus" }}</b>
+            <span>{% if lang == "en" %}Status{% elif lang == "uk" %}Статус{% else %}Статус{% endif %}</span>
+            <b>
+                {% if deal.is_win %}
+                    {% if lang == "en" %}Closed in profit{% elif lang == "uk" %}Закрита в плюс{% else %}Закрыта в плюс{% endif %}
+                {% else %}
+                    {% if lang == "en" %}Closed in loss{% elif lang == "uk" %}Закрита в мінус{% else %}Закрыта в минус{% endif %}
+                {% endif %}
+            </b>
         </div>
         <div class="detail-cell">
-            <span>Price move</span>
+            <span>{% if lang == "en" %}Price move{% elif lang == "uk" %}Рух ціни{% else %}Движение цены{% endif %}</span>
             <b>{{ "%.3f"|format((deal.change_percent or 0) or 0) }}%</b>
         </div>
         <div class="detail-cell">
-            <span>Leveraged move</span>
+            <span>{% if lang == "en" %}Leveraged move{% elif lang == "uk" %}Рух з плечем{% else %}Движение с плечом{% endif %}</span>
             <b>{{ "%.3f"|format(((deal.change_percent or 0) or 0) * ((deal.leverage if deal.leverage else 10))) }}%</b>
         </div>
         <div class="detail-cell">
-            <span>Start price</span>
+            <span>{% if lang == "en" %}Start price{% elif lang == "uk" %}Стартова ціна{% else %}Стартовая цена{% endif %}</span>
             <b>{{ "%.4f"|format((deal.start_price or 0) or 0) }} USD</b>
         </div>
         <div class="detail-cell">
-            <span>End price</span>
+            <span>{% if lang == "en" %}End price{% elif lang == "uk" %}Кінцева ціна{% else %}Конечная цена{% endif %}</span>
             <b>{{ "%.4f"|format((deal.end_price or 0) or 0) }} USD</b>
         </div>
     </div>
     <div class="detail-note">
-        Формула результата: {{ "%.3f"|format((deal.change_percent or 0) or 0) }}% × {{ deal.leverage if deal.leverage else 10 }} = {{ "%.3f"|format(((deal.change_percent or 0) or 0) * ((deal.leverage if deal.leverage else 10))) }}%.
-        {% if deal.is_win %}
-        Финальный результат уже был зачислен на баланс.
+        {% if lang == "en" %}
+        Result formula:
+        {% elif lang == "uk" %}
+        Формула результату:
         {% else %}
-        Сделка завершилась в минус по итоговому движению рынка.
+        Формула результата:
+        {% endif %}
+        {{ "%.3f"|format((deal.change_percent or 0) or 0) }}% × {{ deal.leverage if deal.leverage else 10 }} = {{ "%.3f"|format(((deal.change_percent or 0) or 0) * ((deal.leverage if deal.leverage else 10))) }}%.
+        {% if deal.is_win %}
+            {% if lang == "en" %}
+            Final result has already been credited to the balance.
+            {% elif lang == "uk" %}
+            Підсумковий результат уже зараховано на баланс.
+            {% else %}
+            Финальный результат уже зачислен на баланс.
+            {% endif %}
+        {% else %}
+            {% if lang == "en" %}
+            The deal closed in loss based on the final market move.
+            {% elif lang == "uk" %}
+            Угода завершилась у мінус за підсумковим рухом ринку.
+            {% else %}
+            Сделка завершилась в минус по итоговому движению рынка.
+            {% endif %}
         {% endif %}
     </div>
 </section>
