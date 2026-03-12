@@ -2847,6 +2847,8 @@ BOT_SECTION_MEDIA = {
     "worker_referrals_base": {"setting": "bot_photo_worker_referrals_base", "title": "База лохматых"},
     "platform_stats": {"setting": "bot_photo_platform_stats", "title": "Статистика платформы"},
     "deposit_status": {"setting": "bot_photo_deposit_status", "title": "Статус пополнения"},
+    "deposit_status_approved": {"setting": "bot_photo_deposit_status_approved", "title": "Статус пополнения (подтверждено)"},
+    "deposit_status_rejected": {"setting": "bot_photo_deposit_status_rejected", "title": "Статус пополнения (отклонено)"},
 }
 CURRENCY_PER_USDT = {
     "USD": 1.0,
@@ -4745,9 +4747,12 @@ async def approve_deposit(callback: CallbackQuery):
         meta={"deposit_id": dep_id},
     )
     try:
+        section_key = "deposit_status_approved"
+        if not await get_section_photo_file_id(section_key):
+            section_key = "deposit_status"
         await send_section_chat_message(
             user_id,
-            "deposit_status",
+            section_key,
             build_deposit_status_notice(lang, True, amount, currency),
             reply_markup=support_section_keyboard(lang),
         )
@@ -4782,9 +4787,12 @@ async def reject_deposit(callback: CallbackQuery):
         meta={"deposit_id": dep_id},
     )
     try:
+        section_key = "deposit_status_rejected"
+        if not await get_section_photo_file_id(section_key):
+            section_key = "deposit_status"
         await send_section_chat_message(
             int(dep["user_tg_id"]),
-            "deposit_status",
+            section_key,
             build_deposit_status_notice(lang, False, float(dep["amount"] or 0.0), dep["currency"] or "USD"),
             reply_markup=support_section_keyboard(lang),
         )
