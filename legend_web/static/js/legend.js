@@ -1074,7 +1074,6 @@ function bindDepositForm() {
 function bindDepositMethodCards() {
     const wrap = document.getElementById("deposit-method-cards");
     const methodSelect = document.getElementById("deposit-method");
-    const hint = document.getElementById("deposit-method-hint");
     const detailSpeed = document.getElementById("deposit-detail-speed");
     const detailFee = document.getElementById("deposit-detail-fee");
     const detailNote = document.getElementById("deposit-detail-note");
@@ -1082,24 +1081,6 @@ function bindDepositMethodCards() {
     const cards = Array.from(wrap.querySelectorAll(".deposit-method-card[data-method]"));
     if (!cards.length) return;
     const lang = uiLang();
-    const hints = {
-        en: {
-            crypto: "Crypto bot route is selected. Support will send final instructions after request submission.",
-            trc20: "TRC20 route selected. Verify the wallet and network in support chat before transfer.",
-            card: "Card method selected. Support will provide secure payment instructions in chat.",
-        },
-        ru: {
-            crypto: "Выбран Crypto bot. Поддержка отправит финальные реквизиты после заявки.",
-            trc20: "Выбран TRC20. Перед переводом уточните сеть и кошелёк у поддержки.",
-            card: "Выбрана банковская карта. Поддержка отправит безопасные инструкции по оплате в чате.",
-        },
-        uk: {
-            crypto: "Обрано Crypto bot. Підтримка надішле фінальні реквізити після заявки.",
-            trc20: "Обрано TRC20. Перед переказом уточніть мережу та гаманець у підтримки.",
-            card: "Обрано банківську картку. Підтримка надішле безпечні інструкції в чаті.",
-        },
-    };
-    const dict = hints[lang] || hints.en;
     const details = {
         en: {
             crypto: { speed: "Speed: 1-5 min", fee: "Fee: low", note: "Recommended: quick start and instant support follow-up." },
@@ -1122,7 +1103,6 @@ function bindDepositMethodCards() {
     const sync = (method) => {
         cards.forEach((card) => card.classList.toggle("active", card.dataset.method === method));
         methodSelect.value = method;
-        if (hint) hint.textContent = dict[method] || dict.crypto;
         const d = detailsDict[method] || detailsDict.crypto;
         if (detailSpeed) detailSpeed.textContent = d.speed;
         if (detailFee) detailFee.textContent = d.fee;

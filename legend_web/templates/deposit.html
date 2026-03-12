@@ -35,33 +35,28 @@
         <div class="deposit-method-detail"><span id="deposit-detail-fee">{% if lang == "ru" %}Комиссия: минимальная{% elif lang == "uk" %}Комісія: мінімальна{% else %}Fee: low{% endif %}</span></div>
         <div class="deposit-method-detail"><span id="deposit-detail-note">{% if lang == "ru" %}Рекомендация: для быстрого старта{% elif lang == "uk" %}Рекомендація: для швидкого старту{% else %}Recommended: quick start{% endif %}</span></div>
     </div>
-    <div class="deposit-method-hint" id="deposit-method-hint">
-        {% if lang == "ru" %}
-        Выбран Crypto bot. Поддержка отправит финальные реквизиты после заявки.
-        {% elif lang == "uk" %}
-        Обрано Crypto bot. Підтримка надішле фінальні реквізити після заявки.
-        {% else %}
-        Crypto bot route is selected. Support will send final instructions after request submission.
-        {% endif %}
-    </div>
     <form id="deposit-form" class="form-grid">
         <input type="hidden" name="tg_id" value="{{ tg_id }}">
+        <input type="hidden" name="method" id="deposit-method" value="crypto">
         <label>{{ labels.deposit_amount if labels else "Сумма" }}
             <input type="number" name="amount" min="1" step="0.01" value="100">
-        </label>
-        <label>{{ labels.deposit_way if labels else "Способ" }}
-            <select name="method" id="deposit-method">
-                <option value="crypto">Crypto bot</option>
-                <option value="trc20">TRC20 USDT</option>
-                <option value="card">{{ labels.pay_card if labels else "Банковская карта" }}</option>
-            </select>
         </label>
         <button class="submit" type="submit">{{ labels.deposit_continue if labels else "Продолжить" }}</button>
     </form>
     <div class="support-banner">
         <div>
-            <b>{{ labels.get('deposit_support_title', 'Deposit via support') if labels else "Deposit via support" }}</b>
-            <small>{{ labels.get('deposit_support_desc', 'A manager will send payment details or a payment link after you select a method.') if labels else "A manager will send payment details or a payment link after you select a method." }}</small>
+            <b>
+                {% if lang == "ru" %}Пополнение через поддержку{% elif lang == "uk" %}Поповнення через підтримку{% else %}Deposit via support{% endif %}
+            </b>
+            <small>
+                {% if lang == "ru" %}
+                Менеджер пришлет реквизиты или ссылку на оплату после выбора метода.
+                {% elif lang == "uk" %}
+                Менеджер надішле реквізити або посилання на оплату після вибору методу.
+                {% else %}
+                A manager will send payment details or a payment link after you select a method.
+                {% endif %}
+            </small>
         </div>
         <small>{{ support_contact }}</small>
         {% if support_url %}<a class="qa-btn" href="{{ support_entry_url }}">{{ labels.js_support_btn if labels else "Перейти в поддержку" }}</a>{% endif %}
