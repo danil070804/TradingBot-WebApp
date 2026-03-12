@@ -11,12 +11,16 @@
 <div class="app-shell" style="max-width: 1100px;">
     <main class="content">
         <section class="card hero">
-            <h1>Карточка пользователя</h1>
+            <div class="markets-hero-top">
+                <div class="markets-hero-copy">
+                    <h1>Карточка пользователя</h1>
+                    <strong class="markets-hero-headline">Админ-разбор аккаунта и финансовой активности</strong>
+                    <p class="markets-hero-lead">Просматривайте статусы, операции, сделки и историю действий пользователя в одном окне.</p>
+                </div>
+                <a class="qa-btn markets-hero-cta" href="/admin">Назад в админку</a>
+            </div>
             <div class="balance">{{ "%.2f"|format((user.balance or 0) or 0) }} {{ user.currency if user.currency else "USD" }}</div>
             <div class="hint">{{ user.first_name if user.first_name else "Пользователь" }} · ID {{ user.tg_id }} · @{{ user.username if user.username else "-" }}</div>
-            <div class="quick-actions">
-                <a class="qa-btn" href="/admin">Назад в админку</a>
-            </div>
         </section>
 
         <section class="stats-grid">

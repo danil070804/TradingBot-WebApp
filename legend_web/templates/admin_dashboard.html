@@ -11,9 +11,15 @@
 <div class="app-shell" style="max-width: 1100px;">
     <main class="content">
         <section class="card hero">
-            <h1>Админ-панель</h1>
-            <div class="hint">Управление реквизитами, монетами и параметрами платформы</div>
-            <div class="hint" id="admin-live-status">Admin feed: online</div>
+            <div class="markets-hero-top">
+                <div class="markets-hero-copy">
+                    <h1>Админ-панель</h1>
+                    <strong class="markets-hero-headline">Операционный центр платформы</strong>
+                    <p class="markets-hero-lead">Управление пользователями, финансами, поддержкой и системными параметрами в одном рабочем контуре.</p>
+                </div>
+                <a class="qa-btn markets-hero-cta" href="/">В webapp</a>
+            </div>
+            <div class="hint" id="admin-live-status">Админ-лента: онлайн</div>
             <div id="admin-live-meta" data-scope="admin"></div>
         </section>
 
@@ -25,7 +31,12 @@
         </section>
 
         <section class="card admin-command-deck">
-            <div class="section-title">Command Deck</div>
+            <div class="deposit-panel-head">
+                <div>
+                    <div class="section-title">Command Deck</div>
+                    <strong class="deposit-panel-title">Ключевые показатели платформы</strong>
+                </div>
+            </div>
             <div class="worker-meta">
                 <span>Users: {{ users_count }}</span>
                 <span>Workers: {{ workers_count }}</span>
@@ -52,7 +63,7 @@
             <div class="admin-tabs">
                 <button class="admin-tab active" type="button" data-tab="admin-users">Пользователи</button>
                 <button class="admin-tab" type="button" data-tab="admin-finance">Финансы</button>
-                <button class="admin-tab" type="button" data-tab="admin-support">Support</button>
+                <button class="admin-tab" type="button" data-tab="admin-support">Поддержка</button>
                 <button class="admin-tab" type="button" data-tab="admin-workers">Воркеры</button>
                 <button class="admin-tab" type="button" data-tab="admin-system">Система</button>
             </div>
@@ -181,7 +192,7 @@
         </section>
 
         <section class="card admin-tab-panel" data-panel="admin-support">
-            <div class="section-title">Support center</div>
+            <div class="section-title">Центр поддержки</div>
             <div id="admin-support-result" class="result-box"></div>
             <div id="admin-support-list" class="list">
                 {% for s in snapshot.support %}
@@ -225,7 +236,7 @@
         </section>
 
         <section class="card admin-tab-panel" data-panel="admin-support">
-            <div class="section-title">Audit log</div>
+            <div class="section-title">Журнал аудита</div>
             <div id="admin-audit-list" class="list">
                 {% for a in snapshot.audit %}
                 <div class="row worker-event-row">
@@ -438,7 +449,7 @@ async function refreshAdminDashboard() {
         if (!resp.ok) throw new Error("dashboard");
         const data = await resp.json();
         if (!data.ok) throw new Error(data.error || "dashboard");
-        document.getElementById("admin-live-status").textContent = "Admin feed: online";
+        document.getElementById("admin-live-status").textContent = "Админ-лента: онлайн";
         const metrics = data.metrics || {};
         const kpiCards = document.querySelectorAll("#admin-kpi-grid .metric p");
         if (kpiCards[0]) kpiCards[0].textContent = Number(metrics.pending_deposits || 0);
