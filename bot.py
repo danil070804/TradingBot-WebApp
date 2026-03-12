@@ -1296,6 +1296,48 @@ def build_deposit_status_notice(lang: str, approved: bool, amount: float, curren
     )
 
 
+def build_withdraw_request_status_notice(lang: str, approved: bool, amount: float, currency: str) -> str:
+    return tr(
+        lang,
+        (
+            "✅ <b>Заявка на вывод подтверждена</b>\n\n"
+            "╭ <b>Статус заявки</b>\n"
+            "├ Операция: <b>одобрена</b>\n"
+            f"╰ Сумма к выводу: <b>{amount:.2f} {currency}</b>\n\n"
+            "Средства будут отправлены в ближайшее время. Если перевод не поступит, откройте техподдержку по кнопке ниже."
+            if approved
+            else "❌ <b>Заявка на вывод отклонена</b>\n\n"
+            "╭ <b>Статус заявки</b>\n"
+            "├ Операция: <b>отклонена</b>\n"
+            "╰ Если у вас остались вопросы, обратитесь в техподдержку по кнопке ниже."
+        ),
+        (
+            "✅ <b>Withdrawal request approved</b>\n\n"
+            "╭ <b>Request status</b>\n"
+            "├ Operation: <b>approved</b>\n"
+            f"╰ Withdrawal amount: <b>{amount:.2f} {currency}</b>\n\n"
+            "Funds will be sent shortly. If you do not receive them, open support using the button below."
+            if approved
+            else "❌ <b>Withdrawal request rejected</b>\n\n"
+            "╭ <b>Request status</b>\n"
+            "├ Operation: <b>rejected</b>\n"
+            "╰ If you have any questions, open support using the button below."
+        ),
+        (
+            "✅ <b>Заявку на виведення підтверджено</b>\n\n"
+            "╭ <b>Статус заявки</b>\n"
+            "├ Операція: <b>підтверджена</b>\n"
+            f"╰ Сума до виведення: <b>{amount:.2f} {currency}</b>\n\n"
+            "Кошти будуть надіслані найближчим часом. Якщо переказ не надійде, відкрийте підтримку кнопкою нижче."
+            if approved
+            else "❌ <b>Заявку на виведення відхилено</b>\n\n"
+            "╭ <b>Статус заявки</b>\n"
+            "├ Операція: <b>відхилена</b>\n"
+            "╰ Якщо у вас залишились питання, відкрийте підтримку кнопкою нижче."
+        ),
+    )
+
+
 async def get_client_access_flags(client_tg_id: int):
     row = await get_client_trade_settings(client_tg_id)
     return {
@@ -3009,6 +3051,9 @@ BOT_SECTION_MEDIA = {
     "deposit_status": {"setting": "bot_photo_deposit_status", "title": "Статус пополнения"},
     "deposit_status_approved": {"setting": "bot_photo_deposit_status_approved", "title": "Статус пополнения (подтверждено)"},
     "deposit_status_rejected": {"setting": "bot_photo_deposit_status_rejected", "title": "Статус пополнения (отклонено)"},
+    "withdraw_status": {"setting": "bot_photo_withdraw_status", "title": "Статус вывода"},
+    "withdraw_status_approved": {"setting": "bot_photo_withdraw_status_approved", "title": "Статус вывода (подтверждено)"},
+    "withdraw_status_rejected": {"setting": "bot_photo_withdraw_status_rejected", "title": "Статус вывода (отклонено)"},
 }
 CURRENCY_PER_USDT = {
     "USD": 1.0,
@@ -4945,6 +4990,8 @@ async def approve_withdrawal(callback: CallbackQuery):
     user_id = row["user_tg_id"]
     amount = row["amount"]
     currency = row["currency"]
+    user = await get_user_by_tg_id(int(user_id))
+    lang = normalize_lang(user["language"] if user else "ru")
 
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
@@ -4972,9 +5019,14 @@ async def approve_withdrawal(callback: CallbackQuery):
         meta={"withdrawal_id": w_id},
     )
     try:
-        await bot.send_message(
+        section_key = "withdraw_status_approved"
+        if not await get_section_photo_file_id(section_key):
+            section_key = "withdraw_status"
+        await send_section_chat_message(
             user_id,
-            "✅ Ваша заявка на вывод одобрена.\n\nСредства будут отправлены в ближайшее время.",
+            section_key,
+            build_withdraw_request_status_notice(lang, True, float(amount), currency or "USD"),
+            reply_markup=support_section_keyboard(lang),
         )
     except Exception:
         pass
@@ -4993,6 +5045,8 @@ async def reject_withdrawal(callback: CallbackQuery):
         await callback.answer("Заявка не найдена или уже обработана.")
         return
     user_id = row["user_tg_id"]
+    user = await get_user_by_tg_id(int(user_id))
+    lang = normalize_lang(user["language"] if user else "ru")
     await set_withdrawal_status(w_id, "rejected")
     await log_activity_for_worker_client(
         client_tg_id=int(user_id),
@@ -5006,9 +5060,19 @@ async def reject_withdrawal(callback: CallbackQuery):
         meta={"withdrawal_id": w_id},
     )
     try:
-        await bot.send_message(
+        section_key = "withdraw_status_rejected"
+        if not await get_section_photo_file_id(section_key):
+            section_key = "withdraw_status"
+        await send_section_chat_message(
             user_id,
-            "❌ Заявка на вывод отклонена.\n\nЕсли нужна помощь, пожалуйста, обратитесь в поддержку.",
+            section_key,
+            build_withdraw_request_status_notice(
+                lang,
+                False,
+                float(row["amount"] or 0.0),
+                row["currency"] or "USD",
+            ),
+            reply_markup=support_section_keyboard(lang),
         )
     except Exception:
         pass
