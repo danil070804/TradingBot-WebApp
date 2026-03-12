@@ -5,25 +5,11 @@
     <div class="deposit-hero-top">
         <div class="deposit-hero-copy">
             <h1>{{ labels.deposit_title if labels else "Пополнение баланса" }}</h1>
-            <strong class="deposit-hero-headline">{{ labels.deposit_hero_title if labels else "Пополняй счет быстро и выбирай удобный маршрут оплаты" }}</strong>
-            <p class="deposit-hero-lead">{{ labels.deposit_hero_text if labels else "Выбери метод, отправь заявку и получи актуальные реквизиты или ссылку на оплату." }}</p>
+            <p class="deposit-hero-lead">{{ labels.deposit_hero_text if labels else "Выберите метод и отправьте заявку на пополнение." }}</p>
         </div>
-        <a class="qa-btn deposit-hero-cta" href="/profile">{{ labels.deposit_to_profile if labels else "К профилю" }}</a>
     </div>
     <div class="balance">{{ "%.2f"|format((user.balance if user else 0) or 0) }} {{ (user.currency if user else "USD") or "USD" }}</div>
     <div class="hint">ID: {{ tg_id }}</div>
-</section>
-
-<section class="deposit-command-bar">
-    <article class="card deposit-command-card">
-        <span>{{ labels.deposit_strategy if labels else "Стратегия пополнения" }}</span>
-        <strong>{{ labels.deposit_strategy_title if labels else "Выбери скорость, маршрут и удобство" }}</strong>
-        <small>{{ labels.deposit_strategy_text if labels else "Crypto bot для быстрого старта, TRC20 для прямого перевода, карта через поддержку." }}</small>
-    </article>
-    <article class="card deposit-command-actions">
-        <a class="qa-btn" href="/trade">{{ labels.deposit_go_trade if labels else "К торговле" }}</a>
-        <a class="qa-btn" href="/markets">{{ labels.deposit_open_markets if labels else "Открыть рынки" }}</a>
-    </article>
 </section>
 
 <section class="card">
