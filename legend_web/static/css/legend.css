@@ -2251,6 +2251,50 @@ select, input {
     justify-content: center;
 }
 
+.deposit-status-row {
+    align-items: center;
+}
+
+.deposit-status-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+}
+
+.deposit-status-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 92px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    border: 1px solid rgba(116, 200, 244, 0.18);
+    background: rgba(243, 250, 255, 0.92);
+    color: #55758d;
+}
+
+.deposit-status-chip.status-pending {
+    color: #9a6a14;
+    background: rgba(255, 242, 213, 0.92);
+    border-color: rgba(225, 183, 92, 0.35);
+}
+
+.deposit-status-chip.status-approved {
+    color: #1f7a54;
+    background: rgba(221, 248, 234, 0.92);
+    border-color: rgba(80, 177, 126, 0.35);
+}
+
+.deposit-status-chip.status-rejected {
+    color: #9b4757;
+    background: rgba(255, 228, 234, 0.94);
+    border-color: rgba(202, 95, 115, 0.3);
+}
+
 .deposit-lead {
     margin: 0 0 12px;
     color: #4d6981;

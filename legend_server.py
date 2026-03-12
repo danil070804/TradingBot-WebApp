@@ -2299,6 +2299,12 @@ async def deposit_page(request: Request):
     tg_id = await get_current_user_id(request)
     lang, labels = await get_request_lang_labels(request, tg_id)
     user = await get_nav_user(tg_id)
+    deposits = []
+    if tg_id:
+        deposits = await fetch_all(
+            "SELECT id, amount, currency, method, status, created_at FROM deposit_requests WHERE user_tg_id = ? ORDER BY id DESC LIMIT 6",
+            (tg_id,),
+        )
     return templates.TemplateResponse(
         "deposit.html",
         {
@@ -2314,6 +2320,7 @@ async def deposit_page(request: Request):
             "support_url": bot.config.support_url,
             "support_entry_url": build_support_redirect_url(),
             "support_contact": bot.support_contact_text(),
+            "deposits": deposits,
             "lang": lang,
             "labels": labels,
         },

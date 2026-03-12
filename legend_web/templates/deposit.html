@@ -83,4 +83,31 @@
     </div>
     <div id="deposit-result" class="result-box"></div>
 </section>
+
+<section class="card">
+    <div class="deposit-panel-head">
+        <div>
+            <div class="section-title">{{ labels.profile_recent_deposits if labels else "Последние пополнения" }}</div>
+            <strong class="deposit-panel-title">
+                {% if lang == "ru" %}Статус последних заявок{% elif lang == "uk" %}Статус останніх заявок{% else %}Latest request status{% endif %}
+            </strong>
+        </div>
+    </div>
+    <div class="list">
+        {% for d in deposits %}
+        <div class="row profile-row deposit-status-row">
+            <div>
+                <b>#{{ d.id }} · {{ d.method }}</b>
+                <small>{{ d.created_at }}</small>
+            </div>
+            <div class="deposit-status-meta">
+                <b>{{ "%.2f"|format(d.amount) }} {{ d.currency }}</b>
+                <small class="deposit-status-chip status-{{ d.status }}">{{ d.status }}</small>
+            </div>
+        </div>
+        {% else %}
+        <div class="empty">{{ labels.profile_no_deposits if labels else "Пополнений пока нет." }}</div>
+        {% endfor %}
+    </div>
+</section>
 {% endblock %}
