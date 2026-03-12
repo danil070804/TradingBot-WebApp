@@ -24,6 +24,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 import bot
 import db_compat as db
+from identity_guard import resolve_session_user_id
 from binance_market import (
     BinanceMarketService,
     asset_to_binance_ticker,
@@ -1126,32 +1127,17 @@ async def resolve_api_user_id(
     *,
     require_session: bool = True,
 ) -> tuple[int | None, JSONResponse | None]:
-    """Resolve user id for API calls and block spoofed tg_id from client payload/query."""
     session_tg_id = request.session.get(USER_SESSION_KEY)
-    if require_session and not session_tg_id:
-        return None, JSONResponse(
-            {"ok": False, "error": "Требуется авторизация через Telegram WebApp"},
-            status_code=401,
-        )
-
-    if session_tg_id is not None:
-        current_tg_id = int(session_tg_id)
-    else:
-        current_tg_id = await get_current_user_id(request)
-
-    if not current_tg_id:
-        return None, JSONResponse(
-            {"ok": False, "error": "Пользователь не определён"},
-            status_code=401,
-        )
-
-    if payload_tg_id is not None and int(payload_tg_id) != int(current_tg_id):
-        return None, JSONResponse(
-            {"ok": False, "error": "Несовпадение пользователя с текущей сессией"},
-            status_code=403,
-        )
-
-    return int(current_tg_id), None
+    fallback_tg_id = None if session_tg_id else await get_current_user_id(request)
+    resolved = resolve_session_user_id(
+        int(session_tg_id) if session_tg_id is not None else None,
+        int(fallback_tg_id) if fallback_tg_id else None,
+        int(payload_tg_id) if payload_tg_id is not None else None,
+        require_session=require_session,
+    )
+    if resolved.error:
+        return None, JSONResponse({"ok": False, "error": resolved.error}, status_code=int(resolved.status_code))
+    return int(resolved.user_id), None
 
 
 async def get_nav_user(tg_id: int):
