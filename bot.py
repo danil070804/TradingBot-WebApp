@@ -77,6 +77,12 @@ SYNTH_MARKET_STATE: dict[str, dict] = {}
 SYNTH_TAPE_NAMES = [
     "quant_x", "hft_pro", "wolf_cap", "delta_room", "zen_entry", "north_alpha", "orbit_trader", "sigma_lab",
 ]
+SYNTH_REGIME_PROFILES = {
+    "calm": {"vol": 0.0012, "drift": 0.00035, "jump": 0.0025},
+    "volatile": {"vol": 0.0034, "drift": 0.00095, "jump": 0.0060},
+    "impulse_up": {"vol": 0.0026, "drift": 0.0022, "jump": 0.0100},
+    "impulse_down": {"vol": 0.0026, "drift": 0.0022, "jump": 0.0100},
+}
 
 
 class DepositStates(StatesGroup):
@@ -2185,14 +2191,52 @@ def _advance_synthetic_market(asset_name: str, symbol: str, anchor_price: float)
         state = {
             "open": max(0.00001, open_price),
             "last": max(0.00001, last_price),
-            "drift": random.uniform(-0.0009, 0.0009),
+            "drift": random.uniform(-0.0004, 0.0004),
+            "regime": "calm",
+            "regime_until": now_ts + random.uniform(30, 90),
             "last_ts": now_ts,
             "session_start": now_ts,
         }
+
+    if now_ts >= float(state.get("regime_until") or 0):
+        pick = random.random()
+        if pick < 0.58:
+            regime = "calm"
+            ttl = random.uniform(35, 110)
+        elif pick < 0.84:
+            regime = "volatile"
+            ttl = random.uniform(20, 70)
+        elif pick < 0.92:
+            regime = "impulse_up"
+            ttl = random.uniform(12, 35)
+        else:
+            regime = "impulse_down"
+            ttl = random.uniform(12, 35)
+        state["regime"] = regime
+        state["regime_until"] = now_ts + ttl
+
+    regime = str(state.get("regime") or "calm")
+    profile = SYNTH_REGIME_PROFILES.get(regime, SYNTH_REGIME_PROFILES["calm"])
     dt = max(0.4, min(7.0, now_ts - float(state.get("last_ts") or now_ts)))
     drift = float(state.get("drift") or 0.0)
-    drift = drift * 0.82 + random.uniform(-0.00065, 0.00065)
-    shock = random.gauss(0.0, 0.0021) * math.sqrt(dt)
+    drift_cap = float(profile["drift"])
+    base_pull = random.uniform(-drift_cap, drift_cap)
+    if regime == "impulse_up":
+        base_pull = abs(base_pull) + drift_cap * 0.55
+    elif regime == "impulse_down":
+        base_pull = -abs(base_pull) - drift_cap * 0.55
+    drift = drift * 0.78 + base_pull * 0.22
+    drift = max(-drift_cap * 1.9, min(drift, drift_cap * 1.9))
+
+    vol = float(profile["vol"])
+    shock = random.gauss(0.0, vol) * math.sqrt(dt)
+    if random.random() < 0.08:
+        jump = random.uniform(-float(profile["jump"]), float(profile["jump"]))
+        if regime == "impulse_up":
+            jump = abs(jump)
+        elif regime == "impulse_down":
+            jump = -abs(jump)
+        shock += jump
     step = drift * dt + shock
     last = float(state.get("last") or safe_anchor)
     updated = max(0.00001, last * (1 + step))
@@ -2217,6 +2261,7 @@ def _advance_synthetic_market(asset_name: str, symbol: str, anchor_price: float)
         "symbol": symbol,
         "price": round(updated, 5 if updated < 1 else 4 if updated < 10 else 2),
         "day_change": round(day_change, 2),
+        "regime": regime,
         "fallback": True,
     }
 
@@ -2238,10 +2283,11 @@ def _build_synthetic_tape_events(market_rows: list[dict], count: int) -> list[di
         symbol = str(market.get("symbol") or "BTC")
         price = float(market.get("price") or 100.0)
         ch = float(market.get("day_change") or 0.0)
+        energy = max(0.6, min(2.2, abs(ch) / 1.6 + 0.6))
         direction = "up" if ch >= 0 else "down"
-        amount = round(max(20.0, price * random.uniform(0.004, 0.028)), 2)
+        amount = round(max(20.0, price * random.uniform(0.004, 0.028) * energy), 2)
         user = random.choice(SYNTH_TAPE_NAMES)
-        is_closed = random.random() > 0.42
+        is_closed = random.random() > (0.50 - min(0.18, energy * 0.08))
         ts = now_ts - i * random.uniform(2.2, 9.5)
         if is_closed:
             sign = 1 if random.random() > 0.45 else -1
