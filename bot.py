@@ -73,6 +73,10 @@ ACTIVE_DEAL_TASKS: set[asyncio.Task] = set()
 ACTIVE_TRADE_MONITORS: dict[str, asyncio.Task] = {}
 ACTIVE_MARKET_STREAMS: dict[int, asyncio.Task] = {}
 DEFAULT_MARKET_REFRESH_SEC = max(5, min(60, int(os.getenv("BOT_MARKET_REFRESH_SEC", "12"))))
+SYNTH_MARKET_STATE: dict[str, dict] = {}
+SYNTH_TAPE_NAMES = [
+    "quant_x", "hft_pro", "wolf_cap", "delta_room", "zen_entry", "north_alpha", "orbit_trader", "sigma_lab",
+]
 
 
 class DepositStates(StatesGroup):
@@ -2152,8 +2156,129 @@ async def fetch_market_overview_rows(limit: int = 8) -> list[dict]:
 
         rows.extend(await asyncio.gather(*[_fetch(asset_name) for asset_name in target_assets], return_exceptions=False))
 
+    for idx, row in enumerate(rows):
+        asset_name = str(row.get("name") or "")
+        symbol = str(row.get("symbol") or "BTC")
+        price = float(row.get("price") or 0.0)
+        day_change = float(row.get("day_change") or 0.0)
+        synth_row = _advance_synthetic_market(asset_name, symbol, max(0.00001, price))
+        if bool(row.get("fallback")):
+            rows[idx] = synth_row
+            continue
+        # Keep movement alive when upstream market feed is too flat.
+        if abs(day_change) < 0.03:
+            row["day_change"] = round(day_change * 0.5 + float(synth_row["day_change"]) * 0.5, 2)
+            row["price"] = round((price * 0.82) + (float(synth_row["price"]) * 0.18), 5 if price < 1 else 4 if price < 10 else 2)
+
     rows.sort(key=lambda item: float(item["day_change"]), reverse=True)
     return rows
+
+
+def _advance_synthetic_market(asset_name: str, symbol: str, anchor_price: float) -> dict:
+    key = f"{symbol}:{asset_name}"  # keep stream deterministic per instrument
+    now_ts = time.time()
+    safe_anchor = max(0.00001, float(anchor_price or estimate_trade_price(asset_name)))
+    state = SYNTH_MARKET_STATE.get(key)
+    if not state:
+        open_price = safe_anchor * (1 + random.uniform(-0.012, 0.012))
+        last_price = safe_anchor * (1 + random.uniform(-0.008, 0.008))
+        state = {
+            "open": max(0.00001, open_price),
+            "last": max(0.00001, last_price),
+            "drift": random.uniform(-0.0009, 0.0009),
+            "last_ts": now_ts,
+            "session_start": now_ts,
+        }
+    dt = max(0.4, min(7.0, now_ts - float(state.get("last_ts") or now_ts)))
+    drift = float(state.get("drift") or 0.0)
+    drift = drift * 0.82 + random.uniform(-0.00065, 0.00065)
+    shock = random.gauss(0.0, 0.0021) * math.sqrt(dt)
+    step = drift * dt + shock
+    last = float(state.get("last") or safe_anchor)
+    updated = max(0.00001, last * (1 + step))
+    lower = safe_anchor * 0.55
+    upper = safe_anchor * 1.75
+    updated = min(max(updated, lower), upper)
+
+    # Reset synthetic trading day every 24h to keep 24h change meaningful.
+    if now_ts - float(state.get("session_start") or now_ts) > 86400:
+        state["open"] = updated
+        state["session_start"] = now_ts
+
+    state["last"] = updated
+    state["drift"] = drift
+    state["last_ts"] = now_ts
+    SYNTH_MARKET_STATE[key] = state
+
+    open_px = max(0.00001, float(state.get("open") or updated))
+    day_change = ((updated - open_px) / open_px) * 100.0
+    return {
+        "name": asset_name,
+        "symbol": symbol,
+        "price": round(updated, 5 if updated < 1 else 4 if updated < 10 else 2),
+        "day_change": round(day_change, 2),
+        "fallback": True,
+    }
+
+
+def _build_synthetic_tape_events(market_rows: list[dict], count: int) -> list[dict]:
+    safe_count = max(0, int(count))
+    if safe_count == 0:
+        return []
+    rows = list(market_rows or [])
+    if not rows:
+        rows = [
+            {"symbol": "BTC", "day_change": random.uniform(-2, 2), "price": random.uniform(30000, 90000)},
+            {"symbol": "ETH", "day_change": random.uniform(-2, 2), "price": random.uniform(1500, 5000)},
+        ]
+    now_ts = time.time()
+    out: list[dict] = []
+    for i in range(safe_count):
+        market = random.choice(rows)
+        symbol = str(market.get("symbol") or "BTC")
+        price = float(market.get("price") or 100.0)
+        ch = float(market.get("day_change") or 0.0)
+        direction = "up" if ch >= 0 else "down"
+        amount = round(max(20.0, price * random.uniform(0.004, 0.028)), 2)
+        user = random.choice(SYNTH_TAPE_NAMES)
+        is_closed = random.random() > 0.42
+        ts = now_ts - i * random.uniform(2.2, 9.5)
+        if is_closed:
+            sign = 1 if random.random() > 0.45 else -1
+            pnl = round(amount * random.uniform(0.01, 0.11) * sign, 2)
+            out.append(
+                {
+                    "kind": "closed",
+                    "ref": f"syn-close-{int(ts)}-{i}",
+                    "user_tg_id": 0,
+                    "username": user,
+                    "first_name": "Synthetic",
+                    "asset_name": symbol,
+                    "direction": direction,
+                    "amount": amount,
+                    "currency": "UAH",
+                    "pnl": pnl,
+                    "is_win": pnl >= 0,
+                    "ts": ts,
+                }
+            )
+        else:
+            out.append(
+                {
+                    "kind": "open",
+                    "ref": f"syn-open-{int(ts)}-{i}",
+                    "user_tg_id": 0,
+                    "username": user,
+                    "first_name": "Synthetic",
+                    "asset_name": symbol,
+                    "direction": direction,
+                    "amount": amount,
+                    "currency": "UAH",
+                    "ts": ts,
+                }
+            )
+    out.sort(key=lambda item: float(item.get("ts") or 0.0), reverse=True)
+    return out
 
 
 async def get_unified_leaderboard(limit: int = 8, min_deals: int = 3) -> list[dict]:
@@ -2324,6 +2449,10 @@ async def get_platform_trade_tape(limit: int = 10) -> list[dict]:
     events = events[:safe_limit]
 
     # Keep the tape alive even when platform activity is low.
+    if len(events) < safe_limit:
+        markets = await fetch_market_overview_rows(limit=min(8, safe_limit))
+        events.extend(_build_synthetic_tape_events(markets, safe_limit - len(events)))
+
     if len(events) < safe_limit:
         markets = await fetch_market_overview_rows(limit=min(6, safe_limit))
         now_ts = time.time()
