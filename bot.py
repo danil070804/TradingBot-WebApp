@@ -2846,6 +2846,7 @@ BOT_SECTION_MEDIA = {
     "worker_guide": {"setting": "bot_photo_worker_guide", "title": "Инструкция по функциям воркер панели"},
     "worker_referrals_base": {"setting": "bot_photo_worker_referrals_base", "title": "База лохматых"},
     "platform_stats": {"setting": "bot_photo_platform_stats", "title": "Статистика платформы"},
+    "deposit_status": {"setting": "bot_photo_deposit_status", "title": "Статус пополнения"},
 }
 CURRENCY_PER_USDT = {
     "USD": 1.0,
@@ -4744,8 +4745,9 @@ async def approve_deposit(callback: CallbackQuery):
         meta={"deposit_id": dep_id},
     )
     try:
-        await bot.send_message(
+        await send_section_chat_message(
             user_id,
+            "deposit_status",
             build_deposit_status_notice(lang, True, amount, currency),
             reply_markup=support_section_keyboard(lang),
         )
@@ -4780,8 +4782,9 @@ async def reject_deposit(callback: CallbackQuery):
         meta={"deposit_id": dep_id},
     )
     try:
-        await bot.send_message(
+        await send_section_chat_message(
             int(dep["user_tg_id"]),
+            "deposit_status",
             build_deposit_status_notice(lang, False, float(dep["amount"] or 0.0), dep["currency"] or "USD"),
             reply_markup=support_section_keyboard(lang),
         )
