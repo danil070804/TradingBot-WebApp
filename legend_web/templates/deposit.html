@@ -10,6 +10,9 @@
     </div>
     <div class="balance">{{ "%.2f"|format((user.balance if user else 0) or 0) }} {{ (user.currency if user else "USD") or "USD" }}</div>
     <div class="hint">ID: {{ tg_id }}</div>
+    {% if user and min_deposit_amount %}
+    <div class="hint">{% if lang == "ru" %}Минимальное пополнение:{% elif lang == "uk" %}Мінімальне поповнення:{% else %}Minimum deposit:{% endif %} {{ "%.2f"|format(min_deposit_amount) }} {{ (user.currency if user else "USD") or "USD" }}</div>
+    {% endif %}
 </section>
 
 <section class="card">
@@ -19,6 +22,12 @@
             <strong class="deposit-panel-title">{{ labels.deposit_choose_route if labels else "Выбери маршрут пополнения" }}</strong>
         </div>
     </div>
+    {% if access.blocked %}
+    <div class="result-box">
+        <span class="neg">{% if lang == "ru" %}Аккаунт временно заблокирован. Обратитесь в поддержку.{% elif lang == "uk" %}Акаунт тимчасово заблоковано. Зверніться в підтримку.{% else %}Your account is temporarily blocked. Contact support.{% endif %}</span>
+    </div>
+    {% if support_url %}<a class="qa-btn" href="{{ support_url }}">{{ labels.js_support_btn if labels else "Перейти в поддержку" }}</a>{% endif %}
+    {% else %}
     <p class="deposit-lead">{{ labels.deposit_lead if labels else "Choose a payment method. After you submit a request, support will provide the latest payment instructions." }}</p>
     <div class="deposit-method-cards" id="deposit-method-cards">
         <button type="button" class="deposit-method-card active" data-method="crypto">
@@ -67,6 +76,7 @@
         </div>
     </div>
     <div id="deposit-result" class="result-box"></div>
+    {% endif %}
 </section>
 
 <section class="card">

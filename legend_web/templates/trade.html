@@ -23,6 +23,9 @@
             <b id="live-open-trades">0</b>
         </div>
     </div>
+    {% if user and min_trade_amount %}
+    <div class="hint">{% if lang == "ru" %}Минимальная сумма сделки:{% elif lang == "uk" %}Мінімальна сума угоди:{% else %}Minimum trade amount:{% endif %} {{ "%.2f"|format(min_trade_amount) }} {{ (user.currency if user else "USD") or "USD" }}</div>
+    {% endif %}
     <div class="activity-strip">
         <span id="market-live-dot" class="activity-dot"></span>
         <strong id="market-live-text">{{ labels.trade_feed_booting if labels else "Рынок: подключение" }}</strong>
@@ -31,6 +34,22 @@
     </div>
     <div class="pulse-wrap"><div id="market-pulse" class="pulse-track"></div></div>
 </section>
+
+{% if access.blocked %}
+<section class="card">
+    <div class="result-box">
+        <span class="neg">{% if lang == "ru" %}Аккаунт временно заблокирован. Обратитесь в поддержку.{% elif lang == "uk" %}Акаунт тимчасово заблоковано. Зверніться в підтримку.{% else %}Your account is temporarily blocked. Contact support.{% endif %}</span>
+    </div>
+    {% if support_url %}<a class="qa-btn" href="{{ support_url }}">{{ labels.js_support_btn if labels else "Перейти в поддержку" }}</a>{% endif %}
+</section>
+{% elif not access.trading_enabled %}
+<section class="card">
+    <div class="result-box">
+        <span class="neg">{% if lang == "ru" %}Торговля для аккаунта отключена. Обратитесь в поддержку.{% elif lang == "uk" %}Торгівлю для акаунта вимкнено. Зверніться в підтримку.{% else %}Trading is disabled for this account. Contact support.{% endif %}</span>
+    </div>
+    {% if support_url %}<a class="qa-btn" href="{{ support_url }}">{{ labels.js_support_btn if labels else "Перейти в поддержку" }}</a>{% endif %}
+</section>
+{% endif %}
 
 <section class="trade-command-bar">
     <article class="card trade-command-actions">
@@ -65,6 +84,7 @@
 </section>
 
 <section class="card trade-layout">
+    {% if not access.blocked and access.trading_enabled %}
     <div class="trade-left trade-form-panel">
         <div class="trade-panel-head">
             <div>
@@ -184,6 +204,13 @@
             <div class="row mono"><div><b>--</b><small>--</small></div><div>--</div></div>
         </div>
     </div>
+    {% else %}
+    <div class="trade-left trade-form-panel">
+        <div class="result-box">
+            <span class="neg">{% if lang == "ru" %}Открытие новых сделок временно недоступно для этого аккаунта.{% elif lang == "uk" %}Відкриття нових угод тимчасово недоступне для цього акаунта.{% else %}Opening new trades is temporarily unavailable for this account.{% endif %}</span>
+        </div>
+    </div>
+    {% endif %}
 </section>
 <section class="card">
     <div class="section-title">{{ labels.trade_countdown if labels else "До завершения" }}</div>

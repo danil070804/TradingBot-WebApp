@@ -2250,6 +2250,10 @@ async def trade(request: Request):
     raw_assets = await fetch_all("SELECT id, name FROM ecn_assets ORDER BY id ASC")
     assets = [{"id": a["id"], "name": a["name"], "ticker": ticker_from_asset_name(a["name"])} for a in raw_assets]
     user = await get_nav_user(tg_id)
+    access = await bot.get_client_access_flags(tg_id) if tg_id else {"verified": False, "blocked": False, "withdraw_enabled": False, "trading_enabled": True}
+    min_trade_amount = 0.0
+    if tg_id and user:
+        min_trade_amount = await bot.get_effective_min_trade_amount(int(tg_id), user["currency"] or "USD")
     initial_open_positions = []
     initial_trade_status = None
     if tg_id:
@@ -2294,6 +2298,9 @@ async def trade(request: Request):
             "tg_id": tg_id,
             "assets": assets,
             "user": user,
+            "access": access,
+            "min_trade_amount": min_trade_amount,
+            "support_url": bot.config.support_url,
             "lang": lang,
             "labels": labels,
             "initial_open_positions": initial_open_positions,
@@ -2343,6 +2350,10 @@ async def deposit_page(request: Request):
     tg_id = await get_current_user_id(request)
     lang, labels = await get_request_lang_labels(request, tg_id)
     user = await get_nav_user(tg_id)
+    access = await bot.get_client_access_flags(tg_id) if tg_id else {"verified": False, "blocked": False, "withdraw_enabled": False, "trading_enabled": True}
+    min_deposit_amount = 0.0
+    if tg_id and user:
+        min_deposit_amount = await bot.get_effective_min_deposit_amount(int(tg_id), user["currency"] or "USD")
     deposits = []
     if tg_id:
         deposits = await fetch_all(
@@ -2364,6 +2375,8 @@ async def deposit_page(request: Request):
             "support_url": bot.config.support_url,
             "support_entry_url": build_support_redirect_url(),
             "support_contact": bot.support_contact_text(),
+            "access": access,
+            "min_deposit_amount": min_deposit_amount,
             "deposits": deposits,
             "lang": lang,
             "labels": labels,
