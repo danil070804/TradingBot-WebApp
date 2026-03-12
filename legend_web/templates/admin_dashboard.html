@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Legend Trading Admin</title>
-    <link rel="stylesheet" href="/static/css/legend.css?v=20260312v10">
+    <meta name="legend-build" content="{{ STATIC_VERSION }}">
+    <link rel="stylesheet" href="/static/css/legend.css?v={{ STATIC_VERSION }}">
 </head>
 <body class="app-ready">
 <div class="page-bg"></div>
@@ -637,6 +638,6 @@ adminWs.addEventListener("error", () => {
 });
 initTelegramAdminAuth();
 </script>
-<script src="/static/js/legend.js?v=20260312v10"></script>
+<script src="/static/js/legend.js?v={{ STATIC_VERSION }}"></script>
 </body>
 </html>

@@ -53,6 +53,12 @@ ADMIN_WEB_USERNAME = os.getenv("ADMIN_WEB_USERNAME", "admin")
 ADMIN_WEB_PASSWORD = os.getenv("ADMIN_WEB_PASSWORD", "")
 USER_SESSION_KEY = "tg_user_id"
 LANG_SESSION_KEY = "web_lang"
+STATIC_VERSION = (
+    os.getenv("WEB_STATIC_VERSION")
+    or os.getenv("RAILWAY_GIT_COMMIT_SHA")
+    or os.getenv("RAILWAY_DEPLOYMENT_ID")
+    or str(int(time.time()))
+)
 
 
 polling_task: asyncio.Task | None = None
@@ -2097,17 +2103,24 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Legend Trading", lifespan=lifespan)
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET, same_site="lax", https_only=True)
 templates = Jinja2Templates(directory=str(WEB_DIR / "templates"))
+templates.env.globals["STATIC_VERSION"] = STATIC_VERSION
 app.mount("/static", StaticFiles(directory=str(WEB_DIR / "static")), name="static")
 
 
 @app.middleware("http")
 async def disable_html_cache(request: Request, call_next):
     response = await call_next(request)
+    path = request.url.path
     content_type = response.headers.get("content-type", "")
     if "text/html" in content_type.lower():
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
+    if path in {"/static/css/legend.css", "/static/js/legend.js"}:
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    response.headers["X-Legend-Version"] = STATIC_VERSION
     return response
 
 
