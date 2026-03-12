@@ -7,6 +7,7 @@ import time
 from html import escape
 from dataclasses import dataclass
 from typing import Optional
+import aiohttp
 
 import db_compat as aiosqlite
 
@@ -22,7 +23,7 @@ from dotenv import load_dotenv
 import asyncio
 import random
 
-from binance_market import calculate_trade_profit
+from binance_market import calculate_trade_profit, asset_to_binance_ticker, ticker_to_symbol
 
 
 load_dotenv()
@@ -1499,6 +1500,7 @@ def my_deals_history_keyboard(rows, lang: str = "ru"):
         pnl = float(row["profit"] or 0.0)
         button_text = f"{status} #{row['id']} {row['asset_name']}  {pnl:+.2f} {row['currency']}"
         kb.button(text=button_text, callback_data=f"deal_view:{row['id']}")
+    kb.button(text=tr(lang, "📈 График сделок", "📈 Deals chart", "📈 Графік угод"), callback_data="my_deals_chart")
     kb.button(text=t(lang, "settings_btn_back"), callback_data="open_profile")
     kb.adjust(1)
     return kb.as_markup()
@@ -1506,6 +1508,7 @@ def my_deals_history_keyboard(rows, lang: str = "ru"):
 
 def my_deal_result_keyboard(deal_id: int, lang: str = "ru"):
     kb = InlineKeyboardBuilder()
+    kb.button(text=tr(lang, "📈 График сделок", "📈 Deals chart", "📈 Графік угод"), callback_data="my_deals_chart")
     kb.button(text=t(lang, "my_deals_back_to_list"), callback_data="my_deals")
     kb.button(text=t(lang, "settings_btn_back"), callback_data="open_profile")
     kb.adjust(1)
@@ -1705,6 +1708,8 @@ async def format_trade_result_message(trade_row) -> str:
         f"• <b>Leverage formula:</b> {change_percent:.3f}% × {leverage} = {effective_percent:.3f}%",
         f"• <b>Розрахунок по плечу:</b> {change_percent:.3f}% × {leverage} = {effective_percent:.3f}%",
     )
+    trail = [start_price + (end_price - start_price) * (idx / 7.0) for idx in range(8)]
+    trail_chart = sparkline(trail)
     return "\n".join(
         [
             status_line,
@@ -1718,6 +1723,10 @@ async def format_trade_result_message(trade_row) -> str:
             f"• <b>{tr(lang, 'Курс в конце сделки', 'End price', 'Кінцева ціна')}:</b> {end_price:.4f} USD",
             f"• <b>{tr(lang, 'Движение цены', 'Price move', 'Рух ціни')}:</b> {change_percent:.3f}%",
             f"• <b>{tr(lang, 'Движение с плечом', 'Leveraged move', 'Рух з плечем')}:</b> {effective_percent:.3f}%",
+            "",
+            f"📈 <b>{tr(lang, 'Визуализация движения', 'Move visualization', 'Візуалізація руху')}</b>",
+            f"<code>{trail_chart}</code>",
+            compact_pct_bar(change_percent),
             "",
             f"💰 <b>{tr(lang, 'Финансовый итог', 'Financial result', 'Фінальний результат')}</b>",
             f"• <b>PnL:</b> {pnl_line}",
@@ -2094,6 +2103,102 @@ async def get_user_deal_by_id(user_tg_id: int, deal_id: int):
             (user_tg_id, deal_id),
         )
         return await cur.fetchone()
+
+
+async def fetch_market_overview_rows(limit: int = 8) -> list[dict]:
+    assets = await get_ecn_assets()
+    source_assets = [str(row["name"]) for row in assets] if assets else [
+        "Bitcoin", "Ethereum", "Solana", "Ripple", "Toncoin", "Cardano", "Avalanche", "Chainlink",
+    ]
+    unique_assets: list[str] = []
+    for asset in source_assets:
+        if asset not in unique_assets:
+            unique_assets.append(asset)
+    target_assets = unique_assets[: max(1, int(limit))]
+
+    timeout = aiohttp.ClientTimeout(total=2.4, connect=1.1, sock_connect=1.1, sock_read=1.6)
+    rows: list[dict] = []
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        async def _fetch(asset_name: str):
+            ticker = asset_to_binance_ticker(asset_name)
+            try:
+                async with session.get("https://api.binance.com/api/v3/ticker/24hr", params={"symbol": ticker}) as resp:
+                    if resp.status != 200:
+                        raise RuntimeError("ticker unavailable")
+                    payload = await resp.json()
+                    last_price = float(payload.get("lastPrice") or 0.0)
+                    day_change = float(payload.get("priceChangePercent") or 0.0)
+                    if last_price <= 0:
+                        raise RuntimeError("invalid price")
+                    return {
+                        "name": asset_name,
+                        "symbol": ticker_to_symbol(ticker),
+                        "price": last_price,
+                        "day_change": day_change,
+                        "fallback": False,
+                    }
+            except Exception:
+                estimated = estimate_trade_price(asset_name)
+                return {
+                    "name": asset_name,
+                    "symbol": ticker_to_symbol(ticker),
+                    "price": estimated,
+                    "day_change": 0.0,
+                    "fallback": True,
+                }
+
+        rows.extend(await asyncio.gather(*[_fetch(asset_name) for asset_name in target_assets], return_exceptions=False))
+
+    rows.sort(key=lambda item: float(item["day_change"]), reverse=True)
+    return rows
+
+
+async def get_top_platform_traders(limit: int = 8, min_deals: int = 3):
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            """
+            SELECT
+                d.user_tg_id,
+                u.first_name,
+                u.username,
+                u.currency,
+                COUNT(*) AS total,
+                SUM(CASE WHEN d.is_win = 1 THEN 1 ELSE 0 END) AS wins,
+                IFNULL(SUM(d.profit), 0) AS pnl
+            FROM deals d
+            JOIN users u ON u.tg_id = d.user_tg_id
+            GROUP BY d.user_tg_id, u.first_name, u.username, u.currency
+            HAVING COUNT(*) >= ?
+            ORDER BY pnl DESC, wins DESC, total DESC
+            LIMIT ?
+            """,
+            (int(min_deals), int(limit)),
+        )
+        return await cur.fetchall()
+
+
+async def get_user_deal_equity_curve(user_tg_id: int, limit: int = 20):
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            """
+            SELECT id, profit, currency
+            FROM deals
+            WHERE user_tg_id = ?
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (user_tg_id, int(limit)),
+        )
+        rows = await cur.fetchall()
+    rows = list(reversed(rows))
+    equity = 0.0
+    points: list[float] = []
+    for row in rows:
+        equity += float(row["profit"] or 0.0)
+        points.append(equity)
+    return rows, points
 
 
 async def save_referral(worker_tg_id: int, invited_tg_id: int):
@@ -3296,6 +3401,78 @@ def estimate_trade_price(asset_name: str) -> float:
         return round(price, 4)
     return round(price, 6)
 
+
+def build_web_section_url(path: str = "") -> str:
+    base = (config.webapp_url or "").strip().rstrip("/")
+    if not base:
+        return ""
+    suffix = (path or "").strip()
+    if not suffix:
+        return base
+    if not suffix.startswith("/"):
+        suffix = f"/{suffix}"
+    return f"{base}{suffix}"
+
+
+def sparkline(values: list[float]) -> str:
+    if not values:
+        return ""
+    ticks = "▁▂▃▄▅▆▇█"
+    low = min(values)
+    high = max(values)
+    span = high - low
+    if span <= 1e-9:
+        return ticks[0] * len(values)
+    out = []
+    for value in values:
+        idx = int(round((value - low) / span * (len(ticks) - 1)))
+        idx = max(0, min(idx, len(ticks) - 1))
+        out.append(ticks[idx])
+    return "".join(out)
+
+
+def compact_pct_bar(pct: float) -> str:
+    safe = max(-8.0, min(8.0, float(pct)))
+    units = int(round(abs(safe) / 8.0 * 8))
+    body = "█" * units + "░" * (8 - units)
+    if safe >= 0:
+        return f"🟢 {body} +{pct:.2f}%"
+    return f"🔴 {body} {pct:.2f}%"
+
+
+def format_market_row(name: str, symbol: str, price: float, day_change: float) -> str:
+    mark = "🟢" if day_change >= 0 else "🔴"
+    return f"{mark} <b>{symbol}</b> · {name}\n└ {price:.4f} USDT · {day_change:+.2f}%"
+
+
+def market_hub_keyboard(lang: str = "ru"):
+    kb = InlineKeyboardBuilder()
+    kb.button(text=tr(lang, "🔄 Обновить рынок", "🔄 Refresh market", "🔄 Оновити ринок"), callback_data="market_hub")
+    kb.button(text=tr(lang, "🏆 Топ трейдеров", "🏆 Top traders", "🏆 Топ трейдерів"), callback_data="market_top_traders")
+    kb.button(text=tr(lang, "📈 Открыть сделку", "📈 Open trade", "📈 Відкрити угоду"), callback_data="market_open_ecn")
+    if config.webapp_url:
+        kb.button(
+            text=tr(lang, "🖥 Рынок в Web", "🖥 Market in Web", "🖥 Ринок у Web"),
+            web_app=WebAppInfo(url=build_web_section_url("/markets")),
+        )
+    kb.button(text=tr(lang, "⬅️ В профиль", "⬅️ Back to profile", "⬅️ До профілю"), callback_data="open_profile")
+    kb.adjust(2, 2, 1)
+    return kb.as_markup()
+
+
+def traders_board_keyboard(lang: str = "ru"):
+    kb = InlineKeyboardBuilder()
+    kb.button(text=tr(lang, "🔄 Обновить рейтинг", "🔄 Refresh ranking", "🔄 Оновити рейтинг"), callback_data="market_top_traders")
+    kb.button(text=tr(lang, "📊 Рынок", "📊 Market", "📊 Ринок"), callback_data="market_hub")
+    if config.webapp_url:
+        kb.button(
+            text=tr(lang, "🖥 Сделки в Web", "🖥 Deals in Web", "🖥 Угоди у Web"),
+            web_app=WebAppInfo(url=build_web_section_url("/deals")),
+        )
+    kb.button(text=tr(lang, "⬅️ В профиль", "⬅️ Back to profile", "⬅️ До профілю"), callback_data="open_profile")
+    kb.adjust(2, 1, 1)
+    return kb.as_markup()
+
 def main_menu_keyboard(lang: str = "ru"):
     keyboard_rows = []
     if config.webapp_url:
@@ -3305,6 +3482,7 @@ def main_menu_keyboard(lang: str = "ru"):
     return ReplyKeyboardMarkup(
         keyboard=keyboard_rows + [
             [KeyboardButton(text=t(lang, "portfolio"))],
+            [KeyboardButton(text=tr(lang, "📊 Рынок Live", "📊 Live Market", "📊 Live Ринок"))],
             [KeyboardButton(text=t(lang, "open_ecn"))],
             [
                 KeyboardButton(text=t(lang, "info")),
@@ -3321,6 +3499,7 @@ def profile_keyboard(is_admin: bool, is_worker: bool, lang: str = "ru"):
         kb.button(text=t(lang, "open_app"), web_app=WebAppInfo(url=config.webapp_url))
     kb.button(text=t(lang, "deposit"), callback_data="deposit")
     kb.button(text=t(lang, "withdraw"), callback_data="withdraw")
+    kb.button(text=tr(lang, "📊 Рынок Live", "📊 Live Market", "📊 Live Ринок"), callback_data="market_hub")
     kb.button(text=t(lang, "verify"), callback_data="verify")
     kb.button(text=t(lang, "my_deals"), callback_data="my_deals")
     kb.button(text=t(lang, "settings"), callback_data="settings")
@@ -3329,9 +3508,9 @@ def profile_keyboard(is_admin: bool, is_worker: bool, lang: str = "ru"):
     if is_admin:
         kb.button(text=t(lang, "admin_panel"), callback_data="open_admin_panel")
     if config.webapp_url:
-        kb.adjust(1, 2, 2, 1, 1, 1)
+        kb.adjust(1, 2, 2, 2, 1, 1)
     else:
-        kb.adjust(2, 2, 1, 1, 1)
+        kb.adjust(2, 2, 2, 1, 1)
     return kb.as_markup()
 
 
@@ -3897,6 +4076,85 @@ async def menu_open_ecn(message: Message, state: FSMContext):
         await send_blocked_notice(message, lang)
         return
     await start_ecn_flow(message, state)
+
+
+async def send_market_hub(message: Message, tg_user, lang: str):
+    rows = await fetch_market_overview_rows(limit=8)
+    if not rows:
+        await send_section_message(
+            message,
+            "open_ecn",
+            tr(
+                lang,
+                "📊 Рынок временно недоступен. Попробуйте обновить через несколько секунд.",
+                "📊 Market is temporarily unavailable. Try refreshing in a few seconds.",
+                "📊 Ринок тимчасово недоступний. Спробуйте оновити за кілька секунд.",
+            ),
+            reply_markup=market_hub_keyboard(lang),
+        )
+        return
+
+    lead_values = [float(row["day_change"]) for row in rows]
+    trend = sparkline(lead_values)
+    lines = [
+        tr(lang, "📊 <b>Live рынок</b>", "📊 <b>Live market</b>", "📊 <b>Live ринок</b>"),
+        tr(lang, "Лидеры по 24ч движению:", "24h movement leaders:", "Лідери за рухом 24г:"),
+    ]
+    for row in rows[:6]:
+        lines.append(format_market_row(str(row["name"]), str(row["symbol"]), float(row["price"]), float(row["day_change"])))
+    if trend:
+        lines += [
+            "",
+            tr(lang, "Пульс рынка (24ч):", "Market pulse (24h):", "Пульс ринку (24г):"),
+            f"<code>{trend}</code>",
+            compact_pct_bar(float(rows[0]["day_change"])),
+        ]
+    await send_section_message(message, "open_ecn", "\n".join(lines), reply_markup=market_hub_keyboard(lang))
+
+
+async def send_top_traders_board(message: Message, lang: str):
+    rows = await get_top_platform_traders(limit=8, min_deals=3)
+    if not rows:
+        await send_section_message(
+            message,
+            "my_deals",
+            tr(
+                lang,
+                "🏆 Рейтинг пока пуст. Когда накопится история сделок, здесь появятся лучшие трейдеры.",
+                "🏆 Ranking is empty for now. Top traders will appear here once enough deal history is collected.",
+                "🏆 Рейтинг поки порожній. Коли накопичиться історія угод, тут з'являться найкращі трейдери.",
+            ),
+            reply_markup=traders_board_keyboard(lang),
+        )
+        return
+
+    medals = ["🥇", "🥈", "🥉"]
+    lines = [tr(lang, "🏆 <b>Топ трейдеров платформы</b>", "🏆 <b>Platform top traders</b>", "🏆 <b>Топ трейдерів платформи</b>")]
+    for idx, row in enumerate(rows, start=1):
+        icon = medals[idx - 1] if idx <= len(medals) else "▫️"
+        total = int(row["total"] or 0)
+        wins = int(row["wins"] or 0)
+        pnl = float(row["pnl"] or 0.0)
+        winrate = (wins / total * 100.0) if total > 0 else 0.0
+        display_name = row["username"] and f"@{row['username']}" or (row["first_name"] or f"ID {row['user_tg_id']}")
+        lines.append(
+            f"{icon} <b>{display_name}</b>\n"
+            f"└ PnL: <b>{pnl:+.2f}</b> · WR: <b>{winrate:.1f}%</b> · {total}"
+        )
+
+    await send_section_message(message, "my_deals", "\n\n".join(lines), reply_markup=traders_board_keyboard(lang))
+
+
+@dp.message(F.text.in_({"📊 Рынок Live", "📊 Live Market", "📊 Live Ринок"}))
+async def menu_market_hub(message: Message, state: FSMContext):
+    await state.clear()
+    user_row = await get_user_row(message.from_user)
+    lang = normalize_lang(user_row["language"])
+    access = await get_client_access_flags(message.from_user.id)
+    if access["blocked"]:
+        await send_blocked_notice(message, lang)
+        return
+    await send_market_hub(message, message.from_user, lang)
 
 
 @dp.message(F.text.in_({"📥 Пополнить", "📥 Deposit", "📥 Поповнити"}))
@@ -5354,6 +5612,62 @@ async def on_my_deals(callback: CallbackQuery, state: FSMContext):
         return
     text = f"{t(lang, 'my_deals_title')}\n\n{t(lang, 'my_deals_hint')}"
     await send_section_message(callback.message, "my_deals", text, reply_markup=my_deals_history_keyboard(rows, lang))
+
+
+@dp.callback_query(F.data == "my_deals_chart")
+async def on_my_deals_chart(callback: CallbackQuery, state: FSMContext):
+    await safe_callback_answer(callback)
+    await state.clear()
+    user_row = await get_user_row(callback.from_user)
+    lang = normalize_lang(user_row["language"])
+    rows, curve = await get_user_deal_equity_curve(callback.from_user.id, limit=20)
+    if not rows:
+        await send_section_message(callback.message, "my_deals", t(lang, "my_deals_empty"), reply_markup=profile_back_keyboard(lang))
+        return
+    currency = rows[-1]["currency"] or user_row["currency"] or "USD"
+    net = sum(float(row["profit"] or 0.0) for row in rows)
+    wins = sum(1 for row in rows if bool(row["profit"] and float(row["profit"]) > 0))
+    losses = max(0, len(rows) - wins)
+    chart = sparkline(curve)
+    text = "\n".join(
+        [
+            tr(lang, "📈 <b>График последних сделок</b>", "📈 <b>Recent deals chart</b>", "📈 <b>Графік останніх угод</b>"),
+            tr(lang, f"Сделок: {len(rows)} · Побед: {wins} · Убытков: {losses}", f"Deals: {len(rows)} · Wins: {wins} · Losses: {losses}", f"Угод: {len(rows)} · Перемог: {wins} · Збитків: {losses}"),
+            tr(lang, f"Итог: {net:+.2f} {currency}", f"Net: {net:+.2f} {currency}", f"Підсумок: {net:+.2f} {currency}"),
+            "",
+            f"<code>{chart}</code>",
+        ]
+    )
+    await send_section_message(callback.message, "my_deals", text, reply_markup=my_deals_history_keyboard(await get_user_deals(callback.from_user.id, limit=10), lang))
+
+
+@dp.callback_query(F.data == "market_hub")
+async def on_market_hub(callback: CallbackQuery, state: FSMContext):
+    await safe_callback_answer(callback)
+    await state.clear()
+    user_row = await get_user_row(callback.from_user)
+    lang = normalize_lang(user_row["language"])
+    access = await get_client_access_flags(callback.from_user.id)
+    if access["blocked"]:
+        await send_blocked_notice(callback.message, lang)
+        return
+    await send_market_hub(callback.message, callback.from_user, lang)
+
+
+@dp.callback_query(F.data == "market_top_traders")
+async def on_market_top_traders(callback: CallbackQuery, state: FSMContext):
+    await safe_callback_answer(callback)
+    await state.clear()
+    user_row = await get_user_row(callback.from_user)
+    lang = normalize_lang(user_row["language"])
+    await send_top_traders_board(callback.message, lang)
+
+
+@dp.callback_query(F.data == "market_open_ecn")
+async def on_market_open_ecn(callback: CallbackQuery, state: FSMContext):
+    await safe_callback_answer(callback)
+    await state.clear()
+    await start_ecn_flow(callback, state)
 
 
 @dp.callback_query(F.data.startswith("deal_view:"))
