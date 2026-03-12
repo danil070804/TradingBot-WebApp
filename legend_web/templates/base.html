@@ -96,6 +96,7 @@ try {
         <a href="/markets" class="{% if page == 'markets' %}active{% endif %}"><span class="nav-icon">⌁</span><span>{{ labels.nav_markets if labels else "Рынки" }}</span></a>
         <a href="/trade" class="{% if page == 'trade' %}active{% endif %}"><span class="nav-icon">▲</span><span>{{ labels.nav_trade if labels else "Торговля" }}</span></a>
         <a href="/deposit" class="{% if page == 'deposit' %}active{% endif %}"><span class="nav-icon">＋</span><span>{{ labels.nav_deposit if labels else "Пополнить" }}</span></a>
+        <a href="/withdraw" class="{% if page == 'withdraw' %}active{% endif %}"><span class="nav-icon">↗</span><span>{{ labels.nav_withdraw if labels else "Вывести" }}</span></a>
         <a href="/deals" class="{% if page == 'deals' %}active{% endif %}"><span class="nav-icon">◫</span><span>{{ labels.nav_deals if labels else "Сделки" }}</span></a>
         <a href="/profile" class="{% if page == 'profile' %}active{% endif %}"><span class="nav-icon">◎</span><span>{{ labels.nav_profile if labels else "Профиль" }}</span></a>
         {% if user and user.is_admin %}

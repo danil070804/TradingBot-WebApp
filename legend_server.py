@@ -2365,6 +2365,38 @@ async def deposit_support_redirect(
     return RedirectResponse(url=target, status_code=302)
 
 
+@app.get("/withdraw", response_class=HTMLResponse)
+async def withdraw_page(request: Request):
+    tg_id = await get_current_user_id(request)
+    lang, labels = await get_request_lang_labels(request, tg_id)
+    user = await get_nav_user(tg_id)
+    access = await bot.get_client_access_flags(tg_id) if tg_id else {"blocked": False, "withdraw_enabled": False}
+    pending = await bot.get_user_pending_withdraw_sum(tg_id) if tg_id else 0.0
+    withdrawals = []
+    if tg_id:
+        withdrawals = await fetch_all(
+            "SELECT id, amount, currency, method, details, status, created_at FROM withdrawals WHERE user_tg_id = ? ORDER BY id DESC LIMIT 8",
+            (tg_id,),
+        )
+    return templates.TemplateResponse(
+        "withdraw.html",
+        {
+            "request": request,
+            "page": "withdraw",
+            "title": "Legend Trading",
+            "tg_id": tg_id,
+            "user": user,
+            "pending": pending,
+            "withdrawals": withdrawals,
+            "access": access,
+            "support_url": bot.config.support_url,
+            "support_contact": bot.support_contact_text(),
+            "lang": lang,
+            "labels": labels,
+        },
+    )
+
+
 @app.get("/deals", response_class=HTMLResponse)
 async def deals(request: Request):
     tg_id = await get_current_user_id(request)
@@ -3826,6 +3858,80 @@ async def api_deposit_request(payload: DepositRequestPayload):
             "message": f"Заявка #{dep_id} создана. Для пополнения через {method_label} перейдите в поддержку: {support_contact}",
         }
     )
+
+
+class WithdrawRequestPayload(BaseModel):
+    tg_id: int
+    amount: float
+    method: str  # trc20 | card
+    details: str
+
+
+@app.post("/api/withdraw/request", response_class=JSONResponse)
+async def api_withdraw_request(payload: WithdrawRequestPayload):
+    user = await fetch_one("SELECT currency, first_name, username, balance FROM users WHERE tg_id = ?", (payload.tg_id,))
+    if not user:
+        return JSONResponse({"ok": False, "error": "Пользователь не найден"}, status_code=404)
+    access = await bot.get_client_access_flags(payload.tg_id)
+    if access["blocked"]:
+        return JSONResponse({"ok": False, "error": "Аккаунт временно заблокирован. Обратитесь в поддержку."}, status_code=403)
+    if not access["withdraw_enabled"]:
+        return JSONResponse({"ok": False, "error": "Вывод средств временно отключён. Обратитесь в поддержку."}, status_code=403)
+    if payload.amount <= 0:
+        return JSONResponse({"ok": False, "error": "Сумма должна быть больше 0"}, status_code=400)
+
+    currency = user["currency"] or "USD"
+    balance = float(user["balance"] or 0.0)
+    if float(payload.amount) > balance:
+        return JSONResponse({"ok": False, "error": f"Недостаточно средств. Доступно: {balance:.2f} {currency}."}, status_code=400)
+
+    method = payload.method.strip().lower()
+    if method not in {"trc20", "card"}:
+        return JSONResponse({"ok": False, "error": "Неподдерживаемый метод"}, status_code=400)
+    details = (payload.details or "").strip()
+    if not details:
+        return JSONResponse({"ok": False, "error": "Укажите реквизиты для вывода"}, status_code=400)
+
+    wd_id = await bot.create_withdrawal(payload.tg_id, payload.amount, currency, method, details)
+    await log_web_activity_for_worker(
+        client_tg_id=payload.tg_id,
+        actor_tg_id=payload.tg_id,
+        event_type="web_withdraw_request",
+        title="Заявка на вывод",
+        details=f"Лохматый создал заявку на вывод через WebApp. Метод: {deposit_method_label(method)}.",
+        amount=payload.amount,
+        currency=currency,
+        meta={"withdrawal_id": wd_id, "method": method},
+    )
+    await bot.notify_worker_withdraw_event(
+        client_tg_id=payload.tg_id,
+        first_name=user["first_name"],
+        username=user["username"],
+        amount=payload.amount,
+        currency=currency,
+        method=method,
+        withdrawal_id=wd_id,
+        source="web",
+    )
+
+    details_label = "Карта" if method == "card" else "Кошелёк"
+    text_admin = (
+        "💸 <b>Новая заявка на вывод</b>\n\n"
+        f"ID заявки: <b>{wd_id}</b>\n"
+        f"Пользователь: <a href='tg://user?id={payload.tg_id}'>{user['first_name'] or 'Пользователь'}</a>\n"
+        f"TG ID: <code>{payload.tg_id}</code>\n"
+        f"Сумма: {float(payload.amount):.2f} {currency}\n"
+        f"Метод: {deposit_method_label(method)}\n"
+        f"{details_label}: <code>{html.escape(details)}</code>"
+    )
+    for admin_id in bot.config.admin_ids:
+        with contextlib.suppress(Exception):
+            await bot.bot.send_message(admin_id, text_admin, reply_markup=bot.withdrawal_admin_keyboard(wd_id))
+    if bot.config.log_chat_id:
+        with contextlib.suppress(Exception):
+            await bot.bot.send_message(bot.config.log_chat_id, text_admin, reply_markup=bot.withdrawal_admin_keyboard(wd_id))
+
+    return JSONResponse({"ok": True, "withdrawal_id": wd_id, "message": "Заявка на вывод отправлена на обработку."})
 
 
 @app.get("/api/overview", response_class=JSONResponse)

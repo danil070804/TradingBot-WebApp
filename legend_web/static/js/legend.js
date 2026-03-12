@@ -1322,6 +1322,54 @@ function bindDepositSupportAccordion() {
     sync();
 }
 
+function bindWithdrawForm() {
+    const form = document.getElementById("withdraw-form");
+    const result = document.getElementById("withdraw-result");
+    const methodSelect = document.getElementById("withdraw-method");
+    const detailsLabel = document.getElementById("withdraw-details-label");
+    const detailsInput = document.getElementById("withdraw-details-input");
+    if (!form || !result) return;
+    const syncMethod = () => {
+        if (!methodSelect || !detailsLabel || !detailsInput) return;
+        const method = methodSelect.value || "trc20";
+        const isCard = method === "card";
+        const lang = uiLang();
+        detailsLabel.firstChild.textContent = isCard
+            ? (lang === "ru" ? "Номер карты" : lang === "uk" ? "Номер картки" : "Card number")
+            : (lang === "ru" ? "TRC20 кошелёк" : lang === "uk" ? "TRC20 гаманець" : "TRC20 wallet");
+        detailsInput.placeholder = isCard ? "0000 0000 0000 0000" : "T...";
+    };
+    methodSelect?.addEventListener("change", syncMethod);
+    syncMethod();
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        result.textContent = L("js_withdraw_processing", "Sending request...");
+        const body = Object.fromEntries(new FormData(form).entries());
+        body.tg_id = Number(body.tg_id);
+        body.amount = Number(body.amount);
+        try {
+            const resp = await fetch("/api/withdraw/request", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+            });
+            const data = await resp.json();
+            if (!resp.ok || !data.ok) {
+                result.innerHTML = `<span class="neg">Error: ${data.error || L("js_withdraw_error", "failed to send")}</span>`;
+                showToast(data.error || L("js_withdraw_error", "failed to send"), "error");
+                return;
+            }
+            const success = data.message || L("js_withdraw_sent", "Withdrawal request #{id} sent").replace("{id}", data.withdrawal_id);
+            result.innerHTML = `<span class="pos">${success}</span>`;
+            showToast(success, "success");
+            window.setTimeout(() => window.location.reload(), 900);
+        } catch (_) {
+            result.innerHTML = `<span class="neg">${L("js_network_error", "Network error")}</span>`;
+            showToast(L("js_network_error", "Network error"), "error");
+        }
+    });
+}
+
 function buildCandleState() {
     return { tf: 60, candles: [], lastSmoothMark: null };
 }
@@ -3701,6 +3749,7 @@ bindTradeControls();
 bindTradeForm();
 bindExchangeForm();
 bindDepositForm();
+bindWithdrawForm();
 bindDepositMethodCards();
 bindDepositSupportAccordion();
 bindLangSwitch();

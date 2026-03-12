@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}{{ labels.nav_withdraw if labels else "Withdraw" }} | Legend Trading{% endblock %}
+{% block content %}
+<section class="card hero">
+    <div class="deposit-hero-top">
+        <div class="deposit-hero-copy">
+            <h1>{{ labels.nav_withdraw if labels else "Вывести" }}</h1>
+            <strong class="deposit-hero-headline">
+                {% if lang == "ru" %}Оформи вывод и передай реквизиты на обработку без лишних шагов{% elif lang == "uk" %}Оформи виведення і передай реквізити на обробку без зайвих кроків{% else %}Create a withdrawal request and submit payout details without extra steps{% endif %}
+            </strong>
+            <p class="deposit-hero-lead">
+                {% if lang == "ru" %}Укажи сумму, выбери способ вывода и отправь заявку. Статус обработки появится ниже и в профиле.{% elif lang == "uk" %}Вкажи суму, обери спосіб виведення та надішли заявку. Статус обробки з'явиться нижче та в профілі.{% else %}Enter the amount, choose a withdrawal method and submit the request. Processing status will appear below and in your profile.{% endif %}
+            </p>
+        </div>
+        <a class="qa-btn deposit-hero-cta" href="/profile">{{ labels.deposit_to_profile if labels else "К профилю" }}</a>
+    </div>
+    <div class="balance">{{ "%.2f"|format((user.balance if user else 0) or 0) }} {{ (user.currency if user else "USD") or "USD" }}</div>
+    <div class="hint">
+        {% if lang == "ru" %}На выводе:{% elif lang == "uk" %}На виведенні:{% else %}Pending:{% endif %}
+        {{ "%.2f"|format(pending or 0) }} {{ (user.currency if user else "USD") or "USD" }}
+    </div>
+</section>
+
+<section class="card">
+    <div class="deposit-panel-head">
+        <div>
+            <div class="section-title">{{ labels.nav_withdraw if labels else "Вывести" }}</div>
+            <strong class="deposit-panel-title">
+                {% if lang == "ru" %}Новая заявка на вывод{% elif lang == "uk" %}Нова заявка на виведення{% else %}New withdrawal request{% endif %}
+            </strong>
+        </div>
+    </div>
+    {% if access.blocked %}
+    <div class="result-box">
+        <span class="neg">{% if lang == "ru" %}Аккаунт временно заблокирован. Обратитесь в поддержку.{% elif lang == "uk" %}Акаунт тимчасово заблоковано. Зверніться в підтримку.{% else %}Your account is temporarily blocked. Contact support.{% endif %}</span>
+    </div>
+    {% elif not access.withdraw_enabled %}
+    <div class="result-box">
+        <span class="neg">{% if lang == "ru" %}Вывод средств временно отключён. Обратитесь в поддержку.{% elif lang == "uk" %}Виведення коштів тимчасово вимкнено. Зверніться в підтримку.{% else %}Withdrawals are temporarily disabled. Contact support.{% endif %}</span>
+    </div>
+    {% if support_url %}<a class="qa-btn" href="{{ support_url }}">{{ labels.js_support_btn if labels else "Перейти в поддержку" }}</a>{% endif %}
+    {% else %}
+    <form id="withdraw-form" class="form-grid">
+        <input type="hidden" name="tg_id" value="{{ tg_id }}">
+        <label>{{ labels.deposit_amount if labels else "Сумма" }}
+            <input type="number" name="amount" min="1" step="0.01" value="100">
+        </label>
+        <label>
+            {% if lang == "ru" %}Способ{% elif lang == "uk" %}Спосіб{% else %}Method{% endif %}
+            <select name="method" id="withdraw-method">
+                <option value="trc20">TRC20 USDT</option>
+                <option value="card">{{ labels.pay_card if labels else "Банковская карта" }}</option>
+            </select>
+        </label>
+        <label id="withdraw-details-label">
+            {% if lang == "ru" %}TRC20 кошелёк{% elif lang == "uk" %}TRC20 гаманець{% else %}TRC20 wallet{% endif %}
+            <input type="text" name="details" id="withdraw-details-input" placeholder="T...">
+        </label>
+        <button class="submit" type="submit">{% if lang == "ru" %}Отправить заявку{% elif lang == "uk" %}Надіслати заявку{% else %}Send request{% endif %}</button>
+    </form>
+    <div id="withdraw-result" class="result-box"></div>
+    {% endif %}
+</section>
+
+<section class="card">
+    <div class="deposit-panel-head">
+        <div>
+            <div class="section-title">{{ labels.profile_recent_withdraws if labels else "Последние выводы" }}</div>
+            <strong class="deposit-panel-title">
+                {% if lang == "ru" %}Статус последних заявок{% elif lang == "uk" %}Статус останніх заявок{% else %}Latest request status{% endif %}
+            </strong>
+        </div>
+    </div>
+    <div class="list">
+        {% for w in withdrawals %}
+        <div class="row profile-row deposit-status-row">
+            <div>
+                <b>#{{ w.id }} · {{ w.method }}</b>
+                <small>{{ w.created_at }}</small>
+            </div>
+            <div class="deposit-status-meta">
+                <b>{{ "%.2f"|format(w.amount) }} {{ w.currency }}</b>
+                <small class="deposit-status-chip status-{{ w.status }}">{{ w.status }}</small>
+            </div>
+        </div>
+        {% else %}
+        <div class="empty">{{ labels.profile_no_withdraws if labels else "Выводов пока нет." }}</div>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}
