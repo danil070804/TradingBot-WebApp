@@ -385,6 +385,11 @@ class WithdrawStates(StatesGroup):
     waiting_wallet = State()
 
 
+class SettingsFlowStates(StatesGroup):
+    choosing_lang = State()
+    choosing_currency = State()
+
+
 class AdminStates(StatesGroup):
     waiting_worker_id = State()
 
@@ -2446,6 +2451,15 @@ def language_keyboard(include_back: bool = False):
     return kb.as_markup()
 
 
+def settings_language_keyboard():
+    kb = InlineKeyboardBuilder()
+    for text, code in LANG_BUTTONS:
+        kb.button(text=text, callback_data=f"lang:{code}")
+    kb.button(text="⬅️ К настройкам", callback_data="settings")
+    kb.adjust(3, 1)
+    return kb.as_markup()
+
+
 CURRENCIES = [
     "USD", "EUR", "RUB", "UAH", "GBP", "TRY", "KZT", "JPY", "CNY", "AUD", "CAD", "BRL",
 ]
@@ -2567,6 +2581,15 @@ def currency_keyboard(include_back: bool = False):
         kb.adjust(4, 4, 4, 1)
     else:
         kb.adjust(4, 4, 4)
+    return kb.as_markup()
+
+
+def settings_currency_keyboard():
+    kb = InlineKeyboardBuilder()
+    for cur in CURRENCIES:
+        kb.button(text=cur, callback_data=f"cur:{cur}")
+    kb.button(text="⬅️ К настройкам", callback_data="settings")
+    kb.adjust(4, 4, 4, 1)
     return kb.as_markup()
 
 
@@ -2911,13 +2934,21 @@ async def start_back_rules(callback: CallbackQuery):
 
 
 @dp.callback_query(F.data.startswith("lang:"))
-async def on_language_selected(callback: CallbackQuery):
+async def on_language_selected(callback: CallbackQuery, state: FSMContext):
     lang_code = normalize_lang(callback.data.split(":", 1)[1])
     await set_language(callback.from_user.id, lang_code)
-    await callback.message.edit_text(
-        start_currency_text(lang_code),
-        reply_markup=currency_keyboard(include_back=True),
-    )
+    current_state = await state.get_state()
+    if current_state == SettingsFlowStates.choosing_lang.state:
+        await state.clear()
+        user_row = await get_user_row(callback.from_user)
+        cur = user_row["currency"] or "не выбрана"
+        text = t(lang_code, "settings_title", lang_value=lang_code.upper(), cur=cur)
+        await send_section_message(callback.message, "settings", text, reply_markup=settings_keyboard(lang_code))
+    else:
+        await callback.message.edit_text(
+            start_currency_text(lang_code),
+            reply_markup=currency_keyboard(include_back=True),
+        )
     await callback.answer()
 
 
@@ -2933,13 +2964,19 @@ async def start_back_lang(callback: CallbackQuery):
 
 
 @dp.callback_query(F.data.startswith("cur:"))
-async def on_currency_selected(callback: CallbackQuery):
+async def on_currency_selected(callback: CallbackQuery, state: FSMContext):
     currency = callback.data.split(":", 1)[1]
     await set_currency(callback.from_user.id, currency)
+    current_state = await state.get_state()
     user_row = await get_user_row(callback.from_user)
     lang = normalize_lang(user_row["language"])
-    await callback.message.edit_text(start_complete_text(lang))
-    await send_main_menu(callback.message)
+    if current_state == SettingsFlowStates.choosing_currency.state:
+        await state.clear()
+        text = t(lang, "settings_title", lang_value=lang.upper(), cur=currency)
+        await send_section_message(callback.message, "settings", text, reply_markup=settings_keyboard(lang))
+    else:
+        await callback.message.edit_text(start_complete_text(lang))
+        await send_main_menu(callback.message)
     await callback.answer()
 
 
@@ -4149,18 +4186,20 @@ async def on_settings(callback: CallbackQuery, state: FSMContext):
 
 
 @dp.callback_query(F.data == "settings_lang")
-async def on_settings_lang(callback: CallbackQuery):
+async def on_settings_lang(callback: CallbackQuery, state: FSMContext):
     user_row = await get_user_row(callback.from_user)
     lang = normalize_lang(user_row["language"])
-    await send_section_message(callback.message, "settings", t(lang, "settings_choose_lang"), reply_markup=language_keyboard())
+    await state.set_state(SettingsFlowStates.choosing_lang)
+    await send_section_message(callback.message, "settings", t(lang, "settings_choose_lang"), reply_markup=settings_language_keyboard())
     await callback.answer()
 
 
 @dp.callback_query(F.data == "settings_currency")
-async def on_settings_currency(callback: CallbackQuery):
+async def on_settings_currency(callback: CallbackQuery, state: FSMContext):
     user_row = await get_user_row(callback.from_user)
     lang = normalize_lang(user_row["language"])
-    await send_section_message(callback.message, "settings", t(lang, "settings_choose_currency"), reply_markup=currency_keyboard())
+    await state.set_state(SettingsFlowStates.choosing_currency)
+    await send_section_message(callback.message, "settings", t(lang, "settings_choose_currency"), reply_markup=settings_currency_keyboard())
     await callback.answer()
 
 
