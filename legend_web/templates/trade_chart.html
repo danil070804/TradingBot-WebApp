@@ -1,43 +1,79 @@
 {% extends "base.html" %}
-{% block title %}График | Legend Trading{% endblock %}
+{% block title %}{{ labels.trade_chart_title if labels else "График" }} | Legend Trading{% endblock %}
 {% block content %}
-<section class="card chart-fullscreen-card">
-    <div class="chart-fs-head">
-        <a class="chip chart-back-btn" href="/trade">← Торговля</a>
-        <div class="section-title">Live Chart</div>
-    </div>
-    <div class="chart-controls">
-        <select id="chart-symbol-select" name="asset_name" class="chart-tf">
-            {% for a in assets %}
-            <option value="{{ a.name }}" {% if selected_symbol and selected_symbol == a.name %}selected{% endif %}>{{ a.name }}</option>
-            {% endfor %}
-        </select>
-        <div class="chart-tf-pills">
-            <button type="button" class="chip chart-tf-btn active" data-tf="60">1m</button>
-            <button type="button" class="chip chart-tf-btn" data-tf="300">5m</button>
-            <button type="button" class="chip chart-tf-btn" data-tf="900">15m</button>
-            <button type="button" class="chip chart-tf-btn" data-tf="3600">1h</button>
+<section class="card chart-terminal-shell">
+    <div class="chart-fs-head chart-terminal-head">
+        <a class="chip chart-back-btn" href="/trade">{{ labels.trade_chart_back if labels else "Назад к торговле" }}</a>
+        <div class="chart-terminal-title">
+            <div class="section-title">{{ labels.trade_chart_title if labels else "Биржевой график" }}</div>
+            <small>{{ labels.trade_chart_live if labels else "Live chart" }}</small>
         </div>
-        <select id="chart-tf" class="chart-tf">
-            <option value="60" selected>1m</option>
-            <option value="300">5m</option>
-            <option value="900">15m</option>
-            <option value="3600">1h</option>
-        </select>
     </div>
-    <div class="chart-tools">
-        <button type="button" id="chart-reset-btn" class="chip">Reset</button>
-        <button type="button" id="chart-fit-btn" class="chip">Fit</button>
-        <button type="button" id="chart-crosshair-btn" class="chip">Crosshair</button>
-        <button type="button" id="chart-lock-btn" class="chip active">Live Lock</button>
+
+    <div class="chart-toolbar-grid">
+        <label class="chart-control-card">
+            <span>{{ labels.trade_chart_asset if labels else "Актив" }}</span>
+            <select id="chart-symbol-select" name="asset_name" class="chart-tf chart-tf-terminal">
+                {% for a in assets %}
+                <option value="{{ a.name }}" {% if selected_symbol and selected_symbol == a.name %}selected{% endif %}>{{ a.name }}</option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <div class="chart-control-card">
+            <span>{{ labels.trade_chart_timeframe if labels else "Таймфрейм" }}</span>
+            <div class="chart-tf-pills chart-tf-pills-terminal">
+                <button type="button" class="chip chart-tf-btn active" data-tf="60">1m</button>
+                <button type="button" class="chip chart-tf-btn" data-tf="300">5m</button>
+                <button type="button" class="chip chart-tf-btn" data-tf="900">15m</button>
+                <button type="button" class="chip chart-tf-btn" data-tf="3600">1h</button>
+            </div>
+        </div>
+
+        <label class="chart-control-card">
+            <span>{{ labels.trade_chart_timeframe if labels else "Таймфрейм" }}</span>
+            <select id="chart-tf" class="chart-tf chart-tf-terminal">
+                <option value="60" selected>1m</option>
+                <option value="300">5m</option>
+                <option value="900">15m</option>
+                <option value="3600">1h</option>
+            </select>
+        </label>
     </div>
-    <div id="tv-chart" class="tv-chart tv-chart-fullscreen" data-chart-mode="fullscreen" data-limit="300"></div>
+
+    <div class="chart-tools chart-tools-terminal">
+        <button type="button" id="chart-reset-btn" class="chip">{{ labels.chart_reset if labels else "Сброс" }}</button>
+        <button type="button" id="chart-fit-btn" class="chip">{{ labels.chart_fit if labels else "Фокус" }}</button>
+        <button type="button" id="chart-crosshair-btn" class="chip">{{ labels.chart_crosshair if labels else "Курсор" }}</button>
+        <button type="button" id="chart-lock-btn" class="chip active">{{ labels.chart_live_lock if labels else "Live-режим" }}</button>
+    </div>
+
+    <div class="chart-quick-stats">
+        <div class="chart-stat">
+            <small>MARK</small>
+            <b id="stat-mark">--</b>
+        </div>
+        <div class="chart-stat">
+            <small>SPREAD</small>
+            <b id="stat-spread">--</b>
+        </div>
+        <div class="chart-stat">
+            <small>24H HIGH</small>
+            <b id="stat-high">--</b>
+        </div>
+        <div class="chart-stat">
+            <small>24H LOW</small>
+            <b id="stat-low">--</b>
+        </div>
+    </div>
+
+    <div id="tv-chart" class="tv-chart tv-chart-fullscreen chart-terminal-canvas" data-chart-mode="fullscreen" data-limit="300"></div>
     <canvas id="candle-canvas" width="430" height="180" style="display:none;"></canvas>
 </section>
 
-<section class="card">
+<section class="card chart-terminal-market">
     <div class="section-title">{{ labels.trade_order_book if labels else "Order Book" }}</div>
-    <div class="book">
+    <div class="book chart-book-terminal">
         <div id="orderbook-asks">
             <div class="book-row ask"><span>--</span><em>--</em></div>
             <div class="book-row ask"><span>--</span><em>--</em></div>

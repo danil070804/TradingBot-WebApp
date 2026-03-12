@@ -420,6 +420,7 @@ function bindMarketSocket() {
     const participantsText = document.getElementById("market-participants");
     const canvas = document.getElementById("candle-canvas");
     const tfSelect = document.getElementById("chart-tf");
+    const webLabels = window.LEGEND_LABELS || {};
     if (!asksWrap || !bidsWrap || !markEl || !pairSelect) return;
     if (MARKET_SOCKET_RUNTIME && typeof MARKET_SOCKET_RUNTIME.cleanup === "function") {
         MARKET_SOCKET_RUNTIME.cleanup(true);
@@ -707,10 +708,14 @@ function bindMarketSocket() {
         if (liveDot) liveDot.classList.toggle("live", !!live);
         if (!liveText) return;
         if (source === "poll") {
-            liveText.textContent = live ? "Market Feed: live (polling)" : "Market Feed: polling";
+            liveText.textContent = live
+                ? (webLabels.trade_feed_live ? `${webLabels.trade_feed_live} (polling)` : "Market Feed: live (polling)")
+                : (webLabels.trade_feed_polling || "Market Feed: polling");
             return;
         }
-        liveText.textContent = live ? "Market Feed: live" : "Market Feed: reconnecting";
+        liveText.textContent = live
+            ? (webLabels.trade_feed_live || "Market Feed: live")
+            : (webLabels.trade_feed_reconnect || "Market Feed: reconnecting");
     };
     const stopTimer = (id) => {
         if (!id) return null;
@@ -1205,7 +1210,7 @@ function renderMarketDetail(snapshot, sourceRow) {
         </div>
         <div class="detail-actions">
             <a class="detail-link" href="/trade?asset=${marketRef}">Open Trade</a>
-            <a class="detail-link" href="/trade/chart?symbol=${marketRef}">Open Chart</a>
+            <a class="detail-link" href="/trade/chart?symbol=${marketRef}">${(window.LEGEND_LABELS && window.LEGEND_LABELS.trade_open_chart) || "Open Chart"}</a>
         </div>
         <div class="detail-note">
             ${snapshot.tick ? `Latest tape: ${(snapshot.tick.side || "").toUpperCase()} • ${snapshot.tick.price} • ${snapshot.tick.qty}` : "Open the chart or trade directly from this market card."}

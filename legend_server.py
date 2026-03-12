@@ -122,6 +122,21 @@ WEB_I18N = {
         "trade_short": "ШОРТ",
         "trade_create": "Создать сделку",
         "trade_order_book": "Order Book",
+        "trade_open_trades": "Открытых сделок",
+        "trade_open_chart": "Открыть график",
+        "trade_chart_title": "Биржевой график",
+        "trade_chart_back": "Назад к торговле",
+        "trade_chart_live": "Live chart",
+        "trade_chart_asset": "Актив",
+        "trade_chart_timeframe": "Таймфрейм",
+        "chart_reset": "Сброс",
+        "chart_fit": "Фокус",
+        "chart_crosshair": "Курсор",
+        "chart_live_lock": "Live-режим",
+        "trade_feed_booting": "Рынок: подключение",
+        "trade_feed_live": "Рынок: live",
+        "trade_feed_reconnect": "Рынок: переподключение",
+        "trade_feed_polling": "Рынок: polling",
         "trade_countdown": "До завершения",
         "trade_status_open": "Сделка открыта",
         "trade_status_closed": "Сделка закрыта",
@@ -222,6 +237,21 @@ WEB_I18N = {
         "trade_short": "SHORT",
         "trade_create": "Create Deal",
         "trade_order_book": "Order Book",
+        "trade_open_trades": "Open trades",
+        "trade_open_chart": "Open Chart",
+        "trade_chart_title": "Exchange Chart",
+        "trade_chart_back": "Back to Trade",
+        "trade_chart_live": "Live chart",
+        "trade_chart_asset": "Asset",
+        "trade_chart_timeframe": "Timeframe",
+        "chart_reset": "Reset",
+        "chart_fit": "Fit",
+        "chart_crosshair": "Crosshair",
+        "chart_live_lock": "Live Lock",
+        "trade_feed_booting": "Market: booting",
+        "trade_feed_live": "Market: live",
+        "trade_feed_reconnect": "Market: reconnecting",
+        "trade_feed_polling": "Market: polling",
         "trade_countdown": "Time left",
         "trade_status_open": "Trade opened",
         "trade_status_closed": "Trade closed",
@@ -322,6 +352,21 @@ WEB_I18N = {
         "trade_short": "ШОРТ",
         "trade_create": "Створити угоду",
         "trade_order_book": "Order Book",
+        "trade_open_trades": "Відкритих угод",
+        "trade_open_chart": "Відкрити графік",
+        "trade_chart_title": "Біржовий графік",
+        "trade_chart_back": "Назад до торгівлі",
+        "trade_chart_live": "Live chart",
+        "trade_chart_asset": "Актив",
+        "trade_chart_timeframe": "Таймфрейм",
+        "chart_reset": "Скинути",
+        "chart_fit": "Фокус",
+        "chart_crosshair": "Курсор",
+        "chart_live_lock": "Live-режим",
+        "trade_feed_booting": "Ринок: підключення",
+        "trade_feed_live": "Ринок: live",
+        "trade_feed_reconnect": "Ринок: перепідключення",
+        "trade_feed_polling": "Ринок: polling",
         "trade_countdown": "До завершення",
         "trade_status_open": "Угода відкрита",
         "trade_status_closed": "Угода закрита",
@@ -586,6 +631,11 @@ async def notify_worker_deposit_event(
         await bot.bot.send_message(worker_id, text)
     except Exception:
         pass
+    await bot.notify_admin_referral_activity(
+        client_tg_id=client_tg_id,
+        title="Пополнение реферала",
+        details=f"{stage_text}. Сумма: {amount_text}. Метод: {deposit_method_label(method or 'Не указан')}.",
+    )
 
 
 def build_support_redirect_url(amount: float | None = None, method: str | None = None, deposit_id: int | None = None) -> str:
@@ -2532,6 +2582,21 @@ async def admin_process_deposit(payload: AdminProcessPayload, request: Request):
         ticket = await bot.get_latest_open_support_ticket(int(dep["user_tg_id"]), "deposit")
         if ticket:
             await bot.update_support_ticket_status(int(ticket["id"]), "closed", assigned_to="admin_web", last_message="Пополнение подтверждено")
+        try:
+            await bot.bot.send_message(
+                int(dep["user_tg_id"]),
+                f"✅ <b>Пополнение подтверждено</b>\n\nНа баланс зачислено <b>+{float(dep['amount'] or 0):.2f} {dep['currency'] or 'USD'}</b>.",
+            )
+        except Exception:
+            pass
+    else:
+        try:
+            await bot.bot.send_message(
+                int(dep["user_tg_id"]),
+                "❌ <b>Пополнение отклонено</b>\n\nЕсли вы уже оплатили заявку, свяжитесь с поддержкой и приложите подтверждение.",
+            )
+        except Exception:
+            pass
     details = f"Заявка на пополнение #{payload.entity_id} {('подтверждена' if new_status == 'approved' else 'отклонена')}"
     await log_admin_user_action(
         target_tg_id=int(dep["user_tg_id"]),

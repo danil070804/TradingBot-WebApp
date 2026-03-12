@@ -8,10 +8,10 @@
 <section class="card hero">
     <h1>{{ labels.trade_title if labels else "Futures Terminal" }}</h1>
     <div class="hint">{{ labels.trade_balance if labels else "Баланс" }}: <span id="live-balance">{{ "%.2f"|format((user.balance if user else 0) or 0) }}</span> <span id="live-currency">{{ (user.currency if user else "USD") or "USD" }}</span></div>
-    <div class="hint">Open trades: <span id="live-open-trades">0</span></div>
+    <div class="hint">{{ labels.trade_open_trades if labels else "Открытых сделок" }}: <span id="live-open-trades">0</span></div>
     <div class="activity-strip">
         <span id="market-live-dot" class="activity-dot"></span>
-        <strong id="market-live-text">Market Feed: booting</strong>
+        <strong id="market-live-text">{{ labels.trade_feed_booting if labels else "Рынок: подключение" }}</strong>
         <span id="market-flow">0 trades/min</span>
         <span id="market-participants">0 symbols active</span>
     </div>
@@ -40,8 +40,8 @@
 <section class="card">
     <div class="chart-top">
         <div class="chart-top-left">
-            <div class="section-title">Candle Chart</div>
-            <a id="open-chart-btn" class="chip chart-open-btn" href="/trade/chart">Открыть график</a>
+            <div class="section-title">{{ labels.trade_chart_title if labels else "Биржевой график" }}</div>
+            <a id="open-chart-btn" class="chip chart-open-btn" href="/trade/chart">{{ labels.trade_open_chart if labels else "Открыть график" }}</a>
         </div>
         <div class="chart-top-right">
             <select id="chart-symbol-select" class="chart-tf">

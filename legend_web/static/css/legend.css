@@ -417,6 +417,38 @@ body.perf-lite .card:hover {
     padding: 12px;
 }
 
+.chart-terminal-shell {
+    padding: 14px;
+    background:
+        radial-gradient(circle at top left, rgba(34, 92, 128, 0.24), transparent 32%),
+        linear-gradient(180deg, rgba(7, 14, 20, 0.98), rgba(9, 18, 28, 0.98));
+    border: 1px solid rgba(110, 198, 243, 0.16);
+    box-shadow: 0 24px 60px rgba(5, 16, 29, 0.28);
+}
+
+.chart-terminal-head {
+    margin-bottom: 12px;
+}
+
+.chart-terminal-title {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+}
+
+.chart-terminal-title .section-title,
+.chart-terminal-title small {
+    color: #d8e9f7;
+}
+
+.chart-terminal-title small {
+    font-size: 11px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: #7ea5c2;
+}
+
 .chart-fs-head {
     display: flex;
     align-items: center;
@@ -436,10 +468,45 @@ body.perf-lite .card:hover {
     align-items: center;
 }
 
+.chart-toolbar-grid {
+    display: grid;
+    grid-template-columns: 1.3fr 1.6fr .9fr;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.chart-control-card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px;
+    border-radius: 14px;
+    background: rgba(11, 24, 36, 0.82);
+    border: 1px solid rgba(110, 198, 243, 0.12);
+}
+
+.chart-control-card > span {
+    font-size: 11px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: #6f8ca5;
+}
+
 .chart-tf-pills {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 6px;
+}
+
+.chart-tf-terminal {
+    min-width: 100%;
+    border-color: rgba(110, 198, 243, 0.14);
+    background: rgba(20, 36, 49, 0.96);
+    color: #d8e9f7;
+}
+
+.chart-tf-pills-terminal {
+    gap: 8px;
 }
 
 .chart-tools {
@@ -449,11 +516,74 @@ body.perf-lite .card:hover {
     margin-bottom: 10px;
 }
 
+.chart-tools-terminal {
+    margin-bottom: 12px;
+}
+
+.chart-tools-terminal .chip,
+.chart-tf-pills-terminal .chip,
+.chart-back-btn {
+    border-color: rgba(110, 198, 243, 0.16);
+    background: rgba(15, 31, 45, 0.95);
+    color: #cbe3f6;
+}
+
 .chart-tools .chip.active,
 .chart-tf-pills .chip.active {
     border-color: rgba(116, 200, 244, 0.45);
     color: #2f7db0;
     box-shadow: inset 0 0 0 1px rgba(116, 200, 244, 0.16);
+}
+
+.chart-tools-terminal .chip.active,
+.chart-tf-pills-terminal .chip.active {
+    background: linear-gradient(180deg, rgba(61, 152, 209, 0.22), rgba(35, 107, 155, 0.18));
+    border-color: rgba(110, 198, 243, 0.4);
+    color: #eff8ff;
+    box-shadow: inset 0 0 0 1px rgba(110, 198, 243, 0.14);
+}
+
+.chart-quick-stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.chart-stat {
+    padding: 10px 12px;
+    border-radius: 14px;
+    background: rgba(11, 24, 36, 0.86);
+    border: 1px solid rgba(110, 198, 243, 0.12);
+}
+
+.chart-stat small {
+    display: block;
+    font-size: 10px;
+    letter-spacing: .08em;
+    color: #6f8ca5;
+    margin-bottom: 4px;
+}
+
+.chart-stat b {
+    color: #f2fbff;
+    font-size: 18px;
+}
+
+.chart-terminal-canvas {
+    border-color: rgba(110, 198, 243, 0.12);
+    border-radius: 16px;
+    background: #05090e;
+}
+
+.chart-terminal-market {
+    background: linear-gradient(180deg, rgba(12, 24, 35, 0.94), rgba(10, 18, 27, 0.96));
+    border: 1px solid rgba(110, 198, 243, 0.12);
+}
+
+.chart-terminal-market .section-title,
+.chart-terminal-market .tape-title {
+    color: #d8e9f7;
 }
 
 .chart-top .section-title {
@@ -1526,7 +1656,13 @@ select, input {
     .chart-controls {
         grid-template-columns: 1fr;
     }
+    .chart-toolbar-grid {
+        grid-template-columns: 1fr;
+    }
     .chart-tools {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .chart-quick-stats {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
     .chart-top {

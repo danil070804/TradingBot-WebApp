@@ -1147,6 +1147,13 @@ def worker_client_back_keyboard(wc_id: int, label: str = "⬅️ К карточ
     return kb.as_markup()
 
 
+def worker_back_keyboard(callback_data: str = "open_worker_panel", label: str = "⬅️ К панели воркера"):
+    kb = InlineKeyboardBuilder()
+    kb.button(text=label, callback_data=callback_data)
+    kb.adjust(1)
+    return kb.as_markup()
+
+
 def worker_transfer_keyboard(wc_id: int, workers, current_worker_id: int):
     kb = InlineKeyboardBuilder()
     for row in workers:
@@ -2873,6 +2880,7 @@ def workers_list_keyboard(rows):
 def worker_panel_keyboard():
     kb = InlineKeyboardBuilder()
     kb.button(text="🐑 Лохматые", callback_data="worker_sheeps")
+    kb.button(text="📘 Инструкция по функциям", callback_data="worker_guide")
     kb.button(text="⚙️Settings сервиса", callback_data="worker_settings")
     kb.button(text="⬅️ В профиль", callback_data="open_profile")
     kb.adjust(1)
@@ -4380,6 +4388,40 @@ async def send_worker_panel(msg: Message, tg_user):
         "Выберите нужный раздел:"
     )
     await send_section_message(msg, "worker_panel", text, reply_markup=worker_panel_keyboard())
+
+
+@dp.callback_query(F.data == "worker_guide")
+async def worker_guide_cb(callback: CallbackQuery):
+    user_row = await get_user_row(callback.from_user)
+    if not bool(user_row["is_worker"]):
+        await callback.answer("⛔ Только для воркеров.")
+        return
+    text = (
+        "📘 <b>Инструкция по функциям воркер-панели</b>\n\n"
+        "╭ <b>Карточка реферала</b>\n"
+        "├ <b>Баланс</b> — меняет баланс клиента. Можно добавить сумму или списать её со знаком минус.\n"
+        "├ <b>Удача</b> — задаёт шанс положительного закрытия сделки для клиента от 0 до 100%.\n"
+        "├ <b>Мин. депозит</b> — минимальная сумма пополнения для этого клиента.\n"
+        "├ <b>Мин. вывод</b> — минимальная сумма вывода для этого клиента.\n"
+        "├ <b>Мин. сделка</b> — минимальная сумма входа в сделку.\n"
+        "├ <b>Вериф ON/OFF</b> — отмечает клиента как прошедшего или не прошедшего верификацию.\n"
+        "├ <b>Вывод ON/OFF</b> — разрешает или запрещает вывод средств.\n"
+        "├ <b>Торговля ON/OFF</b> — разрешает или запрещает открытие сделок.\n"
+        "├ <b>В избранное</b> — переносит клиента в отдельный быстрый список.\n"
+        "├ <b>Передать реферала</b> — переводит клиента другому воркеру из списка.\n"
+        "├ <b>Заблокировать</b> — ограничивает доступ клиента и отправляет его в техподдержку.\n"
+        "╰ <b>Начать диалог</b> — открывает прямую переписку с клиентом через саппорт.\n\n"
+        "╭ <b>База рефералов</b>\n"
+        "├ <b>День / Неделя / Месяц / Всё время</b> — фильтрует базу по активности.\n"
+        "├ <b>Избранные</b> — показывает только приоритетных клиентов.\n"
+        "╰ <b>Поиск по ID</b> — быстрый вход в карточку по номеру /n<ID>.\n\n"
+        "╭ <b>Settings сервиса</b>\n"
+        "├ <b>Мин. пополнение</b> — лимит для вашей воронки по пополнению.\n"
+        "╰ <b>Мин. вывод</b> — лимит по выводу для клиентов вашей ветки.\n\n"
+        "Все изменения из карточки должны отражаться и в боте, и в вебе, потому что логика работает через одну общую базу."
+    )
+    await callback.message.answer(text, reply_markup=worker_back_keyboard("open_worker_panel", "⬅️ К панели воркера"))
+    await callback.answer()
 
 @dp.callback_query(F.data == "worker_sheeps")
 async def worker_sheeps(callback: CallbackQuery):
