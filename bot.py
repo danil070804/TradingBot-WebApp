@@ -90,6 +90,11 @@ def spawn_background_task(coro):
     return task
 
 
+async def safe_callback_answer(callback: CallbackQuery, *args, **kwargs):
+    with contextlib.suppress(Exception):
+        await callback.answer(*args, **kwargs)
+
+
 I18N = {
     "ru": {
         "open_app": "🚀 Открыть приложение",
@@ -3598,6 +3603,7 @@ async def run_demo_deal(
 
 @dp.callback_query(F.data == "open_profile")
 async def on_open_profile(callback: CallbackQuery, state: FSMContext):
+    await safe_callback_answer(callback)
     await state.clear()
     await send_profile(callback)
 
@@ -4189,50 +4195,50 @@ async def on_verify(callback: CallbackQuery, state: FSMContext):
 
 @dp.callback_query(F.data == "settings")
 async def on_settings(callback: CallbackQuery, state: FSMContext):
+    await safe_callback_answer(callback)
     await state.clear()
     user_row = await get_user_row(callback.from_user)
     lang = normalize_lang(user_row["language"])
     cur = user_row["currency"] or "не выбрана"
     text = t(lang, "settings_title", lang_value=lang.upper(), cur=cur)
     await send_section_message(callback.message, "settings", text, reply_markup=settings_keyboard(lang))
-    await callback.answer()
 
 
 @dp.callback_query(F.data == "settings_lang")
 async def on_settings_lang(callback: CallbackQuery, state: FSMContext):
+    await safe_callback_answer(callback)
     user_row = await get_user_row(callback.from_user)
     lang = normalize_lang(user_row["language"])
     await state.set_state(SettingsFlowStates.choosing_lang)
     await send_section_message(callback.message, "settings", t(lang, "settings_choose_lang"), reply_markup=settings_language_keyboard())
-    await callback.answer()
 
 
 @dp.callback_query(F.data == "settings_currency")
 async def on_settings_currency(callback: CallbackQuery, state: FSMContext):
+    await safe_callback_answer(callback)
     user_row = await get_user_row(callback.from_user)
     lang = normalize_lang(user_row["language"])
     await state.set_state(SettingsFlowStates.choosing_currency)
     await send_section_message(callback.message, "settings", t(lang, "settings_choose_currency"), reply_markup=settings_currency_keyboard())
-    await callback.answer()
 
 
 @dp.callback_query(F.data == "my_deals")
 async def on_my_deals(callback: CallbackQuery, state: FSMContext):
+    await safe_callback_answer(callback)
     await state.clear()
     user_row = await get_user_row(callback.from_user)
     lang = normalize_lang(user_row["language"])
     rows = await get_user_deals(callback.from_user.id, limit=10)
     if not rows:
         await send_section_message(callback.message, "my_deals", t(lang, "my_deals_empty"), reply_markup=profile_back_keyboard(lang))
-        await callback.answer()
         return
     text = f"{t(lang, 'my_deals_title')}\n\n{t(lang, 'my_deals_hint')}"
     await send_section_message(callback.message, "my_deals", text, reply_markup=my_deals_history_keyboard(rows, lang))
-    await callback.answer()
 
 
 @dp.callback_query(F.data.startswith("deal_view:"))
 async def on_my_deal_view(callback: CallbackQuery, state: FSMContext):
+    await safe_callback_answer(callback)
     await state.clear()
     user_row = await get_user_row(callback.from_user)
     lang = normalize_lang(user_row["language"])
@@ -4240,11 +4246,9 @@ async def on_my_deal_view(callback: CallbackQuery, state: FSMContext):
     deal = await get_user_deal_by_id(callback.from_user.id, deal_id)
     if not deal:
         await callback.message.answer("❗ Сделка не найдена или недоступна.", reply_markup=profile_back_keyboard(lang))
-        await callback.answer()
         return
     text = await format_trade_result_message(deal)
     await callback.message.answer(text, reply_markup=my_deal_result_keyboard(deal_id, lang))
-    await callback.answer()
 
 # ---------- WORKER PANEL ----------
 
