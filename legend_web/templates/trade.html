@@ -8,9 +8,9 @@
 <section class="card hero">
     <div class="trade-hero-top">
         <div class="trade-hero-copy">
-            <h1>{{ labels.trade_title if labels else "Futures Terminal" }}</h1>
-            <strong class="trade-hero-headline">{{ labels.trade_hero_title if labels else "Открой сделку быстро и контролируй риск в одном окне" }}</strong>
-            <p class="trade-hero-lead">{{ labels.trade_hero_text if labels else "Живой рынок, быстрый вход, контроль экспозиции и результат сделки без прыжков между разделами." }}</p>
+            <h1>{{ labels.nav_trade if labels else ("Торговля" if lang == "ru" else ("Торгівля" if lang == "uk" else "Trade")) }}</h1>
+            <strong class="trade-hero-headline">{% if lang == "ru" %}Открытие и управление сделками{% elif lang == "uk" %}Відкриття та керування угодами{% else %}Open And Manage Trades{% endif %}</strong>
+            <p class="trade-hero-lead">{% if lang == "ru" %}Выберите актив, задайте параметры и откройте позицию.{% elif lang == "uk" %}Оберіть актив, задайте параметри та відкрийте позицію.{% else %}Select asset, set parameters and open a position.{% endif %}</p>
         </div>
     </div>
     <div class="trade-hero-kpis">

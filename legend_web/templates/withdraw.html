@@ -5,14 +5,10 @@
     <div class="deposit-hero-top">
         <div class="deposit-hero-copy">
             <h1>{{ labels.nav_withdraw if labels else "Вывести" }}</h1>
-            <strong class="deposit-hero-headline">
-                {% if lang == "ru" %}Оформи вывод и передай реквизиты на обработку без лишних шагов{% elif lang == "uk" %}Оформи виведення і передай реквізити на обробку без зайвих кроків{% else %}Create a withdrawal request and submit payout details without extra steps{% endif %}
-            </strong>
             <p class="deposit-hero-lead">
-                {% if lang == "ru" %}Укажи сумму, выбери способ вывода и отправь заявку. Статус обработки появится ниже и в профиле.{% elif lang == "uk" %}Вкажи суму, обери спосіб виведення та надішли заявку. Статус обробки з'явиться нижче та в профілі.{% else %}Enter the amount, choose a withdrawal method and submit the request. Processing status will appear below and in your profile.{% endif %}
+                {% if lang == "ru" %}Укажите сумму и отправьте заявку на вывод.{% elif lang == "uk" %}Вкажіть суму та надішліть заявку на виведення.{% else %}Enter amount and submit withdrawal request.{% endif %}
             </p>
         </div>
-        <a class="qa-btn deposit-hero-cta" href="/profile">{{ labels.deposit_to_profile if labels else "К профилю" }}</a>
     </div>
     <div class="balance">{{ "%.2f"|format((user.balance if user else 0) or 0) }} {{ (user.currency if user else "USD") or "USD" }}</div>
     <div class="hint">

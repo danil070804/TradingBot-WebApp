@@ -11,10 +11,10 @@
     <div class="markets-hero-top">
         <div class="markets-hero-copy">
             <h1>{% if lang == "ru" %}Главная{% elif lang == "uk" %}Головна{% else %}Home{% endif %}</h1>
-            <strong class="markets-hero-headline">{{ labels.home_hero_title if labels else "Your launch point for markets, trades and account control" }}</strong>
-            <p class="markets-hero-lead">{{ labels.home_hero_text if labels else "See balance, risk, recent deals and market pulse in one command screen." }}</p>
+            <strong class="markets-hero-headline">{% if lang == "ru" %}Личный кабинет{% elif lang == "uk" %}Особистий кабінет{% else %}Personal Cabinet{% endif %}</strong>
+            <p class="markets-hero-lead">{% if lang == "ru" %}Баланс, сделки и активность в одном месте.{% elif lang == "uk" %}Баланс, угоди й активність в одному місці.{% else %}Balance, deals and activity in one place.{% endif %}</p>
         </div>
-        <a class="qa-btn markets-hero-cta" href="/trade">{{ labels.home_go_trade if labels else "Go To Trade" }}</a>
+        <a class="qa-btn markets-hero-cta" href="/trade">{{ labels.nav_trade if labels else ("Торговля" if lang == "ru" else ("Торгівля" if lang == "uk" else "Trade")) }}</a>
     </div>
     <div class="dashboard-balance">
         <div class="balance"><span id="home-live-balance">{{ "%.2f"|format((user.balance if user else 0) or 0) }}</span> <span id="home-live-currency">{{ (user.currency if user else "USD") or "USD" }}</span></div>
@@ -45,9 +45,11 @@
 
 <section class="quick-actions dashboard-actions">
     <a class="qa-btn" href="/trade">{{ labels.quick_trade if labels else "Открыть сделку" }}</a>
+    <a class="qa-btn" href="/markets">{{ labels.nav_markets if labels else "Рынки" }}</a>
     <a class="qa-btn" href="/deposit">{{ labels.quick_deposit if labels else "Пополнить" }}</a>
+    <a class="qa-btn" href="/withdraw">{{ labels.nav_withdraw if labels else "Вывести" }}</a>
     <a class="qa-btn" href="/deals">{{ labels.quick_history if labels else "История сделок" }}</a>
-    <a class="qa-btn" href="/profile">{{ labels.quick_profile if labels else "Полный профиль" }}</a>
+    <a class="qa-btn" href="/profile">{{ labels.nav_profile if labels else "Профиль" }}</a>
     {% if user and user.is_worker %}
     <a class="qa-btn" href="/worker">{{ labels.quick_worker if labels else "Панель воркера" }}</a>
     {% endif %}
