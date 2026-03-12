@@ -812,6 +812,30 @@ body[data-page="trade"] .hint {
     letter-spacing: 0.02em;
 }
 .markets-row .price-block { display: grid; justify-items: end; gap: 4px; }
+
+.markets-toolbar {
+    display: grid;
+    grid-template-columns: 1.3fr .9fr;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.markets-search,
+.markets-sort {
+    border: 1px solid rgba(116, 200, 244, 0.26);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.92);
+    color: #335976;
+    padding: 10px 12px;
+    font-size: 13px;
+    outline: none;
+}
+
+.markets-search:focus,
+.markets-sort:focus {
+    border-color: rgba(96, 178, 228, 0.52);
+    box-shadow: 0 0 0 3px rgba(96, 178, 228, 0.14);
+}
 .market-card,
 .deal-history-row {
     width: 100%;
@@ -1867,6 +1891,9 @@ body[data-page="trade"] .bottom-nav a.active {
         grid-template-columns: 1fr;
     }
     .chart-toolbar-grid {
+        grid-template-columns: 1fr;
+    }
+    .markets-toolbar {
         grid-template-columns: 1fr;
     }
     .chart-tools {

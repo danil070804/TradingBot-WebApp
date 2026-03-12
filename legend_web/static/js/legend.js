@@ -1272,6 +1272,56 @@ function bindMarketCards() {
     });
 }
 
+function bindMarketsToolbar() {
+    const search = document.getElementById("markets-search");
+    const sort = document.getElementById("markets-sort");
+    const list = document.querySelector(".list");
+    if (!search || !sort || !list) return;
+
+    const allCards = Array.from(list.querySelectorAll(".market-card"));
+    if (!allCards.length) return;
+
+    const normalize = (v) => String(v || "").trim().toLowerCase();
+    const toNum = (v) => Number(String(v || "").replace(",", "."));
+
+    const apply = () => {
+        const q = normalize(search.value);
+        const mode = String(sort.value || "change_desc");
+
+        const cards = allCards.filter((card) => {
+            const name = normalize(card.dataset.marketName);
+            const symbol = normalize(card.dataset.marketSymbol);
+            return !q || name.includes(q) || symbol.includes(q);
+        });
+
+        cards.sort((a, b) => {
+            const aPrice = toNum(a.dataset.marketPrice);
+            const bPrice = toNum(b.dataset.marketPrice);
+            const aChange = toNum(a.dataset.marketChange);
+            const bChange = toNum(b.dataset.marketChange);
+            const aName = normalize(a.dataset.marketName || a.dataset.marketSymbol);
+            const bName = normalize(b.dataset.marketName || b.dataset.marketSymbol);
+            if (mode === "change_desc") return bChange - aChange;
+            if (mode === "change_asc") return aChange - bChange;
+            if (mode === "price_desc") return bPrice - aPrice;
+            if (mode === "price_asc") return aPrice - bPrice;
+            return aName.localeCompare(bName);
+        });
+
+        allCards.forEach((card) => {
+            card.style.display = "none";
+        });
+        cards.forEach((card) => {
+            card.style.display = "";
+            list.appendChild(card);
+        });
+    };
+
+    search.addEventListener("input", apply);
+    sort.addEventListener("change", apply);
+    apply();
+}
+
 function bindLangSwitch() {
     const buttons = document.querySelectorAll(".lang-btn");
     if (!buttons.length) return;
@@ -1869,6 +1919,7 @@ bindDepositForm();
 bindLangSwitch();
 bindWorkerPanel();
 bindWorkerClientPage();
+bindMarketsToolbar();
 bindMarketSocket();
 bindUserSocket();
 bindOpenPositionsActions();

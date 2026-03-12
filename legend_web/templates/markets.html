@@ -3,11 +3,25 @@
 {% block content %}
 <section class="card">
     <div class="section-title">{{ labels.markets_title if labels else "Рынки" }}</div>
+    <div class="markets-toolbar">
+        <input id="markets-search" class="markets-search" type="text" placeholder="Поиск: BTC, Bitcoin, ETH...">
+        <select id="markets-sort" class="markets-sort">
+            <option value="change_desc">Лидеры роста</option>
+            <option value="change_asc">Лидеры падения</option>
+            <option value="price_desc">Цена: выше</option>
+            <option value="price_asc">Цена: ниже</option>
+            <option value="name_asc">По алфавиту</option>
+        </select>
+    </div>
     <div class="list">
         {% for m in markets %}
         <a
             href="/markets/{{ m.market_ref|urlencode }}"
             class="row markets-row market-card"
+            data-market-name="{{ m.name }}"
+            data-market-symbol="{{ m.symbol }}"
+            data-market-price="{{ m.price }}"
+            data-market-change="{{ m.day_change }}"
         >
             <div>
                 <b>{{ m.symbol }}</b>

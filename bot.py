@@ -4913,7 +4913,7 @@ async def send_worker_panel(msg: Message, tg_user):
     text = (
         "⚒ <b>Панель воркера</b>\n\n"
         f"• Ваш ID: <code>{tg_user.id}</code>\n"
-        f"• Лохматыйьная ссылка:\n<code>{ref_link}</code>\n\n"
+        f"• Реферальная ссылка:\n<code>{ref_link}</code>\n\n"
         f"• Приглашено клиентов: <b>{ref_count}</b>\n\n"
         "Выберите нужный раздел:"
     )
@@ -4928,7 +4928,7 @@ async def worker_guide_cb(callback: CallbackQuery):
         return
     text = (
         "📘 <b>Инструкция по функциям воркер-панели</b>\n\n"
-        "╭ <b>Лохматыйная ссылка</b>\n"
+        "╭ <b>Ссылка для лохматого</b>\n"
         "├ Это ваш персональный инструмент для привлечения новых клиентов.\n"
         "├ Формат: <code>https://t.me/ВашБот?start=refВаш_ID</code>.\n"
         "├ Новый пользователь должен перейти именно по этой ссылке и запустить бота.\n"
