@@ -1929,6 +1929,7 @@ async def set_language(tg_id: int, lang: str):
 async def set_currency(tg_id: int, currency: str):
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
+        is_pg = aiosqlite.using_postgres()
         cur = await db.execute("SELECT currency, balance FROM users WHERE tg_id = ?", (tg_id,))
         user_row = await cur.fetchone()
         if not user_row:
@@ -1958,12 +1959,24 @@ async def set_currency(tg_id: int, currency: str):
             converted_profit = convert_amount_between_currencies(float(row["profit"] or 0.0), row_currency, new_currency)
             await db.execute("UPDATE deals SET profit = ? WHERE id = ?", (converted_profit, int(row["id"])))
 
-        cur = await db.execute("SELECT id, amount, currency FROM active_trades WHERE user_tg_id = ? AND status = 'open'", (tg_id,))
-        active_rows = await cur.fetchall()
-        for row in active_rows:
-            row_currency = (row["currency"] or old_currency).upper()
-            converted_amount = convert_amount_between_currencies(float(row["amount"] or 0.0), row_currency, new_currency)
-            await db.execute("UPDATE active_trades SET amount = ?, currency = ? WHERE id = ?", (converted_amount, new_currency, int(row["id"])))
+        active_trade_columns = await get_table_columns(db, "active_trades", is_pg)
+        active_trade_key = "trade_id" if "trade_id" in active_trade_columns else ("id" if "id" in active_trade_columns else None)
+        if active_trade_key:
+            cur = await db.execute(
+                f"SELECT {active_trade_key} AS row_key, amount, currency FROM active_trades WHERE user_tg_id = ? AND status = 'open'",
+                (tg_id,),
+            )
+            active_rows = await cur.fetchall()
+            for row in active_rows:
+                row_currency = (row["currency"] or old_currency).upper()
+                converted_amount = convert_amount_between_currencies(float(row["amount"] or 0.0), row_currency, new_currency)
+                row_key = row["row_key"]
+                if active_trade_key == "id":
+                    row_key = int(row_key)
+                await db.execute(
+                    f"UPDATE active_trades SET amount = ?, currency = ? WHERE {active_trade_key} = ?",
+                    (converted_amount, new_currency, row_key),
+                )
 
         cur = await db.execute("SELECT id, min_deposit, min_withdraw, min_trade_amount FROM worker_clients WHERE client_tg_id = ?", (tg_id,))
         wc_rows = await cur.fetchall()
