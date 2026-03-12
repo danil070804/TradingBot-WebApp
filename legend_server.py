@@ -4296,6 +4296,14 @@ async def api_overview():
     )
 
 
+@app.get("/api/leaderboard", response_class=JSONResponse)
+async def api_leaderboard(limit: int = 10, min_deals: int = 3):
+    safe_limit = max(1, min(50, int(limit)))
+    safe_min_deals = max(1, min(100, int(min_deals)))
+    rows = await bot.get_unified_leaderboard(limit=safe_limit, min_deals=safe_min_deals)
+    return JSONResponse({"ok": True, "rows": rows, "limit": safe_limit, "min_deals": safe_min_deals})
+
+
 @app.get("/api/market/tape", response_class=JSONResponse)
 async def api_market_tape():
     return JSONResponse({"ok": True, "items": current_tape_items(25)})

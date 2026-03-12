@@ -4,6 +4,7 @@ import contextlib
 import math
 import secrets
 import time
+from datetime import datetime, timezone
 from html import escape
 from dataclasses import dataclass
 from typing import Optional
@@ -70,6 +71,8 @@ ACTIVE_DIALOGS_CLIENT: dict[int, int] = {}
 ACTIVE_DIALOGS_WORKER: dict[int, int] = {}
 ACTIVE_DEAL_TASKS: set[asyncio.Task] = set()
 ACTIVE_TRADE_MONITORS: dict[str, asyncio.Task] = {}
+ACTIVE_MARKET_STREAMS: dict[int, asyncio.Task] = {}
+DEFAULT_MARKET_REFRESH_SEC = max(5, min(60, int(os.getenv("BOT_MARKET_REFRESH_SEC", "12"))))
 
 
 class DepositStates(StatesGroup):
@@ -2153,7 +2156,7 @@ async def fetch_market_overview_rows(limit: int = 8) -> list[dict]:
     return rows
 
 
-async def get_top_platform_traders(limit: int = 8, min_deals: int = 3):
+async def get_unified_leaderboard(limit: int = 8, min_deals: int = 3) -> list[dict]:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         cur = await db.execute(
@@ -2165,7 +2168,20 @@ async def get_top_platform_traders(limit: int = 8, min_deals: int = 3):
                 u.currency,
                 COUNT(*) AS total,
                 SUM(CASE WHEN d.is_win = 1 THEN 1 ELSE 0 END) AS wins,
-                IFNULL(SUM(d.profit), 0) AS pnl
+                IFNULL(SUM(d.profit), 0) AS pnl,
+                (
+                    SELECT COUNT(*)
+                    FROM active_trades act
+                    WHERE act.user_tg_id = d.user_tg_id AND act.status = 'open'
+                ) AS open_trades,
+                COALESCE(
+                    (
+                        SELECT MAX(wc.last_activity_at)
+                        FROM worker_clients wc
+                        WHERE wc.client_tg_id = d.user_tg_id
+                    ),
+                    MAX(d.created_at)
+                ) AS last_activity_at
             FROM deals d
             JOIN users u ON u.tg_id = d.user_tg_id
             GROUP BY d.user_tg_id, u.first_name, u.username, u.currency
@@ -2175,7 +2191,12 @@ async def get_top_platform_traders(limit: int = 8, min_deals: int = 3):
             """,
             (int(min_deals), int(limit)),
         )
-        return await cur.fetchall()
+        rows = await cur.fetchall()
+    return [dict(row) for row in rows]
+
+
+async def get_top_platform_traders(limit: int = 8, min_deals: int = 3):
+    return await get_unified_leaderboard(limit=limit, min_deals=min_deals)
 
 
 async def get_user_deal_equity_curve(user_tg_id: int, limit: int = 20):
@@ -3445,18 +3466,64 @@ def format_market_row(name: str, symbol: str, price: float, day_change: float) -
     return f"{mark} <b>{symbol}</b> · {name}\n└ {price:.4f} USDT · {day_change:+.2f}%"
 
 
-def market_hub_keyboard(lang: str = "ru"):
+def normalize_market_refresh_interval(value: int | str | None) -> int:
+    try:
+        iv = int(value or DEFAULT_MARKET_REFRESH_SEC)
+    except (TypeError, ValueError):
+        iv = DEFAULT_MARKET_REFRESH_SEC
+    return max(5, min(60, iv))
+
+
+def format_activity_age(last_activity_at: str | None, lang: str) -> str:
+    if not last_activity_at:
+        return tr(lang, "нет данных", "no data", "немає даних")
+    raw = str(last_activity_at).strip()
+    dt = None
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S.%f"):
+        with contextlib.suppress(Exception):
+            dt = datetime.strptime(raw, fmt).replace(tzinfo=timezone.utc)
+            break
+    if dt is None:
+        return raw
+    diff = datetime.now(timezone.utc) - dt
+    seconds = max(0, int(diff.total_seconds()))
+    if seconds < 60:
+        return tr(lang, "только что", "just now", "щойно")
+    if seconds < 3600:
+        mins = seconds // 60
+        return tr(lang, f"{mins} мин назад", f"{mins} min ago", f"{mins} хв тому")
+    if seconds < 86400:
+        hours = seconds // 3600
+        return tr(lang, f"{hours} ч назад", f"{hours} h ago", f"{hours} год тому")
+    days = seconds // 86400
+    return tr(lang, f"{days} дн назад", f"{days} d ago", f"{days} дн тому")
+
+
+def market_hub_keyboard(lang: str = "ru", streaming: bool = False, interval_sec: int = DEFAULT_MARKET_REFRESH_SEC):
+    safe_interval = normalize_market_refresh_interval(interval_sec)
     kb = InlineKeyboardBuilder()
     kb.button(text=tr(lang, "🔄 Обновить рынок", "🔄 Refresh market", "🔄 Оновити ринок"), callback_data="market_hub")
     kb.button(text=tr(lang, "🏆 Топ трейдеров", "🏆 Top traders", "🏆 Топ трейдерів"), callback_data="market_top_traders")
     kb.button(text=tr(lang, "📈 Открыть сделку", "📈 Open trade", "📈 Відкрити угоду"), callback_data="market_open_ecn")
+    if streaming:
+        kb.button(
+            text=tr(lang, f"⏹ Стоп авто ({safe_interval}с)", f"⏹ Stop auto ({safe_interval}s)", f"⏹ Стоп авто ({safe_interval}с)"),
+            callback_data="market_auto:stop",
+        )
+    else:
+        kb.button(text=tr(lang, "▶️ Авто 5с", "▶️ Auto 5s", "▶️ Авто 5с"), callback_data="market_auto:5")
+        kb.button(text=tr(lang, "▶️ Авто 10с", "▶️ Auto 10s", "▶️ Авто 10с"), callback_data="market_auto:10")
+        kb.button(text=tr(lang, "▶️ Авто 20с", "▶️ Auto 20s", "▶️ Авто 20с"), callback_data="market_auto:20")
     if config.webapp_url:
         kb.button(
             text=tr(lang, "🖥 Рынок в Web", "🖥 Market in Web", "🖥 Ринок у Web"),
             web_app=WebAppInfo(url=build_web_section_url("/markets")),
         )
     kb.button(text=tr(lang, "⬅️ В профиль", "⬅️ Back to profile", "⬅️ До профілю"), callback_data="open_profile")
-    kb.adjust(2, 2, 1)
+    if streaming:
+        kb.adjust(2, 2, 2, 1)
+    else:
+        kb.adjust(2, 2, 2, 1, 1)
     return kb.as_markup()
 
 
@@ -3472,6 +3539,76 @@ def traders_board_keyboard(lang: str = "ru"):
     kb.button(text=tr(lang, "⬅️ В профиль", "⬅️ Back to profile", "⬅️ До профілю"), callback_data="open_profile")
     kb.adjust(2, 1, 1)
     return kb.as_markup()
+
+
+async def stop_market_auto_stream(user_tg_id: int):
+    task = ACTIVE_MARKET_STREAMS.pop(int(user_tg_id), None)
+    if task and not task.done():
+        task.cancel()
+
+
+async def build_market_hub_text(lang: str, interval_sec: int | None = None, auto_mode: bool = False) -> tuple[str, bool]:
+    rows = await fetch_market_overview_rows(limit=8)
+    if not rows:
+        return tr(
+            lang,
+            "📊 Рынок временно недоступен. Попробуйте обновить через несколько секунд.",
+            "📊 Market is temporarily unavailable. Try refreshing in a few seconds.",
+            "📊 Ринок тимчасово недоступний. Спробуйте оновити за кілька секунд.",
+        ), False
+
+    lead_values = [float(row["day_change"]) for row in rows]
+    trend = sparkline(lead_values)
+    lines = [
+        tr(lang, "📊 <b>Live рынок</b>", "📊 <b>Live market</b>", "📊 <b>Live ринок</b>"),
+        tr(lang, "Лидеры по 24ч движению:", "24h movement leaders:", "Лідери за рухом 24г:"),
+    ]
+    for row in rows[:6]:
+        lines.append(format_market_row(str(row["name"]), str(row["symbol"]), float(row["price"]), float(row["day_change"])))
+    if trend:
+        lines += [
+            "",
+            tr(lang, "Пульс рынка (24ч):", "Market pulse (24h):", "Пульс ринку (24г):"),
+            f"<code>{trend}</code>",
+            compact_pct_bar(float(rows[0]["day_change"])),
+        ]
+    if auto_mode:
+        safe_interval = normalize_market_refresh_interval(interval_sec)
+        lines += [
+            "",
+            tr(
+                lang,
+                f"⏱ Автообновление включено: каждые {safe_interval}с.",
+                f"⏱ Auto-refresh enabled: every {safe_interval}s.",
+                f"⏱ Автооновлення увімкнено: кожні {safe_interval}с.",
+            ),
+        ]
+    return "\n".join(lines), True
+
+
+async def run_market_auto_stream(user_tg_id: int, chat_id: int, message_id: int, lang: str, interval_sec: int):
+    user_key = int(user_tg_id)
+    safe_interval = normalize_market_refresh_interval(interval_sec)
+    try:
+        while True:
+            if ACTIVE_MARKET_STREAMS.get(user_key) is not asyncio.current_task():
+                return
+            text, ok = await build_market_hub_text(lang, interval_sec=safe_interval, auto_mode=True)
+            edited = await edit_section_message(
+                chat_id,
+                message_id,
+                "open_ecn",
+                text,
+                reply_markup=market_hub_keyboard(lang, streaming=ok, interval_sec=safe_interval),
+            )
+            if not edited:
+                return
+            await asyncio.sleep(safe_interval)
+    except asyncio.CancelledError:
+        return
+    finally:
+        if ACTIVE_MARKET_STREAMS.get(user_key) is asyncio.current_task():
+            ACTIVE_MARKET_STREAMS.pop(user_key, None)
 
 def main_menu_keyboard(lang: str = "ru"):
     keyboard_rows = []
@@ -4078,42 +4215,19 @@ async def menu_open_ecn(message: Message, state: FSMContext):
     await start_ecn_flow(message, state)
 
 
-async def send_market_hub(message: Message, tg_user, lang: str):
-    rows = await fetch_market_overview_rows(limit=8)
-    if not rows:
-        await send_section_message(
-            message,
-            "open_ecn",
-            tr(
-                lang,
-                "📊 Рынок временно недоступен. Попробуйте обновить через несколько секунд.",
-                "📊 Market is temporarily unavailable. Try refreshing in a few seconds.",
-                "📊 Ринок тимчасово недоступний. Спробуйте оновити за кілька секунд.",
-            ),
-            reply_markup=market_hub_keyboard(lang),
-        )
-        return
-
-    lead_values = [float(row["day_change"]) for row in rows]
-    trend = sparkline(lead_values)
-    lines = [
-        tr(lang, "📊 <b>Live рынок</b>", "📊 <b>Live market</b>", "📊 <b>Live ринок</b>"),
-        tr(lang, "Лидеры по 24ч движению:", "24h movement leaders:", "Лідери за рухом 24г:"),
-    ]
-    for row in rows[:6]:
-        lines.append(format_market_row(str(row["name"]), str(row["symbol"]), float(row["price"]), float(row["day_change"])))
-    if trend:
-        lines += [
-            "",
-            tr(lang, "Пульс рынка (24ч):", "Market pulse (24h):", "Пульс ринку (24г):"),
-            f"<code>{trend}</code>",
-            compact_pct_bar(float(rows[0]["day_change"])),
-        ]
-    await send_section_message(message, "open_ecn", "\n".join(lines), reply_markup=market_hub_keyboard(lang))
+async def send_market_hub(message: Message, tg_user, lang: str, prefer_edit: bool = False):
+    text, ok = await build_market_hub_text(lang)
+    markup = market_hub_keyboard(lang, streaming=False)
+    if prefer_edit:
+        edited = await edit_section_message(message.chat.id, message.message_id, "open_ecn", text, reply_markup=markup)
+        if edited:
+            return message
+    sent = await send_section_message(message, "open_ecn", text, reply_markup=markup)
+    return sent
 
 
 async def send_top_traders_board(message: Message, lang: str):
-    rows = await get_top_platform_traders(limit=8, min_deals=3)
+    rows = await get_unified_leaderboard(limit=8, min_deals=3)
     if not rows:
         await send_section_message(
             message,
@@ -4132,14 +4246,17 @@ async def send_top_traders_board(message: Message, lang: str):
     lines = [tr(lang, "🏆 <b>Топ трейдеров платформы</b>", "🏆 <b>Platform top traders</b>", "🏆 <b>Топ трейдерів платформи</b>")]
     for idx, row in enumerate(rows, start=1):
         icon = medals[idx - 1] if idx <= len(medals) else "▫️"
-        total = int(row["total"] or 0)
-        wins = int(row["wins"] or 0)
-        pnl = float(row["pnl"] or 0.0)
+        total = int(row.get("total") or 0)
+        wins = int(row.get("wins") or 0)
+        pnl = float(row.get("pnl") or 0.0)
         winrate = (wins / total * 100.0) if total > 0 else 0.0
-        display_name = row["username"] and f"@{row['username']}" or (row["first_name"] or f"ID {row['user_tg_id']}")
+        display_name = row.get("username") and f"@{row['username']}" or (row.get("first_name") or f"ID {row.get('user_tg_id')}" )
+        open_trades = int(row.get("open_trades") or 0)
+        activity_text = format_activity_age(row.get("last_activity_at"), lang)
         lines.append(
             f"{icon} <b>{display_name}</b>\n"
-            f"└ PnL: <b>{pnl:+.2f}</b> · WR: <b>{winrate:.1f}%</b> · {total}"
+            f"└ PnL: <b>{pnl:+.2f}</b> · WR: <b>{winrate:.1f}%</b> · {total}\n"
+            f"   {tr(lang, 'Открыто', 'Open', 'Відкрито')}: <b>{open_trades}</b> · {tr(lang, 'Активность', 'Activity', 'Активність')}: <b>{activity_text}</b>"
         )
 
     await send_section_message(message, "my_deals", "\n\n".join(lines), reply_markup=traders_board_keyboard(lang))
@@ -4787,6 +4904,7 @@ async def run_demo_deal(
 async def on_open_profile(callback: CallbackQuery, state: FSMContext):
     await safe_callback_answer(callback)
     await state.clear()
+    await stop_market_auto_stream(callback.from_user.id)
     await send_profile(callback)
 
 
@@ -5604,6 +5722,7 @@ async def on_settings_currency(callback: CallbackQuery, state: FSMContext):
 async def on_my_deals(callback: CallbackQuery, state: FSMContext):
     await safe_callback_answer(callback)
     await state.clear()
+    await stop_market_auto_stream(callback.from_user.id)
     user_row = await get_user_row(callback.from_user)
     lang = normalize_lang(user_row["language"])
     rows = await get_user_deals(callback.from_user.id, limit=10)
@@ -5651,13 +5770,14 @@ async def on_market_hub(callback: CallbackQuery, state: FSMContext):
     if access["blocked"]:
         await send_blocked_notice(callback.message, lang)
         return
-    await send_market_hub(callback.message, callback.from_user, lang)
+    await send_market_hub(callback.message, callback.from_user, lang, prefer_edit=True)
 
 
 @dp.callback_query(F.data == "market_top_traders")
 async def on_market_top_traders(callback: CallbackQuery, state: FSMContext):
     await safe_callback_answer(callback)
     await state.clear()
+    await stop_market_auto_stream(callback.from_user.id)
     user_row = await get_user_row(callback.from_user)
     lang = normalize_lang(user_row["language"])
     await send_top_traders_board(callback.message, lang)
@@ -5667,7 +5787,47 @@ async def on_market_top_traders(callback: CallbackQuery, state: FSMContext):
 async def on_market_open_ecn(callback: CallbackQuery, state: FSMContext):
     await safe_callback_answer(callback)
     await state.clear()
+    await stop_market_auto_stream(callback.from_user.id)
     await start_ecn_flow(callback, state)
+
+
+@dp.callback_query(F.data.startswith("market_auto:"))
+async def on_market_auto_toggle(callback: CallbackQuery, state: FSMContext):
+    await safe_callback_answer(callback)
+    await state.clear()
+    user_row = await get_user_row(callback.from_user)
+    lang = normalize_lang(user_row["language"])
+
+    if callback.data == "market_auto:stop":
+        await stop_market_auto_stream(callback.from_user.id)
+        await send_market_hub(callback.message, callback.from_user, lang, prefer_edit=True)
+        return
+
+    action = callback.data.split(":", 1)[1]
+    interval_sec = normalize_market_refresh_interval(action)
+    await stop_market_auto_stream(callback.from_user.id)
+
+    target_chat_id = callback.message.chat.id
+    target_message_id = callback.message.message_id
+    task = asyncio.create_task(
+        run_market_auto_stream(
+            user_tg_id=callback.from_user.id,
+            chat_id=target_chat_id,
+            message_id=target_message_id,
+            lang=lang,
+            interval_sec=interval_sec,
+        )
+    )
+    ACTIVE_MARKET_STREAMS[int(callback.from_user.id)] = task
+
+    text, ok = await build_market_hub_text(lang, interval_sec=interval_sec, auto_mode=True)
+    await edit_section_message(
+        target_chat_id,
+        target_message_id,
+        "open_ecn",
+        text,
+        reply_markup=market_hub_keyboard(lang, streaming=ok, interval_sec=interval_sec),
+    )
 
 
 @dp.callback_query(F.data.startswith("deal_view:"))
