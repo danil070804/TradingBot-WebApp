@@ -129,7 +129,7 @@ function mountEmptyState(container, kind) {
 function initPageIntroRibbon() {
     const ribbon = document.getElementById("page-intro-ribbon");
     const page = document.body?.dataset?.page || "";
-    if (!ribbon || !["trade", "markets", "profile"].includes(page)) return;
+    if (!ribbon || !["markets", "profile"].includes(page)) return;
     const lang = uiLang();
     const copy = {
         en: {

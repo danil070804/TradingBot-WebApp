@@ -12,9 +12,6 @@
             <strong class="trade-hero-headline">{{ labels.trade_hero_title if labels else "Открой сделку быстро и контролируй риск в одном окне" }}</strong>
             <p class="trade-hero-lead">{{ labels.trade_hero_text if labels else "Живой рынок, быстрый вход, контроль экспозиции и результат сделки без прыжков между разделами." }}</p>
         </div>
-        <a id="hero-open-chart" class="qa-btn trade-hero-cta" href="/trade/chart">
-            {{ labels.trade_full_chart if labels else "Полный график" }}
-        </a>
     </div>
     <div class="trade-hero-kpis">
         <div class="trade-hero-kpi">
@@ -37,14 +34,9 @@
 
 <section class="trade-command-bar">
     <article class="card trade-command-card">
-        <span>{{ labels.trade_active_mode if labels else "Активный режим" }}</span>
-        <strong>{{ labels.trade_turbo_futures if labels else "Турбо-фьючерсы" }}</strong>
-        <small>{{ labels.trade_turbo_text if labels else "Быстрый вход с таймером и live-панелью" }}</small>
-    </article>
-    <article class="card trade-command-card">
         <span>{{ labels.trade_market_label if labels else "Рынок" }}</span>
-        <strong id="command-mark">{{ labels.trade_market_mark if labels else "Текущий mark в столе" }}</strong>
-        <small>{{ labels.trade_market_sync if labels else "Книга цен, лента и chart preview синхронизированы" }}</small>
+        <strong id="command-mark">{{ labels.trade_market_mark if labels else "Текущий mark" }}</strong>
+        <small>{{ labels.trade_feed_booting if labels else "Рынок: подключение" }}</small>
     </article>
     <article class="card trade-command-actions">
         <a class="qa-btn" href="/markets">{{ labels.deposit_open_markets if labels else "Открыть рынки" }}</a>
