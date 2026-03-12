@@ -642,38 +642,41 @@ function buildTradePreset(assetName) {
     const isMeme = /(doge|shib|pepe|floki|bonk)/.test(name);
     const isDex = /(pancake|swap|uni|aave|curve|link)/.test(name);
     const balance = Number((document.getElementById("balance-raw") || {}).value || 0);
+    const selectedMode = document.querySelector(".trade-mode-chip.active")?.dataset.tradeMode || "balanced";
     const baseRisk = balance >= 10000 ? 2 : balance >= 3000 ? 3 : 5;
-    const riskPercent = isMeme ? Math.min(2, baseRisk) : isMajor ? baseRisk : Math.min(4, baseRisk);
-    const leverage = isMajor ? 12 : isDex ? 8 : isMeme ? 5 : 9;
-    const seconds = isMajor ? 60 : isDex ? 30 : 30;
-    const tpPercent = isMajor ? 1.8 : isDex ? 2.4 : 2.0;
-    const slPercent = isMajor ? 1.0 : isDex ? 1.2 : 1.1;
+    const modeScale = selectedMode === "careful" ? 0.75 : selectedMode === "aggressive" ? 1.35 : 1;
+    const riskPercent = Number((isMeme ? Math.min(2, baseRisk) : isMajor ? baseRisk : Math.min(4, baseRisk)) * modeScale).toFixed(1);
+    const leverage = Math.max(3, Math.round((isMajor ? 12 : isDex ? 8 : isMeme ? 5 : 9) * (selectedMode === "careful" ? 0.8 : selectedMode === "aggressive" ? 1.35 : 1)));
+    const seconds = selectedMode === "careful" ? (isMajor ? 300 : 60) : selectedMode === "aggressive" ? 10 : (isMajor ? 60 : 30);
+    const tpPercent = Number((isMajor ? 1.8 : isDex ? 2.4 : 2.0) * (selectedMode === "careful" ? 0.9 : selectedMode === "aggressive" ? 1.25 : 1)).toFixed(1);
+    const slPercent = Number((isMajor ? 1.0 : isDex ? 1.2 : 1.1) * (selectedMode === "careful" ? 0.85 : selectedMode === "aggressive" ? 1.2 : 1)).toFixed(1);
     const direction = LIVE_STATE.mode === "live" && Number(LIVE_STATE.spread || 0) > 0 ? "up" : "up";
-    const amount = balance > 0 ? Number(((balance * riskPercent) / 100).toFixed(2)) : 100;
+    const amount = balance > 0 ? Number(((balance * Number(riskPercent)) / 100).toFixed(2)) : 100;
     return {
-        riskPercent,
+        mode: selectedMode,
+        riskPercent: Number(riskPercent),
         leverage,
         seconds,
-        tpPercent,
-        slPercent,
+        tpPercent: Number(tpPercent),
+        slPercent: Number(slPercent),
         direction,
         amount: Math.max(100, amount),
         note: langPick(
-            isMajor
-                ? "Стартовый сценарий для ликвидного актива: умеренный риск и чуть длиннее экспирация."
-                : isDex
-                    ? "Стартовый сценарий для альта: ниже плечо и умеренный TP/SL для аккуратного входа."
-                    : "Стартовый сценарий: короткая экспирация и сдержанный риск без агрессии.",
-            isMajor
-                ? "Starter setup for a liquid asset: moderate risk and slightly longer expiration."
-                : isDex
-                    ? "Starter setup for an alt: lower leverage and moderate TP/SL for a cleaner entry."
-                    : "Starter setup: short expiration and controlled risk without aggression.",
-            isMajor
-                ? "Стартовий сценарій для ліквідного активу: помірний ризик і трохи довша експірація."
-                : isDex
-                    ? "Стартовий сценарій для альта: нижче плече і помірний TP/SL для акуратного входу."
-                    : "Стартовий сценарій: коротка експірація та стриманий ризик без агресії."
+            selectedMode === "careful"
+                ? "Аккуратный режим: ниже плечо, мягче риск и больше времени на движение."
+                : selectedMode === "aggressive"
+                    ? "Агрессивный режим: быстрее вход, выше плечо и плотнее контроль результата."
+                    : "Быстрый режим: сбалансированный старт для обычного входа без лишней настройки.",
+            selectedMode === "careful"
+                ? "Careful mode: lower leverage, softer risk and more time for the move to develop."
+                : selectedMode === "aggressive"
+                    ? "Aggressive mode: faster entry, higher leverage and tighter outcome control."
+                    : "Fast mode: balanced starter setup for a normal entry without extra tuning.",
+            selectedMode === "careful"
+                ? "Акуратний режим: нижче плече, м'якший ризик і більше часу на рух."
+                : selectedMode === "aggressive"
+                    ? "Агресивний режим: швидший вхід, вище плече та щільніший контроль результату."
+                    : "Швидкий режим: збалансований старт для звичайного входу без зайвого налаштування."
         ),
     };
 }
@@ -1105,12 +1108,22 @@ function bindTradeControls() {
         amountInput.addEventListener("input", syncRiskDeck);
     }
     const pairSelect = document.querySelector('#trade-form select[name="asset_name"]');
+    const tradeModeChips = Array.from(document.querySelectorAll(".trade-mode-chip"));
     if (pairSelect) {
         pairSelect.addEventListener("change", () => {
             applyTradePreset(pairSelect.value, { force: true });
             syncRiskDeck();
         });
     }
+    tradeModeChips.forEach((chip) => {
+        chip.addEventListener("click", () => {
+            tradeModeChips.forEach((node) => node.classList.toggle("active", node === chip));
+            if (pairSelect) {
+                applyTradePreset(pairSelect.value, { force: true });
+            }
+            syncRiskDeck();
+        });
+    });
 
     const levRange = document.getElementById("lev-range");
     const levVal = document.getElementById("lev-val");

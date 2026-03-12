@@ -2240,6 +2240,17 @@ select, input {
     line-height: 1.45;
 }
 
+.trade-mode-row {
+    margin-top: 10px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.trade-mode-chip {
+    justify-content: center;
+}
+
 .deposit-lead {
     margin: 0 0 12px;
     color: #4d6981;
