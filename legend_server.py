@@ -4225,15 +4225,13 @@ async def settle_user_open_trades(tg_id: int):
 @app.websocket("/ws/user")
 async def ws_user(websocket: WebSocket):
     await websocket.accept()
-    tg_id = 0
-    try:
-        first = await websocket.receive_text()
-        payload = json.loads(first)
-        tg_id = int(payload.get("tg_id") or 0)
-    except Exception:
+    tg_id = int((websocket.session or {}).get(USER_SESSION_KEY) or 0)
+    # Backward compatibility for clients that still send tg_id in first frame.
+    if tg_id <= 0:
         with contextlib.suppress(Exception):
-            await websocket.close()
-        return
+            first = await asyncio.wait_for(websocket.receive_text(), timeout=3.0)
+            payload = json.loads(first)
+            tg_id = int(payload.get("tg_id") or 0)
 
     if tg_id <= 0:
         with contextlib.suppress(Exception):
@@ -4294,6 +4292,8 @@ async def ws_user(websocket: WebSocket):
 @app.websocket("/ws/live")
 async def ws_live(websocket: WebSocket):
     await websocket.accept()
+    session_tg_id = int((websocket.session or {}).get(USER_SESSION_KEY) or 0)
+    session_is_admin = bool((websocket.session or {}).get("is_admin"))
     try:
         first = await websocket.receive_text()
         payload = json.loads(first)
@@ -4302,8 +4302,13 @@ async def ws_live(websocket: WebSocket):
         return
 
     scope = str(payload.get("scope") or "").strip().lower()
-    tg_id = int(payload.get("tg_id") or 0)
+    payload_tg_id = int(payload.get("tg_id") or 0)
+    tg_id = session_tg_id or payload_tg_id
     wc_id = int(payload.get("wc_id") or 0)
+
+    if tg_id <= 0:
+        await websocket.close()
+        return
 
     if scope == "worker":
         user = await fetch_one("SELECT is_worker FROM users WHERE tg_id = ?", (tg_id,))
@@ -4316,8 +4321,11 @@ async def ws_live(websocket: WebSocket):
             await websocket.close()
             return
     elif scope == "admin":
-        # Session validation for WebSocket is omitted in the existing app model; keep scope-limited snapshot only.
-        pass
+        if not session_is_admin:
+            row = await fetch_one("SELECT is_admin FROM users WHERE tg_id = ?", (tg_id,))
+            if not row or not bool(row["is_admin"]):
+                await websocket.close()
+                return
     else:
         await websocket.close()
         return

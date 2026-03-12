@@ -4,7 +4,6 @@
 <section class="card">
     <div class="section-title">{{ labels.exchange_title if labels else "Обмен валют" }}</div>
     <form id="exchange-form" class="form-grid">
-        <input type="hidden" name="tg_id" value="{{ tg_id }}">
         <label>{{ labels.exchange_from if labels else "Отдаю" }}
             <select name="from_currency">
                 <option>USD</option>

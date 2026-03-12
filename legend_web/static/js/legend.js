@@ -2098,10 +2098,6 @@ function bindMarketSocket() {
 }
 
 function bindUserSocket() {
-    const tg = document.querySelector('input[name="tg_id"]');
-    if (!tg) return;
-    const tgId = Number(tg.value || 0);
-    if (!tgId) return;
     const runtime = APP_RUNTIME.userFeed;
     const balEl = document.getElementById("live-balance");
     const curEl = document.getElementById("live-currency");
@@ -2123,9 +2119,9 @@ function bindUserSocket() {
         if (homeBal) animateNumericText(homeBal, Number(data.balance || 0), { decimals: 2 });
         if (homeCur) homeCur.textContent = data.currency || "USD";
         if (positionsWrap && Array.isArray(data.open_positions)) {
-            renderOpenPositions(data.open_positions, tgId);
+            renderOpenPositions(data.open_positions);
             updateExposureWidgets(data.open_positions, data.currency || currentUiCurrency());
-            syncTradePanelFromPositions(data.open_positions, tgId);
+            syncTradePanelFromPositions(data.open_positions);
         }
         if (data.latest_deal) {
             updateProfileLatestDeal(data.latest_deal);
@@ -2155,7 +2151,7 @@ function bindUserSocket() {
         ws.addEventListener("open", () => {
             runtime.connected = true;
             runtime.reconnectDelayMs = 1200;
-            ws.send(JSON.stringify({ tg_id: tgId }));
+            ws.send(JSON.stringify({ scope: "user" }));
         });
         ws.addEventListener("message", (event) => {
             let data = null;

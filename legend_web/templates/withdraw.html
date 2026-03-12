@@ -41,7 +41,6 @@
     {% if support_url %}<a class="qa-btn" href="{{ support_url }}">{{ labels.js_support_btn if labels else "Перейти в поддержку" }}</a>{% endif %}
     {% else %}
     <form id="withdraw-form" class="form-grid">
-        <input type="hidden" name="tg_id" value="{{ tg_id }}">
         <label>{{ labels.deposit_amount if labels else "Сумма" }}
             <input type="number" name="amount" min="1" step="0.01" value="100">
         </label>

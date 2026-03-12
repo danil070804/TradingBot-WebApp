@@ -60,7 +60,6 @@
         <div class="deposit-method-detail"><span id="deposit-detail-note">{{ labels.deposit_recommended_fast if labels else "Рекомендация: для быстрого старта" }}</span></div>
     </div>
     <form id="deposit-form" class="form-grid">
-        <input type="hidden" name="tg_id" value="{{ tg_id }}">
         <input type="hidden" name="method" id="deposit-method" value="crypto">
         <label>{{ labels.deposit_amount if labels else "Сумма" }}
             <input type="number" name="amount" min="1" step="0.01" value="100">
