@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Oxanium:wght@500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/legend.css?v=20260312i">
+    <link rel="stylesheet" href="/static/css/legend.css?v=20260312j">
 </head>
 <body data-lang="{{ lang if lang else 'en' }}" data-page="{{ page if page else '' }}">
 <script>
@@ -22,6 +22,19 @@ try {
 } catch (_) {}
 </script>
 <div class="page-bg"></div>
+<div id="onboarding-overlay" class="onboarding-overlay" hidden>
+    <div class="onboarding-card">
+        <div class="onboarding-head">
+            <strong id="onboarding-title">Quick Start</strong>
+            <button type="button" id="onboarding-skip" class="chip">Skip</button>
+        </div>
+        <p id="onboarding-text">Navigate key sections and open your first trade.</p>
+        <div id="onboarding-dots" class="onboarding-dots"></div>
+        <div class="onboarding-actions">
+            <button type="button" id="onboarding-next" class="submit">Next</button>
+        </div>
+    </div>
+</div>
     <div id="app-preloader" class="app-preloader" aria-hidden="true">
     <div class="preloader-core">
         <div class="preloader-halo"></div>
@@ -77,6 +90,6 @@ try {
 window.LEGEND_LABELS = {{ labels|tojson if labels else '{}' }};
 </script>
 {% block extra_scripts %}{% endblock %}
-<script src="/static/js/legend.js?v=20260312i"></script>
+<script src="/static/js/legend.js?v=20260312j"></script>
 </body>
 </html>

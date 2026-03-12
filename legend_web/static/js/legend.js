@@ -1357,11 +1357,19 @@ function renderOpenPositions(items, tgId) {
             <div class="row position-row" data-trade-id="${p.trade_id}" data-tg-id="${tgId}">
                 <div>
                     <b>${p.asset_name} <span class="${sideClass}">${side}</span></b>
-                    <small>${Number(p.amount || 0).toFixed(2)} ${(p.currency || "USD")} · ${p.remaining}s</small>
+                    <small>${Number(p.amount || 0).toFixed(2)} ${(p.currency || "USD")} · ${p.remaining}s · ${Number(p.leverage || 10)}x</small>
                 </div>
-                <button class="chip pos-close-btn" data-trade-id="${p.trade_id}" data-tg-id="${tgId}">
-                    ${L("trade_close_now", "Close Now")}
-                </button>
+                <div class="position-actions">
+                    <button class="chip pos-close-btn" data-trade-id="${p.trade_id}" data-tg-id="${tgId}">
+                        ${L("trade_close_now", "Close Now")}
+                    </button>
+                    <button class="chip pos-partial-btn" data-trade-id="${p.trade_id}" data-tg-id="${tgId}" data-ratio="0.5">
+                        50%
+                    </button>
+                    <button class="chip pos-reverse-btn" data-trade-id="${p.trade_id}" data-tg-id="${tgId}">
+                        Reverse
+                    </button>
+                </div>
             </div>`;
         })
         .join("");
@@ -1382,26 +1390,43 @@ function bindOpenPositionsActions() {
             }
         }
         const btn = e.target.closest(".pos-close-btn");
-        if (!btn) return;
-        const tradeId = btn.dataset.tradeId;
-        const tgId = Number(btn.dataset.tgId || 0);
+        const partialBtn = e.target.closest(".pos-partial-btn");
+        const reverseBtn = e.target.closest(".pos-reverse-btn");
+        const actionBtn = btn || partialBtn || reverseBtn;
+        if (!actionBtn) return;
+        const tradeId = actionBtn.dataset.tradeId;
+        const tgId = Number(actionBtn.dataset.tgId || 0);
         if (!tradeId || !tgId) return;
-        btn.disabled = true;
+        actionBtn.disabled = true;
         try {
-            const resp = await fetch("/api/trade/close", {
+            let endpoint = "/api/trade/close";
+            let body = { trade_id: tradeId, tg_id: tgId };
+            if (partialBtn) {
+                endpoint = "/api/trade/close_partial";
+                body = { trade_id: tradeId, tg_id: tgId, ratio: Number(partialBtn.dataset.ratio || 0.5) };
+            } else if (reverseBtn) {
+                endpoint = "/api/trade/reverse";
+                body = { trade_id: tradeId, tg_id: tgId };
+            }
+            const resp = await fetch(endpoint, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ trade_id: tradeId, tg_id: tgId }),
+                body: JSON.stringify(body),
             });
             const data = await resp.json();
             if (!resp.ok || !data.ok) {
                 alert(data.error || "Failed to close");
-                btn.disabled = false;
+                actionBtn.disabled = false;
                 return;
+            }
+            await refreshOpenPositions();
+            if (data.new_trade_id) {
+                LIVE_TRADE_PANEL_ID = data.new_trade_id;
+                await syncTradePanel(data.new_trade_id, tgId);
             }
         } catch (_) {
             alert("Network error");
-            btn.disabled = false;
+            actionBtn.disabled = false;
         }
     });
 }
@@ -1641,6 +1666,8 @@ function renderMarketDetail(snapshot, sourceRow) {
 function bindMarketCards() {
     const rows = document.querySelectorAll(".market-card");
     if (!rows.length) return;
+    const hasDrawer = Boolean(document.getElementById("market-detail-card"));
+    if (!hasDrawer) return;
     const loadSnapshot = async (row) => {
         const ref = row.dataset.marketRef || row.dataset.marketSymbol || "BTC";
         try {
@@ -1653,7 +1680,14 @@ function bindMarketCards() {
         }
     };
     rows.forEach((row, index) => {
-        row.addEventListener("click", () => loadSnapshot(row));
+        row.addEventListener("click", (event) => {
+            const target = event.target;
+            if (target && target.closest(".watch-toggle")) return;
+            if (hasDrawer && row.tagName === "A" && !event.metaKey && !event.ctrlKey && !event.shiftKey) {
+                event.preventDefault();
+            }
+            if (hasDrawer) loadSnapshot(row);
+        });
         if (index === 0) loadSnapshot(row);
     });
 }
@@ -1665,12 +1699,41 @@ function bindMarketsToolbar() {
     if (!search || !sort || !list) return;
     const filterChips = Array.from(document.querySelectorAll(".market-filter-chip"));
     let filterMode = "all";
+    const WATCH_KEY = "legend_watchlist_v1";
+    const readWatchlist = () => {
+        try {
+            const raw = localStorage.getItem(WATCH_KEY) || "[]";
+            const arr = JSON.parse(raw);
+            return new Set(Array.isArray(arr) ? arr.map((x) => String(x).toUpperCase()) : []);
+        } catch (_) {
+            return new Set();
+        }
+    };
+    const writeWatchlist = (set) => {
+        try {
+            localStorage.setItem(WATCH_KEY, JSON.stringify(Array.from(set)));
+        } catch (_) {
+            // no-op
+        }
+    };
+    const watchlist = readWatchlist();
 
     const allCards = Array.from(list.querySelectorAll(".market-card"));
     if (!allCards.length) return;
 
     const normalize = (v) => String(v || "").trim().toLowerCase();
     const toNum = (v) => Number(String(v || "").replace(",", "."));
+
+    const syncWatchButtons = () => {
+        allCards.forEach((card) => {
+            const btn = card.querySelector(".watch-toggle");
+            if (!btn) return;
+            const ref = String(btn.dataset.watchRef || card.dataset.marketRef || card.dataset.marketSymbol || "").toUpperCase();
+            const active = watchlist.has(ref);
+            btn.textContent = active ? "★" : "☆";
+            btn.classList.toggle("active", active);
+        });
+    };
 
     const updateStats = (cards) => {
         const toSet = (id, value) => {
@@ -1712,9 +1775,11 @@ function bindMarketsToolbar() {
             const baseMatch = !q || name.includes(q) || symbol.includes(q);
             if (!baseMatch) return false;
             const ch = toNum(card.dataset.marketChange);
+            const ref = normalize(card.dataset.marketRef || card.dataset.marketSymbol);
             if (filterMode === "gainers") return ch >= 0;
             if (filterMode === "losers") return ch < 0;
             if (filterMode === "volatile") return Math.abs(ch) >= 1.0;
+            if (filterMode === "watch") return watchlist.has(ref.toUpperCase());
             return true;
         });
 
@@ -1747,6 +1812,21 @@ function bindMarketsToolbar() {
 
     search.addEventListener("input", apply);
     sort.addEventListener("change", apply);
+    allCards.forEach((card) => {
+        const btn = card.querySelector(".watch-toggle");
+        if (!btn) return;
+        btn.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            const ref = String(btn.dataset.watchRef || card.dataset.marketRef || card.dataset.marketSymbol || "").toUpperCase();
+            if (!ref) return;
+            if (watchlist.has(ref)) watchlist.delete(ref);
+            else watchlist.add(ref);
+            writeWatchlist(watchlist);
+            syncWatchButtons();
+            if (filterMode === "watch") apply();
+        });
+    });
     filterChips.forEach((chip) => {
         chip.addEventListener("click", () => {
             filterMode = chip.dataset.filterMode || "all";
@@ -1755,7 +1835,67 @@ function bindMarketsToolbar() {
             apply();
         });
     });
+    syncWatchButtons();
     apply();
+}
+
+function initOnboardingTour() {
+    const overlay = document.getElementById("onboarding-overlay");
+    const title = document.getElementById("onboarding-title");
+    const text = document.getElementById("onboarding-text");
+    const dots = document.getElementById("onboarding-dots");
+    const skip = document.getElementById("onboarding-skip");
+    const next = document.getElementById("onboarding-next");
+    if (!overlay || !title || !text || !dots || !skip || !next) return;
+    const key = "legend_onboarding_v2_done";
+    try {
+        if (localStorage.getItem(key) === "1") return;
+    } catch (_) {
+        return;
+    }
+    const page = document.body?.dataset?.page || "";
+    if (!["home", "markets", "trade"].includes(page)) return;
+    const steps = [
+        { t: "Welcome", d: "Use bottom navigation to switch between dashboard, markets and trade terminal." },
+        { t: "Live Metrics", d: "Watch balance, exposure and feed status in real time. Values update without reload." },
+        { t: "Trade Actions", d: "Open position, then use Close / 50% / Reverse controls directly from open positions." },
+    ];
+    if (page === "markets") {
+        steps[1] = { t: "Market Scanner", d: "Use filters, sorting and watchlist stars to build your fast access universe." };
+    } else if (page === "trade") {
+        steps[1] = { t: "Execution Deck", d: "Use risk templates, leverage and insight block for faster and safer entries." };
+    }
+    let idx = 0;
+    const render = () => {
+        const s = steps[idx];
+        title.textContent = s.t;
+        text.textContent = s.d;
+        dots.innerHTML = steps.map((_, i) => `<span class="${i === idx ? "active" : ""}"></span>`).join("");
+        next.textContent = idx === steps.length - 1 ? "Start" : "Next";
+        overlay.hidden = false;
+        requestAnimationFrame(() => overlay.classList.add("show"));
+    };
+    const finish = () => {
+        try {
+            localStorage.setItem(key, "1");
+        } catch (_) {
+            // no-op
+        }
+        overlay.classList.remove("show");
+        setTimeout(() => {
+            overlay.hidden = true;
+        }, 220);
+    };
+    skip.addEventListener("click", finish);
+    next.addEventListener("click", () => {
+        if (idx >= steps.length - 1) {
+            finish();
+            return;
+        }
+        idx += 1;
+        render();
+    });
+    render();
 }
 
 function bindLangSwitch() {
@@ -2418,15 +2558,18 @@ bindLangSwitch();
 bindWorkerPanel();
 bindWorkerClientPage();
 bindMarketsToolbar();
+bindMarketCards();
 bindMarketSocket();
 bindUserSocket();
 bindOpenPositionsActions();
 bindMarketMiniCharts();
 hydrateInitialTradeState();
 bindTradeQuickActions();
+bindDealHistoryCards();
 initInteractiveFeedback();
 bindPageTransitions();
 initPageArrivalFx();
+initOnboardingTour();
 
 const tapeWrap = document.getElementById("market-tape-list");
 if (tapeWrap) {

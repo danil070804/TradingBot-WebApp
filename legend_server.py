@@ -1727,6 +1727,9 @@ async def trade(request: Request):
                     "asset_name": str(tr["asset_name"] or ""),
                     "direction": str(tr["direction"] or "up"),
                     "amount": float(tr["amount"] or 0),
+                    "currency": str(tr["currency"] or "USD"),
+                    "leverage": int(tr["leverage"] or 10),
+                    "start_price": float(tr["start_price"] or 0),
                     "remaining": max(0, int(float(tr["close_ts"] or 0) - now)),
                 }
             )
@@ -3018,6 +3021,9 @@ async def api_trade_open_positions(tg_id: int):
                 "asset_name": tr["asset_name"],
                 "direction": tr["direction"],
                 "amount": tr["amount"],
+                "currency": tr["currency"] or "USD",
+                "leverage": int(tr["leverage"] or 10),
+                "start_price": float(tr["start_price"] or 0.0),
                 "remaining": max(0, int(float(tr["close_ts"] or 0) - now)),
             }
         )
@@ -3026,6 +3032,17 @@ async def api_trade_open_positions(tg_id: int):
 
 
 class TradeClosePayload(BaseModel):
+    tg_id: int
+    trade_id: str
+
+
+class TradePartialClosePayload(BaseModel):
+    tg_id: int
+    trade_id: str
+    ratio: float = 0.5
+
+
+class TradeReversePayload(BaseModel):
     tg_id: int
     trade_id: str
 
@@ -3065,6 +3082,144 @@ async def api_trade_close(payload: TradeClosePayload):
             "profit": float(closed["profit"]),
             "balance": float(await bot.get_user_balance(int(payload.tg_id))),
             "close_reason": closed["close_reason"] or "manual",
+        }
+    )
+
+
+@app.post("/api/trade/close_partial", response_class=JSONResponse)
+async def api_trade_close_partial(payload: TradePartialClosePayload):
+    tr = await bot.get_active_trade(payload.trade_id)
+    if not tr:
+        return JSONResponse({"ok": False, "error": "Trade not found"}, status_code=404)
+    if int(tr["user_tg_id"]) != int(payload.tg_id):
+        return JSONResponse({"ok": False, "error": "Forbidden"}, status_code=403)
+    if tr["status"] == "closed":
+        return JSONResponse({"ok": False, "error": "Trade already closed"}, status_code=400)
+
+    ratio = float(payload.ratio or 0.0)
+    if ratio <= 0.0 or ratio >= 1.0:
+        return JSONResponse({"ok": False, "error": "Ratio must be between 0 and 1"}, status_code=400)
+
+    total_amount = float(tr["amount"] or 0.0)
+    close_amount = round(total_amount * ratio, 2)
+    remain_amount = round(total_amount - close_amount, 2)
+    if close_amount <= 0 or remain_amount <= 0:
+        return JSONResponse({"ok": False, "error": "Amount is too small for partial close"}, status_code=400)
+
+    now_ts = time.time()
+    remain_seconds = max(5, int(float(tr["close_ts"] or 0.0) - now_ts))
+    current_mark = await fetch_live_mark_or_none(str(tr["asset_name"] or ""))
+    if not current_mark or current_mark <= 0:
+        current_mark = float(tr["start_price"] or 0.0) or 1.0
+
+    await execute_query(
+        "UPDATE active_trades SET amount = ?, close_ts = ?, close_reason = ? WHERE trade_id = ? AND status = 'open'",
+        (close_amount, now_ts, "manual", payload.trade_id),
+    )
+    closed = await settle_web_trade(payload.trade_id)
+    if not closed:
+        return JSONResponse({"ok": False, "error": "Failed to settle partial close"}, status_code=500)
+
+    new_trade_id = await bot.create_active_trade(
+        user_tg_id=int(tr["user_tg_id"]),
+        source=str(tr["source"] or "web"),
+        asset_name=str(tr["asset_name"] or ""),
+        direction=str(tr["direction"] or "up"),
+        amount=remain_amount,
+        currency=str(tr["currency"] or "USD"),
+        seconds=int(remain_seconds),
+        start_price=float(_format_price(current_mark)),
+        ticker=str(tr["ticker"] or ""),
+        leverage=int(tr["leverage"] or 10),
+        tp_price=float(tr["tp_price"]) if tr["tp_price"] is not None else None,
+        sl_price=float(tr["sl_price"]) if tr["sl_price"] is not None else None,
+        risk_percent=float(tr["risk_percent"] or 0.0),
+        close_reason=str(tr["close_reason"] or "time"),
+    )
+    await bot.notify_trade_opened(new_trade_id)
+    await log_web_activity_for_worker(
+        client_tg_id=int(tr["user_tg_id"]),
+        actor_tg_id=int(tr["user_tg_id"]),
+        event_type="trade_partial_close",
+        title="Частичное закрытие",
+        details=f"Частичное закрытие {str(tr['asset_name'])}: {close_amount:.2f} закрыто, {remain_amount:.2f} переоткрыто",
+        amount=float(closed["profit"] or 0.0),
+        currency=str(tr["currency"] or "USD"),
+        meta={"trade_id": payload.trade_id, "new_trade_id": new_trade_id, "ratio": ratio},
+    )
+    return JSONResponse(
+        {
+            "ok": True,
+            "closed_trade_id": payload.trade_id,
+            "new_trade_id": new_trade_id,
+            "closed_profit": float(closed["profit"] or 0.0),
+            "remaining_amount": remain_amount,
+            "remaining_seconds": remain_seconds,
+            "balance": float(await bot.get_user_balance(int(payload.tg_id))),
+        }
+    )
+
+
+@app.post("/api/trade/reverse", response_class=JSONResponse)
+async def api_trade_reverse(payload: TradeReversePayload):
+    tr = await bot.get_active_trade(payload.trade_id)
+    if not tr:
+        return JSONResponse({"ok": False, "error": "Trade not found"}, status_code=404)
+    if int(tr["user_tg_id"]) != int(payload.tg_id):
+        return JSONResponse({"ok": False, "error": "Forbidden"}, status_code=403)
+    if tr["status"] == "closed":
+        return JSONResponse({"ok": False, "error": "Trade already closed"}, status_code=400)
+
+    now_ts = time.time()
+    remain_seconds = max(10, int(float(tr["close_ts"] or 0.0) - now_ts))
+    opposite_direction = "down" if str(tr["direction"] or "up") == "up" else "up"
+    current_mark = await fetch_live_mark_or_none(str(tr["asset_name"] or ""))
+    if not current_mark or current_mark <= 0:
+        current_mark = float(tr["start_price"] or 0.0) or 1.0
+
+    await execute_query(
+        "UPDATE active_trades SET close_ts = ?, close_reason = ? WHERE trade_id = ? AND status = 'open'",
+        (now_ts, "manual", payload.trade_id),
+    )
+    closed = await settle_web_trade(payload.trade_id)
+    if not closed:
+        return JSONResponse({"ok": False, "error": "Failed to close current trade"}, status_code=500)
+
+    new_trade_id = await bot.create_active_trade(
+        user_tg_id=int(tr["user_tg_id"]),
+        source=str(tr["source"] or "web"),
+        asset_name=str(tr["asset_name"] or ""),
+        direction=opposite_direction,
+        amount=float(tr["amount"] or 0.0),
+        currency=str(tr["currency"] or "USD"),
+        seconds=int(remain_seconds),
+        start_price=float(_format_price(current_mark)),
+        ticker=str(tr["ticker"] or ""),
+        leverage=int(tr["leverage"] or 10),
+        tp_price=float(tr["tp_price"]) if tr["tp_price"] is not None else None,
+        sl_price=float(tr["sl_price"]) if tr["sl_price"] is not None else None,
+        risk_percent=float(tr["risk_percent"] or 0.0),
+        close_reason="time",
+    )
+    await bot.notify_trade_opened(new_trade_id)
+    await log_web_activity_for_worker(
+        client_tg_id=int(tr["user_tg_id"]),
+        actor_tg_id=int(tr["user_tg_id"]),
+        event_type="trade_reversed",
+        title="Реверс позиции",
+        details=f"Позиция {str(tr['asset_name'])} развернута в {'ЛОНГ' if opposite_direction == 'up' else 'ШОРТ'}",
+        amount=float(closed["profit"] or 0.0),
+        currency=str(tr["currency"] or "USD"),
+        meta={"trade_id": payload.trade_id, "new_trade_id": new_trade_id, "new_direction": opposite_direction},
+    )
+    return JSONResponse(
+        {
+            "ok": True,
+            "closed_trade_id": payload.trade_id,
+            "new_trade_id": new_trade_id,
+            "new_direction": opposite_direction,
+            "closed_profit": float(closed["profit"] or 0.0),
+            "balance": float(await bot.get_user_balance(int(payload.tg_id))),
         }
     )
 
@@ -3380,6 +3535,9 @@ async def ws_user(websocket: WebSocket):
                         "asset_name": tr["asset_name"],
                         "direction": tr["direction"],
                         "amount": tr["amount"],
+                        "currency": tr["currency"] or "USD",
+                        "leverage": int(tr["leverage"] or 10),
+                        "start_price": float(tr["start_price"] or 0.0),
                         "remaining": max(0, int(float(tr["close_ts"] or 0) - now)),
                     }
                 )

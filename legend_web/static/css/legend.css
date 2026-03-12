@@ -943,7 +943,7 @@ body[data-page="trade"] .hint {
 
 .markets-filters {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 8px;
     margin-bottom: 10px;
 }
@@ -1226,6 +1226,17 @@ body[data-page="trade"] .hint {
     font-weight: 700;
     text-decoration: none;
 }
+
+.watch-toggle {
+    margin-top: 6px;
+    min-width: 44px;
+}
+
+.watch-toggle.active {
+    background: linear-gradient(180deg, rgba(255, 214, 124, 0.42), rgba(245, 179, 82, 0.2));
+    border-color: rgba(237, 174, 82, 0.5);
+    color: #9b640f;
+}
 .mini-spark {
     margin-top: 6px;
     width: 120px;
@@ -1463,6 +1474,86 @@ select, input {
     padding: 10px 12px;
     margin-bottom: 8px;
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.93), rgba(235, 247, 253, 0.9));
+}
+
+.position-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.position-actions .chip {
+    min-width: 68px;
+}
+
+.onboarding-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2100;
+    display: grid;
+    place-items: center;
+    background: rgba(11, 34, 53, 0.56);
+    backdrop-filter: blur(8px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s ease;
+}
+
+.onboarding-overlay.show {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.onboarding-card {
+    width: min(360px, calc(100vw - 28px));
+    border-radius: 18px;
+    padding: 14px;
+    border: 1px solid rgba(129, 203, 245, 0.36);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(230, 244, 253, 0.94));
+    box-shadow: 0 26px 60px rgba(19, 49, 74, 0.28);
+}
+
+.onboarding-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.onboarding-head strong {
+    font-family: "Oxanium", sans-serif;
+    color: #2a5e83;
+    font-size: 18px;
+}
+
+.onboarding-card p {
+    color: #5f8099;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.onboarding-dots {
+    display: flex;
+    gap: 6px;
+    margin: 10px 0;
+}
+
+.onboarding-dots span {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(104, 171, 214, 0.28);
+}
+
+.onboarding-dots span.active {
+    background: rgba(62, 154, 209, 0.84);
+}
+
+.onboarding-actions {
+    display: flex;
+    justify-content: flex-end;
 }
 
 .deposit-lead {
