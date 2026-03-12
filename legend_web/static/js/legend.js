@@ -508,6 +508,100 @@ function formatExpiration(seconds) {
     return `${sec}s`;
 }
 
+function drawTradeScenarioPreview(payload) {
+    const canvas = document.getElementById("tc-scenario-canvas");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    const w = Math.max(300, canvas.clientWidth || 420);
+    const h = Math.max(120, canvas.clientHeight || 128);
+    canvas.width = Math.floor(w * dpr);
+    canvas.height = Math.floor(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+
+    const padX = 10;
+    const padY = 10;
+    const plotW = w - padX * 2;
+    const plotH = h - padY * 2;
+    const midY = padY + plotH / 2;
+    const tpPct = Math.max(0, Number(payload.tpPercent || 0));
+    const slPct = Math.max(0, Number(payload.slPercent || 0));
+    const side = payload.direction === "up" ? 1 : -1;
+    const rangePct = Math.max(0.35, tpPct, slPct, 1.0);
+
+    const toY = (pctMove) => {
+        const norm = Math.max(-1, Math.min(1, pctMove / rangePct));
+        return midY - norm * (plotH * 0.44);
+    };
+
+    const tpY = toY(side * tpPct);
+    const slY = toY(-side * slPct);
+
+    // TP/SL target zones
+    ctx.fillStyle = "rgba(44, 163, 111, 0.12)";
+    ctx.fillRect(padX, 0, plotW, Math.max(0, Math.min(tpY, midY)));
+    ctx.fillStyle = "rgba(202, 95, 115, 0.12)";
+    ctx.fillRect(padX, Math.max(tpY, midY), plotW, h - Math.max(tpY, midY));
+
+    // Entry reference line
+    ctx.strokeStyle = "rgba(63, 127, 169, 0.72)";
+    ctx.setLineDash([5, 4]);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(padX, midY);
+    ctx.lineTo(w - padX, midY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // TP and SL lines
+    if (tpPct > 0) {
+        ctx.strokeStyle = "rgba(44, 163, 111, 0.86)";
+        ctx.beginPath();
+        ctx.moveTo(padX, tpY);
+        ctx.lineTo(w - padX, tpY);
+        ctx.stroke();
+    }
+    if (slPct > 0) {
+        ctx.strokeStyle = "rgba(202, 95, 115, 0.86)";
+        ctx.beginPath();
+        ctx.moveTo(padX, slY);
+        ctx.lineTo(w - padX, slY);
+        ctx.stroke();
+    }
+
+    // Scenario path
+    const points = 42;
+    const sec = Math.max(10, Number(payload.seconds || 30));
+    const baseAmp = Math.max(0.18, Math.min(0.8, sec / 120));
+    const driftTo = side > 0 ? Math.max(tpPct * 0.6, 0.3) : -Math.max(tpPct * 0.6, 0.3);
+    let prevPct = 0;
+    ctx.strokeStyle = "#3f7fa9";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < points; i += 1) {
+        const t = i / (points - 1);
+        const wobble = (Math.sin(t * 9.2) * 0.22 + Math.sin(t * 4.8 + 0.7) * 0.14) * baseAmp;
+        const drift = driftTo * (t * t);
+        const pct = drift + wobble;
+        prevPct = pct;
+        const x = padX + t * plotW;
+        const y = toY(pct);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+
+    // End marker
+    const endX = w - padX;
+    const endY = toY(prevPct);
+    ctx.fillStyle = "#3f7fa9";
+    ctx.beginPath();
+    ctx.arc(endX, endY, 3.2, 0, Math.PI * 2);
+    ctx.fill();
+}
+
 async function showTradeConfirmSheet(payload) {
     const overlay = document.getElementById("trade-confirm-overlay");
     if (!overlay) {
@@ -524,6 +618,10 @@ async function showTradeConfirmSheet(payload) {
         risk: isRu ? "Оценка, не гарантия. Финальный результат зависит от движения рынка." : isUk ? "Оцінка, не гарантія. Фінальний результат залежить від руху ринку." : "Estimate only, not guaranteed. Final result depends on live market movement.",
         confirm: isRu ? "Подтвердить и открыть" : isUk ? "Підтвердити та відкрити" : "Confirm & Open",
         cancel: isRu ? "Отмена" : isUk ? "Скасувати" : "Cancel",
+        scenario: isRu ? "Сценарий до экспирации" : isUk ? "Сценарій до експірації" : "Scenario To Expiration",
+        entry: isRu ? "Вход" : isUk ? "Вхід" : "Entry",
+        tpZone: isRu ? "TP зона" : isUk ? "TP зона" : "TP zone",
+        slZone: isRu ? "SL зона" : isUk ? "SL зона" : "SL zone",
     };
     const set = (id, value) => {
         const el = document.getElementById(id);
@@ -546,6 +644,12 @@ async function showTradeConfirmSheet(payload) {
     const cancelTopBtn = document.getElementById("tc-cancel-top");
     if (confirmBtn) confirmBtn.textContent = mapText.confirm;
     if (cancelBtn) cancelBtn.textContent = mapText.cancel;
+    set("tc-scenario-title", mapText.scenario);
+    set("tc-scenario-exp", formatExpiration(payload.seconds));
+    set("tc-entry-label", mapText.entry);
+    set("tc-tp-label", mapText.tpZone);
+    set("tc-sl-label", mapText.slZone);
+    drawTradeScenarioPreview(payload);
 
     overlay.hidden = false;
     requestAnimationFrame(() => overlay.classList.add("show"));
@@ -619,6 +723,8 @@ function bindTradeForm() {
                 leverage,
                 currency,
                 mark,
+                tpPercent,
+                slPercent,
                 tpValue: tpPercent > 0 ? (amount * tpPercent) / 100 : 0,
                 slValue: slPercent > 0 ? (amount * slPercent) / 100 : 0,
                 riskLoad,

@@ -210,6 +210,18 @@
             <div><small>Potential SL</small><b class="neg" id="tc-sl">--</b></div>
             <div><small>Risk load</small><b id="tc-risk-load">--</b></div>
         </div>
+        <div class="trade-scenario-wrap">
+            <div class="trade-scenario-head">
+                <small id="tc-scenario-title">Scenario Preview</small>
+                <span id="tc-scenario-exp">--</span>
+            </div>
+            <canvas id="tc-scenario-canvas" width="420" height="128"></canvas>
+            <div class="trade-scenario-legend">
+                <span><i class="sc-line"></i><b id="tc-entry-label">Entry</b></span>
+                <span><i class="sc-tp"></i><b id="tc-tp-label">TP zone</b></span>
+                <span><i class="sc-sl"></i><b id="tc-sl-label">SL zone</b></span>
+            </div>
+        </div>
         <div class="trade-confirm-note" id="tc-note">This estimate is not guaranteed and depends on live market conditions.</div>
         <div class="trade-confirm-actions">
             <button type="button" class="chip" id="tc-cancel">Cancel</button>
