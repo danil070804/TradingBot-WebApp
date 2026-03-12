@@ -2111,6 +2111,18 @@ function bindPageTransitions() {
             haptic();
             try {
                 sessionStorage.setItem("legend_nav_transition", "1");
+                if (anchor.closest(".bottom-nav")) {
+                    const r = anchor.getBoundingClientRect();
+                    sessionStorage.setItem("legend_nav_shared_rect", JSON.stringify({
+                        x: r.left,
+                        y: r.top,
+                        w: r.width,
+                        h: r.height,
+                        text: (anchor.textContent || "").trim(),
+                        ts: Date.now(),
+                    }));
+                    sessionStorage.setItem("legend_nav_skeleton", "1");
+                }
             } catch (_) {
                 // no-op
             }
@@ -2120,6 +2132,194 @@ function bindPageTransitions() {
             }, 95);
         });
     });
+}
+
+function initBottomNavMotion() {
+    const nav = document.querySelector(".bottom-nav");
+    if (!nav) return;
+    const pill = document.getElementById("nav-active-pill");
+    const active = nav.querySelector("a.active");
+    if (!pill || !active) return;
+    const placePill = (anchor, animate = true) => {
+        const navRect = nav.getBoundingClientRect();
+        const r = anchor.getBoundingClientRect();
+        if (!r.width || !r.height) return;
+        nav.classList.add("has-pill");
+        if (!animate) {
+            pill.style.transition = "none";
+        }
+        pill.style.width = `${r.width}px`;
+        pill.style.height = `${r.height}px`;
+        pill.style.transform = `translate3d(${(r.left - navRect.left).toFixed(2)}px, ${(r.top - navRect.top).toFixed(2)}px, 0)`;
+        if (!animate) {
+            requestAnimationFrame(() => {
+                pill.style.transition = "";
+            });
+        }
+    };
+
+    placePill(active, false);
+    window.addEventListener("resize", () => placePill(active, false));
+
+    let prev = null;
+    try {
+        const raw = sessionStorage.getItem("legend_nav_shared_rect");
+        if (raw) {
+            prev = JSON.parse(raw);
+            sessionStorage.removeItem("legend_nav_shared_rect");
+        }
+    } catch (_) {
+        prev = null;
+    }
+    if (!prev || !Number.isFinite(Number(prev.ts))) return;
+    if (Date.now() - Number(prev.ts) > 1600) return;
+    if (!(Number(prev.w) > 0 && Number(prev.h) > 0)) return;
+
+    const toRect = active.getBoundingClientRect();
+    if (!(toRect.width > 0 && toRect.height > 0)) return;
+    const ghost = document.createElement("div");
+    ghost.className = "nav-shared-ghost";
+    ghost.textContent = prev.text || "";
+    ghost.style.left = `${Number(prev.x)}px`;
+    ghost.style.top = `${Number(prev.y)}px`;
+    ghost.style.width = `${Number(prev.w)}px`;
+    ghost.style.height = `${Number(prev.h)}px`;
+    document.body.appendChild(ghost);
+
+    const dx = toRect.left - Number(prev.x);
+    const dy = toRect.top - Number(prev.y);
+    const sx = Number(prev.w) > 0 ? toRect.width / Number(prev.w) : 1;
+    const sy = Number(prev.h) > 0 ? toRect.height / Number(prev.h) : 1;
+    ghost.animate(
+        [
+            { transform: "translate3d(0,0,0) scale(1)", opacity: 0.86 },
+            { transform: `translate3d(${dx}px, ${dy}px, 0) scale(${sx}, ${sy})`, opacity: 0.08 },
+        ],
+        { duration: 340, easing: "cubic-bezier(.2,.8,.2,1)", fill: "forwards" }
+    );
+    window.setTimeout(() => ghost.remove(), 380);
+}
+
+function skeletonMarkupByPage(page) {
+    if (page === "trade") {
+        return `
+            <div class="skeleton-stack">
+                <div class="skeleton-card">
+                    <div class="skeleton-line" style="width:42%"></div>
+                    <div class="skeleton-line" style="width:64%"></div>
+                    <div class="skeleton-line" style="width:56%"></div>
+                </div>
+                <div class="skeleton-grid">
+                    <div class="skeleton-card"><div class="skeleton-line" style="width:74%"></div><div class="skeleton-line" style="width:48%"></div></div>
+                    <div class="skeleton-card"><div class="skeleton-line" style="width:72%"></div><div class="skeleton-line" style="width:42%"></div></div>
+                    <div class="skeleton-card"><div class="skeleton-line" style="width:68%"></div><div class="skeleton-line" style="width:36%"></div></div>
+                </div>
+                <div class="skeleton-card">
+                    <div class="skeleton-line" style="width:38%"></div>
+                    <div class="skeleton-line" style="width:100%;height:120px;border-radius:12px"></div>
+                </div>
+            </div>`;
+    }
+    if (page === "markets") {
+        return `
+            <div class="skeleton-stack">
+                <div class="skeleton-card">
+                    <div class="skeleton-line" style="width:40%"></div>
+                    <div class="skeleton-grid">
+                        <div class="skeleton-line" style="height:56px"></div>
+                        <div class="skeleton-line" style="height:56px"></div>
+                        <div class="skeleton-line" style="height:56px"></div>
+                    </div>
+                </div>
+                <div class="skeleton-card">
+                    <div class="skeleton-chip-row">
+                        <div class="skeleton-line" style="height:30px"></div>
+                        <div class="skeleton-line" style="height:30px"></div>
+                        <div class="skeleton-line" style="height:30px"></div>
+                        <div class="skeleton-line" style="height:30px"></div>
+                    </div>
+                    <div class="skeleton-line" style="width:100%;height:44px;margin-top:10px"></div>
+                    <div class="skeleton-line" style="width:100%;height:44px;margin-top:8px"></div>
+                    <div class="skeleton-line" style="width:100%;height:44px;margin-top:8px"></div>
+                </div>
+            </div>`;
+    }
+    if (page === "profile") {
+        return `
+            <div class="skeleton-stack">
+                <div class="skeleton-card">
+                    <div class="skeleton-line" style="width:28%"></div>
+                    <div class="skeleton-line" style="width:54%"></div>
+                    <div class="skeleton-line" style="width:44%"></div>
+                </div>
+                <div class="skeleton-grid">
+                    <div class="skeleton-card"><div class="skeleton-line" style="height:56px"></div></div>
+                    <div class="skeleton-card"><div class="skeleton-line" style="height:56px"></div></div>
+                    <div class="skeleton-card"><div class="skeleton-line" style="height:56px"></div></div>
+                </div>
+                <div class="skeleton-card">
+                    <div class="skeleton-line" style="width:36%"></div>
+                    <div class="skeleton-line" style="width:100%;height:42px;margin-top:8px"></div>
+                    <div class="skeleton-line" style="width:100%;height:42px;margin-top:8px"></div>
+                </div>
+            </div>`;
+    }
+    return "";
+}
+
+function initPageSkeleton() {
+    const holder = document.getElementById("page-skeleton");
+    const page = document.body?.dataset?.page || "";
+    if (!holder) return;
+    if (!["trade", "markets", "profile"].includes(page)) {
+        holder.remove();
+        return;
+    }
+    let fromNav = false;
+    try {
+        fromNav = sessionStorage.getItem("legend_nav_skeleton") === "1";
+        if (fromNav) sessionStorage.removeItem("legend_nav_skeleton");
+    } catch (_) {
+        // no-op
+    }
+    let firstVisit = false;
+    try {
+        const key = `legend_seen_${page}`;
+        firstVisit = sessionStorage.getItem(key) !== "1";
+        sessionStorage.setItem(key, "1");
+    } catch (_) {
+        firstVisit = false;
+    }
+    if (!fromNav && !firstVisit) {
+        holder.remove();
+        return;
+    }
+    const markup = skeletonMarkupByPage(page);
+    if (!markup) {
+        holder.remove();
+        return;
+    }
+    holder.innerHTML = markup;
+    holder.hidden = false;
+    requestAnimationFrame(() => holder.classList.add("show"));
+
+    const reducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const minMs = reducedMotion ? 220 : (fromNav ? 380 : 560);
+    const started = Date.now();
+    const close = () => {
+        if (holder.classList.contains("done")) return;
+        const wait = Math.max(0, minMs - (Date.now() - started));
+        window.setTimeout(() => {
+            holder.classList.add("done");
+            window.setTimeout(() => holder.remove(), 260);
+        }, wait);
+    };
+    if (document.readyState === "complete") {
+        close();
+    } else {
+        window.addEventListener("load", close, { once: true });
+    }
+    window.setTimeout(close, minMs + 1400);
 }
 
 function initPageArrivalFx() {
@@ -2725,7 +2925,9 @@ hydrateInitialTradeState();
 bindTradeQuickActions();
 bindDealHistoryCards();
 initInteractiveFeedback();
+initPageSkeleton();
 bindPageTransitions();
+initBottomNavMotion();
 initPageArrivalFx();
 initOnboardingTour();
 
