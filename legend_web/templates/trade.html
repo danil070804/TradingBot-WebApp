@@ -6,9 +6,30 @@
     window.LEGEND_INITIAL_TRADE_STATUS = {{ initial_trade_status | tojson if initial_trade_status else 'null' }};
 </script>
 <section class="card hero">
-    <h1>{{ labels.trade_title if labels else "Futures Terminal" }}</h1>
-    <div class="hint">{{ labels.trade_balance if labels else "Баланс" }}: <span id="live-balance">{{ "%.2f"|format((user.balance if user else 0) or 0) }}</span> <span id="live-currency">{{ (user.currency if user else "USD") or "USD" }}</span></div>
-    <div class="hint">{{ labels.trade_open_trades if labels else "Открытых сделок" }}: <span id="live-open-trades">0</span></div>
+    <div class="trade-hero-top">
+        <div class="trade-hero-copy">
+            <h1>{{ labels.trade_title if labels else "Futures Terminal" }}</h1>
+            <strong class="trade-hero-headline">
+                {% if lang == "ru" %}Открой сделку быстро и контролируй риск в одном окне{% elif lang == "uk" %}Відкрий угоду швидко та контролюй ризик в одному екрані{% else %}Open a position fast and control risk in one screen{% endif %}
+            </strong>
+            <p class="trade-hero-lead">
+                {% if lang == "ru" %}Живой рынок, быстрый вход, контроль экспозиции и результат сделки без прыжков между разделами.{% elif lang == "uk" %}Живий ринок, швидкий вхід, контроль експозиції та результат угоди без стрибків між розділами.{% else %}Live market, fast execution, exposure control and result tracking without jumping between screens.{% endif %}
+            </p>
+        </div>
+        <a id="hero-open-chart" class="qa-btn trade-hero-cta" href="/trade/chart">
+            {% if lang == "ru" %}Полный график{% elif lang == "uk" %}Повний графік{% else %}Full Chart{% endif %}
+        </a>
+    </div>
+    <div class="trade-hero-kpis">
+        <div class="trade-hero-kpi">
+            <span>{{ labels.trade_balance if labels else "Баланс" }}</span>
+            <b><span id="live-balance">{{ "%.2f"|format((user.balance if user else 0) or 0) }}</span> <em id="live-currency">{{ (user.currency if user else "USD") or "USD" }}</em></b>
+        </div>
+        <div class="trade-hero-kpi">
+            <span>{{ labels.trade_open_trades if labels else "Открытых сделок" }}</span>
+            <b id="live-open-trades">0</b>
+        </div>
+    </div>
     <div class="activity-strip">
         <span id="market-live-dot" class="activity-dot"></span>
         <strong id="market-live-text">{{ labels.trade_feed_booting if labels else "Рынок: подключение" }}</strong>
@@ -20,6 +41,23 @@
         </span>
     </div>
     <div class="pulse-wrap"><div id="market-pulse" class="pulse-track"></div></div>
+</section>
+
+<section class="trade-command-bar">
+    <article class="card trade-command-card">
+        <span>{% if lang == "ru" %}Активный режим{% elif lang == "uk" %}Активний режим{% else %}Active mode{% endif %}</span>
+        <strong>{% if lang == "ru" %}Turbo Futures{% elif lang == "uk" %}Turbo Futures{% else %}Turbo Futures{% endif %}</strong>
+        <small>{% if lang == "ru" %}Быстрый вход с таймером и live-панелью{% elif lang == "uk" %}Швидкий вхід з таймером і live-панеллю{% else %}Fast execution with timer and live panel{% endif %}</small>
+    </article>
+    <article class="card trade-command-card">
+        <span>Market</span>
+        <strong id="command-mark">Live mark via desk</strong>
+        <small>{% if lang == "ru" %}Книга цен, лента и chart preview синхронизированы{% elif lang == "uk" %}Книга цін, стрічка та chart preview синхронізовані{% else %}Order book, tape and chart preview stay in sync{% endif %}</small>
+    </article>
+    <article class="card trade-command-actions">
+        <a class="qa-btn" href="/markets">{% if lang == "ru" %}Открыть рынки{% elif lang == "uk" %}Відкрити ринки{% else %}Open Markets{% endif %}</a>
+        <a class="qa-btn" href="/deposit">{% if lang == "ru" %}Пополнить баланс{% elif lang == "uk" %}Поповнити баланс{% else %}Top Up Balance{% endif %}</a>
+    </article>
 </section>
 
 <section class="trade-quickdeck">
@@ -84,73 +122,105 @@
 </section>
 
 <section class="card trade-layout">
-    <div class="trade-left">
-        <form id="trade-form" class="form-grid">
+    <div class="trade-left trade-form-panel">
+        <div class="trade-panel-head">
+            <div>
+                <div class="section-title">{% if lang == "ru" %}Execution desk{% elif lang == "uk" %}Execution desk{% else %}Execution desk{% endif %}</div>
+                <strong class="trade-panel-title">{% if lang == "ru" %}Собери параметры сделки{% elif lang == "uk" %}Збери параметри угоди{% else %}Build your trade setup{% endif %}</strong>
+            </div>
+            <div class="trade-panel-badge">{% if lang == "ru" %}ready{% elif lang == "uk" %}ready{% else %}ready{% endif %}</div>
+        </div>
+        <form id="trade-form" class="form-grid trade-form-grid">
             <input type="hidden" name="tg_id" value="{{ tg_id }}">
             <input type="hidden" id="balance-raw" value="{{ "%.4f"|format((user.balance if user else 0) or 0) }}">
-            <label>{{ labels.trade_pair if labels else "Пара" }}
-                <select name="asset_name">
-                    {% for a in assets %}
-                    <option value="{{ a.name }}">{{ a.name }}</option>
-                    {% endfor %}
-                </select>
-            </label>
-            <label>{{ labels.trade_amount if labels else "Сумма" }}
-                <input id="trade-amount-input" type="number" step="0.01" min="100" name="amount" value="100">
-            </label>
-            <label>{% if lang == "ru" %}Риск %{% elif lang == "uk" %}Ризик %{% else %}Risk %{% endif %}
-                <input id="risk-input" type="number" step="0.1" min="0" max="100" name="risk_percent" value="0">
-            </label>
-            <div class="chips">
-                <button type="button" class="chip" data-amt="100">100</button>
-                <button type="button" class="chip" data-amt="500">500</button>
-                <button type="button" class="chip" data-amt="1000">1k</button>
-                <button type="button" class="chip" data-amt="5000">5k</button>
-            </div>
-            <div class="chips">
-                <button type="button" class="chip risk-chip" data-risk="1">1%</button>
-                <button type="button" class="chip risk-chip" data-risk="2">2%</button>
-                <button type="button" class="chip risk-chip" data-risk="5">5%</button>
-                <button type="button" class="chip risk-chip" data-risk="10">10%</button>
-            </div>
-            <div class="chips chips-wide">
-                <button type="button" class="chip risk-chip" data-risk="15">15%</button>
-                <button type="button" class="chip risk-chip" data-risk="25">25%</button>
-                <button type="button" class="chip" data-amt="10000">10k</button>
-                <button type="button" class="chip" data-amt="25000">25k</button>
+            <div class="trade-form-section">
+                <div class="trade-form-section-head">
+                    <span>{% if lang == "ru" %}База позиции{% elif lang == "uk" %}База позиції{% else %}Position base{% endif %}</span>
+                </div>
+                <div class="trade-field-grid">
+                    <label>{{ labels.trade_pair if labels else "Пара" }}
+                        <select name="asset_name">
+                            {% for a in assets %}
+                            <option value="{{ a.name }}">{{ a.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label>{{ labels.trade_amount if labels else "Сумма" }}
+                        <input id="trade-amount-input" type="number" step="0.01" min="100" name="amount" value="100">
+                    </label>
+                    <label>{% if lang == "ru" %}Риск %{% elif lang == "uk" %}Ризик %{% else %}Risk %{% endif %}
+                        <input id="risk-input" type="number" step="0.1" min="0" max="100" name="risk_percent" value="0">
+                    </label>
+                </div>
+                <div class="chips">
+                    <button type="button" class="chip" data-amt="100">100</button>
+                    <button type="button" class="chip" data-amt="500">500</button>
+                    <button type="button" class="chip" data-amt="1000">1k</button>
+                    <button type="button" class="chip" data-amt="5000">5k</button>
+                </div>
+                <div class="chips">
+                    <button type="button" class="chip risk-chip" data-risk="1">1%</button>
+                    <button type="button" class="chip risk-chip" data-risk="2">2%</button>
+                    <button type="button" class="chip risk-chip" data-risk="5">5%</button>
+                    <button type="button" class="chip risk-chip" data-risk="10">10%</button>
+                </div>
+                <div class="chips chips-wide">
+                    <button type="button" class="chip risk-chip" data-risk="15">15%</button>
+                    <button type="button" class="chip risk-chip" data-risk="25">25%</button>
+                    <button type="button" class="chip" data-amt="10000">10k</button>
+                    <button type="button" class="chip" data-amt="25000">25k</button>
+                </div>
             </div>
 
-            <label>{{ labels.trade_leverage if labels else "Плечо" }}: <span id="lev-val">10x</span>
-                <input id="lev-range" type="range" min="1" max="50" value="10">
-                <input type="hidden" name="leverage" id="lev-hidden" value="10">
-            </label>
-
-            <label>{{ labels.trade_expiration if labels else "Экспирация" }}
-                <select name="seconds">
-                    <option value="10">10с</option>
-                    <option value="30" selected>30с</option>
-                    <option value="60">1м</option>
-                    <option value="300">5м</option>
-                </select>
-            </label>
-            <div class="direction-group">
-                <label>{% if lang == "ru" %}TP %{% elif lang == "uk" %}TP %{% else %}TP %{% endif %}
-                    <input type="number" name="tp_percent" step="0.1" min="0" value="0">
+            <div class="trade-form-section">
+                <div class="trade-form-section-head">
+                    <span>{% if lang == "ru" %}Плечо и время{% elif lang == "uk" %}Плече та час{% else %}Leverage and timing{% endif %}</span>
+                </div>
+                <label>{{ labels.trade_leverage if labels else "Плечо" }}: <span id="lev-val">10x</span>
+                    <input id="lev-range" type="range" min="1" max="50" value="10">
+                    <input type="hidden" name="leverage" id="lev-hidden" value="10">
                 </label>
-                <label>{% if lang == "ru" %}SL %{% elif lang == "uk" %}SL %{% else %}SL %{% endif %}
-                    <input type="number" name="sl_percent" step="0.1" min="0" value="0">
+                <label>{{ labels.trade_expiration if labels else "Экспирация" }}
+                    <select name="seconds">
+                        <option value="10">10с</option>
+                        <option value="30" selected>30с</option>
+                        <option value="60">1м</option>
+                        <option value="300">5м</option>
+                    </select>
                 </label>
             </div>
 
-            <div class="direction-group">
-                <button type="button" class="dir-btn long active" data-dir="up">{{ labels.trade_long if labels else "ЛОНГ" }}</button>
-                <button type="button" class="dir-btn short" data-dir="down">{{ labels.trade_short if labels else "ШОРТ" }}</button>
+            <div class="trade-form-section">
+                <div class="trade-form-section-head">
+                    <span>{% if lang == "ru" %}Управление выходом{% elif lang == "uk" %}Керування виходом{% else %}Exit control{% endif %}</span>
+                </div>
+                <div class="direction-group">
+                    <label>{% if lang == "ru" %}TP %{% elif lang == "uk" %}TP %{% else %}TP %{% endif %}
+                        <input type="number" name="tp_percent" step="0.1" min="0" value="0">
+                    </label>
+                    <label>{% if lang == "ru" %}SL %{% elif lang == "uk" %}SL %{% else %}SL %{% endif %}
+                        <input type="number" name="sl_percent" step="0.1" min="0" value="0">
+                    </label>
+                </div>
+            </div>
+
+            <div class="trade-form-section trade-form-section-accent">
+                <div class="trade-form-section-head">
+                    <span>{% if lang == "ru" %}Направление сделки{% elif lang == "uk" %}Напрям угоди{% else %}Trade direction{% endif %}</span>
+                </div>
+                <div class="direction-group">
+                    <button type="button" class="dir-btn long active" data-dir="up">{{ labels.trade_long if labels else "ЛОНГ" }}</button>
+                    <button type="button" class="dir-btn short" data-dir="down">{{ labels.trade_short if labels else "ШОРТ" }}</button>
+                </div>
+                <div class="trade-submit-note">
+                    {% if lang == "ru" %}Перед открытием ты увидишь финальное подтверждение с оценкой сценария.{% elif lang == "uk" %}Перед відкриттям ти побачиш фінальне підтвердження з оцінкою сценарію.{% else %}Before execution you will see a final confirmation with a scenario preview.{% endif %}
+                </div>
             </div>
             <input type="hidden" name="direction" id="direction-input" value="up">
             <button class="submit" type="submit">{{ labels.trade_create if labels else "Создать сделку" }}</button>
         </form>
     </div>
-    <div class="trade-right">
+    <div class="trade-right trade-side-panel">
         <div class="section-title">{{ labels.trade_order_book if labels else "Order Book" }}</div>
         <div class="book">
             <div id="orderbook-asks">

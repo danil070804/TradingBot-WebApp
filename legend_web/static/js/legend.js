@@ -1200,10 +1200,15 @@ function updateMarketStats(data) {
     const s = document.getElementById("stat-spread");
     const h = document.getElementById("stat-high");
     const l = document.getElementById("stat-low");
+    const commandMark = document.getElementById("command-mark");
     setStatValue(m, data.mark);
     setStatValue(s, data.spread);
     setStatValue(h, data.high);
     setStatValue(l, data.low);
+    if (commandMark) {
+        const symbol = String(data.symbol || data.asset_name || "").trim();
+        commandMark.textContent = symbol ? `${symbol} ${data.mark ?? "--"}` : `${data.mark ?? "--"}`;
+    }
     LIVE_STATE.mark = Number(data.mark || 0);
     LIVE_STATE.spread = Number(data.spread || 0);
     LIVE_STATE.high = Number(data.high || 0);
