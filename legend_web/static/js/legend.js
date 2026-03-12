@@ -2,6 +2,7 @@ const LEGEND_LABELS = window.LEGEND_LABELS || {};
 const L = (key, fallback) => LEGEND_LABELS[key] || fallback;
 let MARKET_SOCKET_RUNTIME = null;
 let LIVE_TRADE_PANEL_ID = null;
+let LIVE_TRADE_STATUS_SYNC = { tradeId: null, requestedAt: 0 };
 const INITIAL_OPEN_POSITIONS = Array.isArray(window.LEGEND_INITIAL_OPEN_POSITIONS) ? window.LEGEND_INITIAL_OPEN_POSITIONS : [];
 const INITIAL_TRADE_STATUS = window.LEGEND_INITIAL_TRADE_STATUS || null;
 const LIVE_STATE = {
@@ -481,7 +482,12 @@ function updateTradePanelFromStatus(status) {
 
 async function syncTradePanel(tradeId, tgId) {
     if (!tradeId || !tgId) return;
+    const now = Date.now();
+    if (LIVE_TRADE_STATUS_SYNC.tradeId === tradeId && (now - LIVE_TRADE_STATUS_SYNC.requestedAt) < 900) {
+        return;
+    }
     LIVE_TRADE_PANEL_ID = tradeId;
+    LIVE_TRADE_STATUS_SYNC = { tradeId, requestedAt: now };
     try {
         const statusResp = await fetch(`/api/trade/status?trade_id=${encodeURIComponent(tradeId)}&tg_id=${tgId}`);
         const status = await statusResp.json();
@@ -490,6 +496,36 @@ async function syncTradePanel(tradeId, tgId) {
     } catch (_) {
         // no-op
     }
+}
+
+function updateTradePanelFromPosition(position) {
+    if (!position) return;
+    updateTradePanelFromStatus({
+        trade_id: position.trade_id,
+        status: "open",
+        remaining: Number(position.remaining || 0),
+        seconds: Math.max(1, Number(position.seconds || position.remaining || 1)),
+        asset_name: position.asset_name,
+        direction: position.direction,
+        amount: Number(position.amount || 0),
+        currency: position.currency || "USD",
+    });
+}
+
+function syncTradePanelFromPositions(items, tgId) {
+    if (!Array.isArray(items)) return;
+    const tradeId = LIVE_TRADE_PANEL_ID || (items[0] && items[0].trade_id) || null;
+    if (!tradeId) {
+        LIVE_TRADE_PANEL_ID = null;
+        return;
+    }
+    const selected = items.find((item) => item.trade_id === tradeId) || null;
+    if (selected) {
+        LIVE_TRADE_PANEL_ID = selected.trade_id;
+        updateTradePanelFromPosition(selected);
+        return;
+    }
+    syncTradePanel(tradeId, tgId);
 }
 
 function initInteractiveFeedback() {
@@ -845,8 +881,6 @@ function bindTradeForm() {
             }
             result.innerHTML = `<span class="pos">${L("js_trade_started", "Trade opened, countdown started")}</span>`;
             showToast(L("js_trade_started", "Trade opened, countdown started"), "success", 1800);
-            const started = Math.floor(Date.now() / 1000);
-            const closeAt = Number(data.close_at);
             const total = Math.max(1, Number(data.seconds || 1));
             const updateTimerUi = (remaining) => {
                 if (timer) timer.textContent = `${L("js_trade_waiting", "Time left")}: ${remaining}s`;
@@ -856,46 +890,8 @@ function bindTradeForm() {
                 }
             };
             updateTimerUi(total);
-
-            const poll = async () => {
-                const now = Math.floor(Date.now() / 1000);
-                updateTimerUi(Math.max(0, closeAt - now));
-                let statusResp = null;
-                let status = null;
-                try {
-                    statusResp = await fetch(`/api/trade/status?trade_id=${encodeURIComponent(data.trade_id)}&tg_id=${body.tg_id}`);
-                    status = await statusResp.json();
-                } catch (_) {
-                    return false;
-                }
-                if (!statusResp.ok || !status.ok) return false;
-                if (status.status === "closed") {
-                    const cls = status.is_win ? "pos" : "neg";
-                    const reason = reasonLabel(status.close_reason);
-                    result.innerHTML =
-                        `${L("js_trade_done", "Deal completed")}: <span class="${cls}">${status.profit > 0 ? "+" : ""}${status.profit}</span><br>` +
-                        `Reason: ${reason}<br>` +
-                        `${L("js_trade_balance", "New balance")}: ${status.balance}<br>` +
-                        `${L("js_trade_rate", "Rate")}: ${status.start_price} -> ${status.end_price}`;
-                    updateTimerUi(0);
-                    return true;
-                }
-                return false;
-            };
-
-            let done = false;
-            const hardStopAt = closeAt + 25;
-            while (!done) {
-                done = await poll();
-                if (!done && Math.floor(Date.now() / 1000) > hardStopAt) {
-                    result.innerHTML = `<span class="neg">${L("js_trade_error", "failed to open trade")}</span>`;
-                    showToast(L("js_trade_error", "failed to open trade"), "error");
-                    break;
-                }
-                if (!done) {
-                    await new Promise((resolve) => setTimeout(resolve, 1000));
-                }
-            }
+            LIVE_TRADE_PANEL_ID = data.trade_id;
+            await syncTradePanel(data.trade_id, body.tg_id);
             busy = false;
             if (submitBtn) submitBtn.disabled = false;
         } catch (_) {
@@ -1010,6 +1006,7 @@ async function initTelegramAuth() {
     wa.ready();
     wa.expand();
     if (!wa.initData) return;
+    if (sessionStorage.getItem("tg_auth_done")) return;
     try {
         const resp = await fetch("/api/auth/telegram", {
             method: "POST",
@@ -1887,9 +1884,7 @@ function bindUserSocket() {
         if (positionsWrap && Array.isArray(data.open_positions)) {
             renderOpenPositions(data.open_positions, tgId);
             updateExposureWidgets(data.open_positions, data.currency || currentUiCurrency());
-            if (data.open_positions.length) {
-                syncTradePanel(data.open_positions[0].trade_id, tgId);
-            }
+            syncTradePanelFromPositions(data.open_positions, tgId);
         }
         if (data.latest_deal) {
             updateProfileLatestDeal(data.latest_deal);
@@ -2074,9 +2069,7 @@ async function refreshOpenPositions() {
         if (!resp.ok || !data.ok) return;
         renderOpenPositions(data.items || [], tgId);
         updateExposureWidgets(data.items || [], currentUiCurrency());
-        if (Array.isArray(data.items) && data.items.length) {
-            syncTradePanel(data.items[0].trade_id, tgId);
-        }
+        syncTradePanelFromPositions(data.items || [], tgId);
     } catch (_) {
         // no-op
     }
@@ -3485,7 +3478,6 @@ if (tapeWrap) {
 const openPosWrap = document.getElementById("open-positions-list");
 if (openPosWrap) {
     refreshOpenPositions();
-    setInterval(refreshOpenPositions, 3000);
 }
 
 const hasMarketRows = document.querySelector(".m-price[data-symbol], .m-change[data-symbol]");

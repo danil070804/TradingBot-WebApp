@@ -3099,6 +3099,7 @@ async def api_trade_open_positions(tg_id: int):
                 "currency": tr["currency"] or "USD",
                 "leverage": int(tr["leverage"] or 10),
                 "start_price": float(tr["start_price"] or 0.0),
+                "seconds": int(tr["seconds"] or 0),
                 "remaining": max(0, int(float(tr["close_ts"] or 0) - now)),
             }
         )
@@ -3613,6 +3614,7 @@ async def ws_user(websocket: WebSocket):
                         "currency": tr["currency"] or "USD",
                         "leverage": int(tr["leverage"] or 10),
                         "start_price": float(tr["start_price"] or 0.0),
+                        "seconds": int(tr["seconds"] or 0),
                         "remaining": max(0, int(float(tr["close_ts"] or 0) - now)),
                     }
                 )
