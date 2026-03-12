@@ -8,14 +8,25 @@
     <input type="hidden" name="tg_id" value="{{ tg_id }}">
     <input type="hidden" id="home-stats-total" value="{{ _total }}">
     <input type="hidden" id="home-stats-wins" value="{{ _wins }}">
-    <h1>Legend Command Desk</h1>
+    <div class="markets-hero-top">
+        <div class="markets-hero-copy">
+            <h1>{% if lang == "ru" %}Главная{% elif lang == "uk" %}Головна{% else %}Home{% endif %}</h1>
+            <strong class="markets-hero-headline">
+                {% if lang == "ru" %}Точка входа в рынок, сделки и контроль счета{% elif lang == "uk" %}Точка входу в ринок, угоди та контроль рахунку{% else %}Your launch point for markets, trades and account control{% endif %}
+            </strong>
+            <p class="markets-hero-lead">
+                {% if lang == "ru" %}Смотри баланс, риски, последние сделки и market pulse в одном командном экране.{% elif lang == "uk" %}Дивись баланс, ризики, останні угоди та market pulse в одному командному екрані.{% else %}See balance, risk, recent deals and market pulse in one command screen.{% endif %}
+            </p>
+        </div>
+        <a class="qa-btn markets-hero-cta" href="/trade">{% if lang == "ru" %}К торговле{% elif lang == "uk" %}До торгівлі{% else %}Go To Trade{% endif %}</a>
+    </div>
     <div class="dashboard-balance">
         <div class="balance"><span id="home-live-balance">{{ "%.2f"|format((user.balance if user else 0) or 0) }}</span> <span id="home-live-currency">{{ (user.currency if user else "USD") or "USD" }}</span></div>
-        <div class="hint">ID: {{ tg_id }} · {{ labels.trade_open_trades if labels else "Open trades" }}: <span id="live-open-trades">0</span></div>
+        <div class="hint">ID: {{ tg_id }} · {{ labels.trade_open_trades if labels else ("Открытых сделок" if lang == "ru" else ("Відкритих угод" if lang == "uk" else "Open trades")) }}: <span id="live-open-trades">0</span></div>
     </div>
     <div class="dashboard-grid">
         <div class="dashboard-kpi">
-            <small>Winrate</small>
+            <small>{% if lang == "ru" %}Винрейт{% elif lang == "uk" %}Вінрейт{% else %}Winrate{% endif %}</small>
             <b id="dash-winrate">{{ "%.1f"|format(_winrate) }}%</b>
         </div>
         <div class="dashboard-kpi">
@@ -23,11 +34,11 @@
             <b id="dash-pnl" class="{{ 'pos' if stats.total_profit >= 0 else 'neg' }}">{{ "%+.2f"|format(stats.total_profit) }}</b>
         </div>
         <div class="dashboard-kpi">
-            <small>Exposure</small>
+            <small>{% if lang == "ru" %}Экспозиция{% elif lang == "uk" %}Експозиція{% else %}Exposure{% endif %}</small>
             <b id="dash-exposure">0.00 {{ (user.currency if user else "USD") or "USD" }}</b>
         </div>
         <div class="dashboard-kpi">
-            <small>Risk load</small>
+            <small>{% if lang == "ru" %}Риск нагрузки{% elif lang == "uk" %}Ризик навантаження{% else %}Risk load{% endif %}</small>
             <b id="dash-risk-label">0%</b>
         </div>
     </div>
@@ -65,7 +76,7 @@
 </section>
 
 <section class="card">
-    <div class="section-title">Market Pulse</div>
+    <div class="section-title">{% if lang == "ru" %}Пульс рынка{% elif lang == "uk" %}Пульс ринку{% else %}Market Pulse{% endif %}</div>
     <div class="tickers home-market-grid">
         {% for m in markets %}
         <div class="ticker market-card" data-market-ref="{{ m.market_ref }}" data-market-name="{{ m.name }}" data-market-symbol="{{ m.symbol }}">

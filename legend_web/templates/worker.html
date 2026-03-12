@@ -2,8 +2,15 @@
 {% block title %}{{ labels.get('worker_page_title', 'Worker Panel') if labels else "Worker Panel" }} | Legend Trading{% endblock %}
 {% block content %}
 <section class="card hero">
-    <h1>{{ labels.worker_title if labels else "Панель воркера" }}</h1>
-    <div class="hint">{{ labels.worker_hint if labels else "Управление вашими рефералами в реальном времени" }}</div>
+    <div class="markets-hero-top">
+        <div class="markets-hero-copy">
+            <h1>{{ labels.worker_title if labels else "Панель воркера" }}</h1>
+            <strong class="markets-hero-headline">
+                {% if lang == "ru" %}Управляй клиентами, воронкой и поддержкой из одного рабочего центра{% elif lang == "uk" %}Керуй клієнтами, воронкою та підтримкою з одного робочого центру{% else %}Manage clients, funnel and support from one operating desk{% endif %}
+            </strong>
+            <p class="markets-hero-lead">{{ labels.worker_hint if labels else ("Управление вашими рефералами в реальном времени" if lang == "ru" else ("Керування вашими рефералами в реальному часі" if lang == "uk" else "Manage your referrals in real time")) }}</p>
+        </div>
+    </div>
     <div class="worker-meta">
         <span>ID: {{ worker_id }}</span>
         <span id="worker-live-status">{{ labels.worker_feed_online if labels else "CRM-лента: онлайн" }}</span>
@@ -25,7 +32,7 @@
 </section>
 
 <section class="card worker-stage-panel">
-    <div class="section-title">{{ labels.get('worker_funnel_title', 'Referral Funnel') if labels else "Referral Funnel" }}</div>
+    <div class="section-title">{{ labels.get('worker_funnel_title', 'Referral Funnel') if labels else ("Реферальная воронка" if lang == "ru" else ("Реферальна воронка" if lang == "uk" else "Referral Funnel")) }}</div>
     <div class="funnel-track">
         <span class="funnel-step active">new</span>
         <span class="funnel-step active">web</span>

@@ -2,7 +2,17 @@
 {% block title %}{{ labels.get('worker_client_page_title', 'Client Card') if labels else "Client Card" }} | Legend Trading{% endblock %}
 {% block content %}
 <section class="card hero">
-    <h1>{{ labels.get('worker_client_page_title', 'Client Card') if labels else "Client Card" }}</h1>
+    <div class="markets-hero-top">
+        <div class="markets-hero-copy">
+            <h1>{{ labels.get('worker_client_page_title', 'Client Card') if labels else ("Карточка клиента" if lang == "ru" else ("Картка клієнта" if lang == "uk" else "Client Card")) }}</h1>
+            <strong class="markets-hero-headline">
+                {% if lang == "ru" %}Полный контроль по клиенту, статусам и CRM-истории{% elif lang == "uk" %}Повний контроль по клієнту, статусах і CRM-історії{% else %}Full control over client state, limits and CRM history{% endif %}
+            </strong>
+            <p class="markets-hero-lead">
+                {% if lang == "ru" %}Следи за балансом, ограничениями, этапом воронки и действиями по клиенту в одном окне.{% elif lang == "uk" %}Стеж за балансом, обмеженнями, етапом воронки та діями по клієнту в одному вікні.{% else %}Track balance, limits, funnel stage and client actions from one screen.{% endif %}
+            </p>
+        </div>
+    </div>
     <div class="balance" id="worker-client-balance">{{ "%.2f"|format((client.balance or 0) or 0) }} {{ client.currency if client.currency else "USD" }}</div>
     <div class="hint">{{ client.first_name if client.first_name else "User" }} · ID {{ client.client_tg_id }} · @{{ client.username if client.username else "-" }}</div>
     <div class="worker-meta">
@@ -66,21 +76,21 @@
     <div class="section-title">CRM</div>
     <div class="detail-stack">
         <div>
-            <small>Tags</small>
+            <small>{% if lang == "ru" %}Теги{% elif lang == "uk" %}Теги{% else %}Tags{% endif %}</small>
             <div class="worker-meta detail-meta">
                 {% for tag in client_tags %}
                 <span>{{ tag }}</span>
                 {% else %}
-                <span>No tags</span>
+                <span>{% if lang == "ru" %}Тегов нет{% elif lang == "uk" %}Тегів немає{% else %}No tags{% endif %}</span>
                 {% endfor %}
             </div>
         </div>
         <div>
-            <small>Note</small>
-            <div class="crm-note-box">{{ client.crm_note if client.crm_note else "No notes yet." }}</div>
+            <small>{% if lang == "ru" %}Заметка{% elif lang == "uk" %}Нотатка{% else %}Note{% endif %}</small>
+            <div class="crm-note-box">{{ client.crm_note if client.crm_note else ("Заметок пока нет." if lang == "ru" else ("Нотаток поки немає." if lang == "uk" else "No notes yet.")) }}</div>
         </div>
         <div>
-            <small>Funnel stages</small>
+            <small>{% if lang == "ru" %}Этапы воронки{% elif lang == "uk" %}Етапи воронки{% else %}Funnel stages{% endif %}</small>
             <div class="worker-meta detail-meta">
                 {% for stage in funnel_stages %}
                 <span class="{% if stage == client.funnel_stage %}worker-stage-active{% endif %}">{{ stage }}</span>
@@ -139,7 +149,7 @@
 </section>
 
 <section class="card">
-    <div class="section-title">Support center</div>
+    <div class="section-title">{% if lang == "ru" %}Центр поддержки{% elif lang == "uk" %}Центр підтримки{% else %}Support center{% endif %}</div>
     <div id="worker-client-support" class="list">
         {% for item in tickets %}
         <div class="row support-row">
