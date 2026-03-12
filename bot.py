@@ -1120,6 +1120,18 @@ async def send_section_message(target: Message, section_key: str, text: str, rep
     return await target.answer(text, reply_markup=reply_markup, disable_web_page_preview=True)
 
 
+async def send_section_chat_message(chat_id: int, section_key: str, text: str, reply_markup=None):
+    photo_id = await get_section_photo_file_id(section_key)
+    if photo_id:
+        if len(text or "") > 1024:
+            with contextlib.suppress(Exception):
+                await bot.send_photo(chat_id, photo=photo_id, caption="📌")
+                return await bot.send_message(chat_id, text, reply_markup=reply_markup, disable_web_page_preview=True)
+        with contextlib.suppress(Exception):
+            return await bot.send_photo(chat_id, photo=photo_id, caption=text, reply_markup=reply_markup)
+    return await bot.send_message(chat_id, text, reply_markup=reply_markup, disable_web_page_preview=True)
+
+
 async def notify_client_setting_change(client_tg_id: int, text: str, reply_markup=None):
     with contextlib.suppress(Exception):
         await bot.send_message(client_tg_id, text, reply_markup=reply_markup)
@@ -1675,7 +1687,7 @@ async def notify_trade_opened(trade_id: str):
         leverage=int(trade["leverage"] or 10),
     )
     try:
-        msg = await bot.send_message(int(trade["user_tg_id"]), text)
+        msg = await send_section_chat_message(int(trade["user_tg_id"]), "open_ecn", text)
         await attach_trade_message(trade_id, int(msg.chat.id), int(msg.message_id))
     except Exception:
         pass
@@ -3748,7 +3760,7 @@ async def ecn_choose_asset(callback: CallbackQuery, state: FSMContext):
         f"╰ <code>{asset['name']}</code>\n\n"
         f"{tr(lang, 'Выберите направление движения графика.', 'Choose the chart direction.', 'Оберіть напрям руху графіка.')}"
     )
-    await callback.message.answer(text, reply_markup=ecn_direction_keyboard(asset_id, lang))
+    await send_section_message(callback.message, "open_ecn", text, reply_markup=ecn_direction_keyboard(asset_id, lang))
     await callback.answer()
 
 
@@ -3784,7 +3796,7 @@ async def ecn_choose_direction(callback: CallbackQuery, state: FSMContext):
         f"{tr(lang, 'Введите сумму сделки в валюте счёта.', 'Enter the trade amount in your account currency.', 'Введіть суму угоди у валюті рахунку.')}\n"
         f"<b>{currency}</b>:"
     )
-    await callback.message.answer(text)
+    await send_section_message(callback.message, "open_ecn", text)
     await callback.answer()
 
 
@@ -3846,7 +3858,7 @@ async def ecn_enter_amount(message: Message, state: FSMContext):
         f"╰ {tr(lang, 'Сумма', 'Amount', 'Сума')}: <b>{amount:.2f} {currency}</b>\n\n"
         f"{tr(lang, 'Выберите плечо сделки.', 'Choose leverage for the trade.', 'Оберіть плече угоди.')}"
     )
-    await message.answer(text, reply_markup=ecn_leverage_keyboard(lang, leverage))
+    await send_section_message(message, "open_ecn", text, reply_markup=ecn_leverage_keyboard(lang, leverage))
 
 
 @dp.callback_query(F.data.startswith("ecn_lev:"))
@@ -3877,7 +3889,7 @@ async def ecn_choose_leverage(callback: CallbackQuery, state: FSMContext):
         f"╰ {tr(lang, 'Плечо', 'Leverage', 'Плече')}: <b>{int(leverage)}x</b>\n\n"
         f"{tr(lang, 'Выберите время фиксации сделки.', 'Choose the trade expiration time.', 'Оберіть час фіксації угоди.')}"
     )
-    await callback.message.answer(text, reply_markup=ecn_time_keyboard(lang))
+    await send_section_message(callback.message, "open_ecn", text, reply_markup=ecn_time_keyboard(lang))
     await callback.answer()
 
 
