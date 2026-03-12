@@ -19,6 +19,10 @@
             <b>{{ "%.2f"|format(deal.amount) }} {{ deal.currency }}</b>
         </div>
         <div class="detail-cell">
+            <span>Leverage</span>
+            <b>{{ deal.leverage if deal.leverage else 10 }}x</b>
+        </div>
+        <div class="detail-cell">
             <span>PnL</span>
             <b class="{{ 'pos' if deal.profit >= 0 else 'neg' }}">{{ "%+.2f"|format(deal.profit) }}</b>
         </div>
@@ -30,10 +34,27 @@
             <span>Status</span>
             <b>{{ "Closed in plus" if deal.is_win else "Closed in minus" }}</b>
         </div>
+        <div class="detail-cell">
+            <span>Price move</span>
+            <b>{{ "%.3f"|format((deal.change_percent or 0) or 0) }}%</b>
+        </div>
+        <div class="detail-cell">
+            <span>Leveraged move</span>
+            <b>{{ "%.3f"|format(((deal.change_percent or 0) or 0) * ((deal.leverage if deal.leverage else 10))) }}%</b>
+        </div>
+        <div class="detail-cell">
+            <span>Start price</span>
+            <b>{{ "%.4f"|format((deal.start_price or 0) or 0) }} USD</b>
+        </div>
+        <div class="detail-cell">
+            <span>End price</span>
+            <b>{{ "%.4f"|format((deal.end_price or 0) or 0) }} USD</b>
+        </div>
     </div>
     <div class="detail-note">
+        Формула результата: {{ "%.3f"|format((deal.change_percent or 0) or 0) }}% × {{ deal.leverage if deal.leverage else 10 }} = {{ "%.3f"|format(((deal.change_percent or 0) or 0) * ((deal.leverage if deal.leverage else 10))) }}%.
         {% if deal.is_win %}
-        Сделка завершилась в плюс. Финальный результат уже был зачислен на баланс.
+        Финальный результат уже был зачислен на баланс.
         {% else %}
         Сделка завершилась в минус по итоговому движению рынка.
         {% endif %}

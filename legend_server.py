@@ -1766,7 +1766,8 @@ async def deal_detail(request: Request, deal_id: int):
     user = await get_nav_user(tg_id)
     deal = await fetch_one(
         """
-        SELECT id, asset_name, direction, amount, currency, is_win, profit, created_at
+        SELECT id, asset_name, direction, amount, currency, leverage, start_price, end_price,
+               change_percent, is_win, profit, created_at
         FROM deals
         WHERE id = ? AND user_tg_id = ?
         """,

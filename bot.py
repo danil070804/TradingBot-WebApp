@@ -638,6 +638,7 @@ async def init_db():
                 direction TEXT,
                 amount DOUBLE PRECISION,
                 currency TEXT,
+                leverage INTEGER DEFAULT 10,
                 start_price DOUBLE PRECISION,
                 end_price DOUBLE PRECISION,
                 change_percent DOUBLE PRECISION,
@@ -655,6 +656,7 @@ async def init_db():
                 direction TEXT,
                 amount REAL,
                 currency TEXT,
+                leverage INTEGER DEFAULT 10,
                 start_price REAL,
                 end_price REAL,
                 change_percent REAL,
@@ -886,6 +888,7 @@ async def init_db():
             ("active_trades", "is_win", "INTEGER", "INTEGER"),
             ("active_trades", "notified_open", "INTEGER DEFAULT 0", "INTEGER DEFAULT 0"),
             ("active_trades", "notified_closed", "INTEGER DEFAULT 0", "INTEGER DEFAULT 0"),
+            ("deals", "leverage", "INTEGER DEFAULT 10", "INTEGER DEFAULT 10"),
         ):
             await add_column_if_missing(
                 db,
@@ -1442,6 +1445,7 @@ async def settle_active_trade(trade_id: str, live_end_price: float | None = None
             direction=direction,
             amount=amount,
             currency=str(trade["currency"] or "USD"),
+            leverage=leverage,
             start_price=start_price,
             end_price=float(live_end_price),
             change_percent=change_percent,
@@ -1577,19 +1581,21 @@ async def save_deal(
     is_win: bool,
     profit: float,
     expires_in_sec: int,
+    leverage: int = 10,
 ):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(
             """INSERT INTO deals(
-                user_tg_id, asset_name, direction, amount, currency,
-                start_price, end_price, change_percent, is_win, profit, expires_in_sec
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    user_tg_id, asset_name, direction, amount, currency, leverage,
+                    start_price, end_price, change_percent, is_win, profit, expires_in_sec
+               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 user_tg_id,
                 asset_name,
                 direction,
                 amount,
                 currency,
+                int(leverage),
                 start_price,
                 end_price,
                 change_percent,
@@ -3462,6 +3468,7 @@ async def run_demo_deal(
         direction=direction,
         amount=amount,
         currency=currency,
+        leverage=10,
         start_price=start_price,
         end_price=end_price,
         change_percent=change_percent,
