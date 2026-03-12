@@ -35,12 +35,13 @@
 <section class="trade-command-bar">
     <article class="card trade-command-card">
         <span>{{ labels.trade_market_label if labels else "Рынок" }}</span>
-        <strong id="command-mark">{{ labels.trade_market_mark if labels else "Текущий mark" }}</strong>
+        <strong id="command-mark">{% if lang == "ru" %}Текущая цена{% elif lang == "uk" %}Поточна ціна{% else %}Current Mark{% endif %}</strong>
         <small>{{ labels.trade_feed_booting if labels else "Рынок: подключение" }}</small>
     </article>
     <article class="card trade-command-actions">
-        <a class="qa-btn" href="/markets">{{ labels.deposit_open_markets if labels else "Открыть рынки" }}</a>
         <a class="qa-btn" href="/deposit">{{ labels.quick_deposit if labels else "Пополнить баланс" }}</a>
+        <a class="qa-btn" href="/withdraw">{{ labels.nav_withdraw if labels else "Вывести" }}</a>
+        <a class="qa-btn" href="/markets">{{ labels.deposit_open_markets if labels else "Открыть рынки" }}</a>
     </article>
 </section>
 
@@ -64,19 +65,19 @@
 
 <section class="stats-grid">
     <article class="card stat-card">
-        <small>MARK</small>
+        <small>{% if lang == "ru" %}ЦЕНА{% elif lang == "uk" %}ЦІНА{% else %}MARK{% endif %}</small>
         <b id="stat-mark">--</b>
     </article>
     <article class="card stat-card">
-        <small>SPREAD</small>
+        <small>{% if lang == "ru" %}СПРЕД{% elif lang == "uk" %}СПРЕД{% else %}SPREAD{% endif %}</small>
         <b id="stat-spread">--</b>
     </article>
     <article class="card stat-card">
-        <small>24H HIGH</small>
+        <small>{% if lang == "ru" %}МАКС. 24Ч{% elif lang == "uk" %}МАКС. 24Г{% else %}24H HIGH{% endif %}</small>
         <b id="stat-high">--</b>
     </article>
     <article class="card stat-card">
-        <small>24H LOW</small>
+        <small>{% if lang == "ru" %}МИН. 24Ч{% elif lang == "uk" %}МІН. 24Г{% else %}24H LOW{% endif %}</small>
         <b id="stat-low">--</b>
     </article>
 </section>

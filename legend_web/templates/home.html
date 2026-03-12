@@ -22,7 +22,7 @@
     </div>
     <div class="dashboard-grid">
         <div class="dashboard-kpi">
-            <small>{{ labels.home_winrate if labels else "Winrate" }}</small>
+            <small>{% if lang == "ru" %}Винрейт{% elif lang == "uk" %}Вінрейт{% else %}Winrate{% endif %}</small>
             <b id="dash-winrate">{{ "%.1f"|format(_winrate) }}%</b>
         </div>
         <div class="dashboard-kpi">
@@ -30,11 +30,11 @@
             <b id="dash-pnl" class="{{ 'pos' if stats.total_profit >= 0 else 'neg' }}">{{ "%+.2f"|format(stats.total_profit) }}</b>
         </div>
         <div class="dashboard-kpi">
-            <small>{{ labels.home_exposure if labels else "Exposure" }}</small>
+            <small>{% if lang == "ru" %}Экспозиция{% elif lang == "uk" %}Експозиція{% else %}Exposure{% endif %}</small>
             <b id="dash-exposure">0.00 {{ (user.currency if user else "USD") or "USD" }}</b>
         </div>
         <div class="dashboard-kpi">
-            <small>{{ labels.home_risk_load if labels else "Risk load" }}</small>
+            <small>{% if lang == "ru" %}Риск{% elif lang == "uk" %}Ризик{% else %}Risk{% endif %}</small>
             <b id="dash-risk-label">0%</b>
         </div>
     </div>
@@ -45,9 +45,10 @@
 
 <section class="quick-actions dashboard-actions">
     <a class="qa-btn" href="/trade">{{ labels.quick_trade if labels else "Открыть сделку" }}</a>
-    <a class="qa-btn" href="/markets">{{ labels.nav_markets if labels else "Рынки" }}</a>
     <a class="qa-btn" href="/deposit">{{ labels.quick_deposit if labels else "Пополнить" }}</a>
     <a class="qa-btn" href="/withdraw">{{ labels.nav_withdraw if labels else "Вывести" }}</a>
+    <a class="qa-btn" href="/markets">{{ labels.nav_markets if labels else "Рынки" }}</a>
+    <a class="qa-btn" href="/support">{{ labels.js_support_btn if labels else "Перейти в поддержку" }}</a>
     <a class="qa-btn" href="/deals">{{ labels.quick_history if labels else "История сделок" }}</a>
     <a class="qa-btn" href="/profile">{{ labels.nav_profile if labels else "Профиль" }}</a>
     {% if user and user.is_worker %}
@@ -74,7 +75,7 @@
 </section>
 
 <section class="card">
-    <div class="section-title">{{ labels.home_market_pulse if labels else "Market Pulse" }}</div>
+    <div class="section-title">{% if lang == "ru" %}Рынок{% elif lang == "uk" %}Ринок{% else %}Market{% endif %}</div>
     <div class="tickers home-market-grid">
         {% for m in markets %}
         <div class="ticker market-card" data-market-ref="{{ m.market_ref }}" data-market-name="{{ m.name }}" data-market-symbol="{{ m.symbol }}">

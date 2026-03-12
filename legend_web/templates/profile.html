@@ -19,9 +19,9 @@
     </div>
     <div class="balance">{{ "%.2f"|format((user.balance if user else 0) or 0) }} {{ (user.currency if user else "USD") or "USD" }}</div>
     <div class="profile-chips">
-        <span class="profile-chip">Open: <b id="live-open-trades">0</b></span>
+        <span class="profile-chip">{% if lang == "ru" %}Открыто:{% elif lang == "uk" %}Відкрито:{% else %}Open:{% endif %} <b id="live-open-trades">0</b></span>
         <span class="profile-chip">PNL: <b class="{{ 'pos' if stats.total_profit >= 0 else 'neg' }}">{{ "%+.2f"|format(stats.total_profit) }}</b></span>
-        <span class="profile-chip">Deals: <b>{{ stats.total }}</b></span>
+        <span class="profile-chip">{% if lang == "ru" %}Сделок:{% elif lang == "uk" %}Угод:{% else %}Deals:{% endif %} <b>{{ stats.total }}</b></span>
     </div>
 </section>
 
@@ -63,12 +63,12 @@
 
 <section class="quick-actions profile-quick-actions">
     <a class="qa-btn" href="/trade">{{ labels.quick_trade if labels else "Открыть сделку" }}</a>
-    <a class="qa-btn" href="/markets">{{ labels.nav_markets if labels else "Рынки" }}</a>
     <a class="qa-btn" href="/deposit">{{ labels.nav_deposit if labels else "Пополнить" }}</a>
     <a class="qa-btn" href="/withdraw">{{ labels.nav_withdraw if labels else "Вывести" }}</a>
+    <a class="qa-btn" href="/markets">{{ labels.nav_markets if labels else "Рынки" }}</a>
+    <a class="qa-btn" href="/support">{{ labels.js_support_btn if labels else "Перейти в поддержку" }}</a>
     <a class="qa-btn" href="/deals">{{ labels.nav_deals if labels else "Сделки" }}</a>
     <a class="qa-btn" href="/verify">{{ labels.quick_verify if labels else "Пройти верификацию" }}</a>
-    <a class="qa-btn" href="/support">{{ labels.js_support_btn if labels else "Перейти в поддержку" }}</a>
     {% if user and user.is_worker %}
     <a class="qa-btn" href="/worker">{{ labels.quick_worker if labels else "Панель воркера" }}</a>
     {% endif %}
@@ -85,7 +85,7 @@
         <div class="profile-meta"><span>{{ labels.profile_lang if labels else "Язык" }}</span><b>{{ user.language if user and user.language else "ru" }}</b></div>
         <div class="profile-meta"><span>{{ labels.profile_currency if labels else "Валюта" }}</span><b>{{ user.currency if user and user.currency else "USD" }}</b></div>
         <div class="profile-meta"><span>{{ labels.profile_pending if labels else "На выводе" }}</span><b>{{ "%.2f"|format(pending) }}</b></div>
-        <div class="profile-meta"><span>Status</span><b>{{ "Admin" if user and user.is_admin else ("Worker" if user and user.is_worker else "Client") }}</b></div>
+        <div class="profile-meta"><span>{% if lang == "ru" %}Роль{% elif lang == "uk" %}Роль{% else %}Role{% endif %}</span><b>{{ "Admin" if user and user.is_admin else ("Worker" if user and user.is_worker else "Client") }}</b></div>
     </div>
 </section>
 

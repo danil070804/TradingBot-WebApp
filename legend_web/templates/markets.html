@@ -11,10 +11,10 @@
         <a class="qa-btn markets-hero-cta" href="/trade">{{ labels.nav_trade if labels else ("Торговля" if lang == "ru" else ("Торгівля" if lang == "uk" else "Trade")) }}</a>
     </div>
     <div class="stats-grid markets-stats">
-        <article class="card stat-card"><small>TOTAL</small><b id="markets-total">{{ markets|length }}</b></article>
-        <article class="card stat-card"><small>GAINERS</small><b id="markets-gainers">0</b></article>
-        <article class="card stat-card"><small>LOSERS</small><b id="markets-losers">0</b></article>
-        <article class="card stat-card"><small>AVG MOVE</small><b id="markets-avg-move">0.00%</b></article>
+        <article class="card stat-card"><small>{% if lang == "ru" %}ВСЕГО{% elif lang == "uk" %}ВСЬОГО{% else %}TOTAL{% endif %}</small><b id="markets-total">{{ markets|length }}</b></article>
+        <article class="card stat-card"><small>{% if lang == "ru" %}РОСТ{% elif lang == "uk" %}ЗРОСТАННЯ{% else %}GAINERS{% endif %}</small><b id="markets-gainers">0</b></article>
+        <article class="card stat-card"><small>{% if lang == "ru" %}ПАДЕНИЕ{% elif lang == "uk" %}ПАДІННЯ{% else %}LOSERS{% endif %}</small><b id="markets-losers">0</b></article>
+        <article class="card stat-card"><small>{% if lang == "ru" %}СР. ДВИЖЕНИЕ{% elif lang == "uk" %}СЕР. РУХ{% else %}AVG MOVE{% endif %}</small><b id="markets-avg-move">0.00%</b></article>
     </div>
 </section>
 
@@ -71,10 +71,10 @@
 <section class="card">
     <div class="section-title">{% if lang == "ru" %}Сводка{% elif lang == "uk" %}Зведення{% else %}Summary{% endif %}</div>
     <div class="stats-grid" id="markets-insights">
-        <article class="card stat-card"><small>TOP SYMBOL</small><b id="insight-top-symbol">--</b></article>
-        <article class="card stat-card"><small>TOP MOVE</small><b id="insight-top-move">--</b></article>
-        <article class="card stat-card"><small>CALM SYMBOL</small><b id="insight-calm-symbol">--</b></article>
-        <article class="card stat-card"><small>CALM MOVE</small><b id="insight-calm-move">--</b></article>
+        <article class="card stat-card"><small>{% if lang == "ru" %}ТОП АКТИВ{% elif lang == "uk" %}ТОП АКТИВ{% else %}TOP SYMBOL{% endif %}</small><b id="insight-top-symbol">--</b></article>
+        <article class="card stat-card"><small>{% if lang == "ru" %}ТОП ДВИЖЕНИЕ{% elif lang == "uk" %}ТОП РУХ{% else %}TOP MOVE{% endif %}</small><b id="insight-top-move">--</b></article>
+        <article class="card stat-card"><small>{% if lang == "ru" %}СПОКОЙНЫЙ АКТИВ{% elif lang == "uk" %}СПОКІЙНИЙ АКТИВ{% else %}CALM SYMBOL{% endif %}</small><b id="insight-calm-symbol">--</b></article>
+        <article class="card stat-card"><small>{% if lang == "ru" %}СПОКОЙНОЕ ДВИЖЕНИЕ{% elif lang == "uk" %}СПОКІЙНИЙ РУХ{% else %}CALM MOVE{% endif %}</small><b id="insight-calm-move">--</b></article>
     </div>
 </section>
 
