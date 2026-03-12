@@ -2176,11 +2176,11 @@ async def get_unified_leaderboard(limit: int = 8, min_deals: int = 3) -> list[di
                 ) AS open_trades,
                 COALESCE(
                     (
-                        SELECT MAX(wc.last_activity_at)
+                        SELECT MAX(CAST(wc.last_activity_at AS TEXT))
                         FROM worker_clients wc
                         WHERE wc.client_tg_id = d.user_tg_id
                     ),
-                    MAX(d.created_at)
+                    MAX(CAST(d.created_at AS TEXT))
                 ) AS last_activity_at
             FROM deals d
             JOIN users u ON u.tg_id = d.user_tg_id
