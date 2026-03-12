@@ -2707,6 +2707,7 @@ async def api_trade_open(
         amount=amount,
         currency=currency,
         seconds=int(seconds),
+        leverage=int(leverage),
         trade_id=trade_id,
         source="web",
     )

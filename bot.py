@@ -424,6 +424,7 @@ class ECNStates(StatesGroup):
     choosing_asset = State()
     choosing_direction = State()
     waiting_amount = State()
+    choosing_leverage = State()
     choosing_expiration = State()
 
 
@@ -1256,7 +1257,7 @@ async def mark_trade_closed_notified(trade_id: str) -> bool:
         return bool(cur.rowcount)
 
 
-def format_trade_open_message(lang: str, asset_name: str, direction: str, amount: float, currency: str, seconds: int) -> str:
+def format_trade_open_message(lang: str, asset_name: str, direction: str, amount: float, currency: str, seconds: int, leverage: int = 10) -> str:
     direction_text = tr(lang, "Повышение", "Up", "Вгору") if direction == "up" else tr(lang, "Понижение", "Down", "Вниз")
     side_badge = "📈" if direction == "up" else "📉"
     return (
@@ -1265,6 +1266,7 @@ def format_trade_open_message(lang: str, asset_name: str, direction: str, amount
         f"├ {tr(lang, 'Актив', 'Asset', 'Актив')}: <code>{asset_name}</code>\n"
         f"├ {tr(lang, 'Сторона', 'Side', 'Сторона')}: {side_badge} <b>{direction_text}</b>\n"
         f"├ {tr(lang, 'Объём', 'Amount', 'Обсяг')}: <b>{amount:.2f} {currency}</b>\n"
+        f"├ {tr(lang, 'Плечо', 'Leverage', 'Плече')}: <b>{int(leverage)}x</b>\n"
         f"╰ {tr(lang, 'До фиксации', 'Until close', 'До фіксації')}: <b>{format_trade_duration(lang, seconds)}</b>"
     )
 
@@ -1280,6 +1282,7 @@ async def format_trade_result_message(trade_row) -> str:
     end_price = float(trade_row["end_price"] or trade_row["start_price"] or 0.0)
     start_price = float(trade_row["start_price"] or 0.0)
     change_percent = float(trade_row["change_percent"] or 0.0)
+    leverage = int(trade_row["leverage"] or 10)
     is_win = bool(trade_row["is_win"])
     credited_amount = max(0.0, amount + profit)
     balance_after = await get_user_balance(int(trade_row["user_tg_id"]))
@@ -1321,6 +1324,7 @@ async def format_trade_result_message(trade_row) -> str:
             f"• <b>{tr(lang, 'Актив', 'Asset', 'Актив')}:</b> <code>{trade_row['asset_name']}</code>",
             f"• <b>{tr(lang, 'Позиция', 'Position', 'Позиція')}:</b> {direction_text}",
             f"• <b>{tr(lang, 'Сумма', 'Amount', 'Сума')}:</b> {amount:.2f} {currency}",
+            f"• <b>{tr(lang, 'Плечо', 'Leverage', 'Плече')}:</b> {leverage}x",
             f"• <b>{tr(lang, 'Начальный курс', 'Start price', 'Початкова ціна')}:</b> {start_price:.4f} USD",
             f"• <b>{tr(lang, 'Курс в конце сделки', 'End price', 'Кінцева ціна')}:</b> {end_price:.4f} USD",
             f"• <b>{tr(lang, 'Движение цены', 'Price move', 'Рух ціни')}:</b> {change_percent:.3f}%",
@@ -1455,6 +1459,7 @@ async def notify_trade_opened(trade_id: str):
         amount=float(trade["amount"] or 0.0),
         currency=str(trade["currency"] or "USD"),
         seconds=int(trade["seconds"] or 0),
+        leverage=int(trade["leverage"] or 10),
     )
     try:
         msg = await bot.send_message(int(trade["user_tg_id"]), text)
@@ -1490,6 +1495,7 @@ async def monitor_trade(trade_id: str):
                         amount=float(trade["amount"] or 0.0),
                         currency=str(trade["currency"] or "USD"),
                         seconds=remaining,
+                        leverage=int(trade["leverage"] or 10),
                     ),
                 )
         if remaining <= 0:
@@ -1896,6 +1902,7 @@ async def notify_worker_trade_event(
     amount: float,
     currency: str,
     seconds: int,
+    leverage: int = 10,
     trade_id: str | None = None,
     source: str = "bot",
 ):
@@ -1919,6 +1926,7 @@ async def notify_worker_trade_event(
         f"├ Актив: <b>{asset_name}</b>\n"
         f"├ Направление: <b>{direction_text}</b>\n"
         f"├ Сумма: <b>{float(amount):.2f} {currency}</b>\n"
+        f"├ Плечо: <b>{int(leverage)}x</b>\n"
         f"├ Экспирация: <b>{format_trade_duration('ru', seconds)}</b>\n"
         f"╰ Источник: <b>{source_text}</b>"
         f"{trade_line}"
@@ -1930,7 +1938,7 @@ async def notify_worker_trade_event(
     await notify_admin_referral_activity(
         client_tg_id=client_tg_id,
         title="Сделка реферала",
-        details=f"Открыл сделку по активу {asset_name}. Направление: {direction_text}. Сумма: {float(amount):.2f} {currency}. Источник: {source_text}.",
+        details=f"Открыл сделку по активу {asset_name}. Направление: {direction_text}. Сумма: {float(amount):.2f} {currency}. Плечо: {int(leverage)}x. Источник: {source_text}.",
     )
 
 
@@ -2986,6 +2994,17 @@ def ecn_time_keyboard(lang: str = "ru"):
     return kb.as_markup()
 
 
+def ecn_leverage_keyboard(lang: str = "ru", current: int = 10):
+    kb = InlineKeyboardBuilder()
+    for lev in (1, 5, 10, 20, 50):
+        label = f"{lev}x"
+        if lev == current:
+            label = f"• {label} •"
+        kb.button(text=label, callback_data=f"ecn_lev:{lev}")
+    kb.adjust(3, 2)
+    return kb.as_markup()
+
+
 @dp.message(F.text.in_({"📁 Портфель", "📁 Portfolio", "📁 Портфель"}))
 async def menu_portfolio(message: Message):
     await send_profile(message)
@@ -3223,8 +3242,9 @@ async def ecn_enter_amount(message: Message, state: FSMContext):
         )
         return
 
-    await state.update_data(amount=amount)
-    await state.set_state(ECNStates.choosing_expiration)
+    leverage = 10
+    await state.update_data(amount=amount, leverage=leverage)
+    await state.set_state(ECNStates.choosing_leverage)
 
     text = (
         f"📈 <b>{tr(lang, 'Открытие сделки', 'Open deal', 'Відкриття угоди')}</b>\n\n"
@@ -3232,9 +3252,41 @@ async def ecn_enter_amount(message: Message, state: FSMContext):
         f"├ {tr(lang, 'Актив', 'Asset', 'Актив')}: <code>{asset_name}</code>\n"
         f"├ {tr(lang, 'Направление', 'Direction', 'Напрям')}: <b>{tr(lang, 'Повышение', 'Up', 'Вгору') if direction == 'up' else tr(lang, 'Понижение', 'Down', 'Вниз')}</b>\n"
         f"╰ {tr(lang, 'Сумма', 'Amount', 'Сума')}: <b>{amount:.2f} {currency}</b>\n\n"
+        f"{tr(lang, 'Выберите плечо сделки.', 'Choose leverage for the trade.', 'Оберіть плече угоди.')}"
+    )
+    await message.answer(text, reply_markup=ecn_leverage_keyboard(lang, leverage))
+
+
+@dp.callback_query(F.data.startswith("ecn_lev:"))
+async def ecn_choose_leverage(callback: CallbackQuery, state: FSMContext):
+    leverage = int(callback.data.split(":", 1)[1])
+    data = await state.get_data()
+    asset_name = data.get("asset_name")
+    direction = data.get("direction")
+    amount = data.get("amount")
+
+    user_row = await get_user_row(callback.from_user)
+    lang = normalize_lang(user_row["language"])
+    currency = user_row["currency"] or "USD"
+
+    if leverage < 1 or leverage > 50:
+        await callback.answer(tr(lang, "Плечо должно быть от 1x до 50x.", "Leverage must be from 1x to 50x.", "Плече має бути від 1x до 50x."), show_alert=True)
+        return
+
+    await state.update_data(leverage=leverage)
+    await state.set_state(ECNStates.choosing_expiration)
+
+    text = (
+        f"📈 <b>{tr(lang, 'Открытие сделки', 'Open deal', 'Відкриття угоди')}</b>\n\n"
+        f"╭ <b>{tr(lang, 'Параметры входа', 'Entry details', 'Параметри входу')}</b>\n"
+        f"├ {tr(lang, 'Актив', 'Asset', 'Актив')}: <code>{asset_name}</code>\n"
+        f"├ {tr(lang, 'Направление', 'Direction', 'Напрям')}: <b>{tr(lang, 'Повышение', 'Up', 'Вгору') if direction == 'up' else tr(lang, 'Понижение', 'Down', 'Вниз')}</b>\n"
+        f"├ {tr(lang, 'Сумма', 'Amount', 'Сума')}: <b>{float(amount or 0.0):.2f} {currency}</b>\n"
+        f"╰ {tr(lang, 'Плечо', 'Leverage', 'Плече')}: <b>{int(leverage)}x</b>\n\n"
         f"{tr(lang, 'Выберите время фиксации сделки.', 'Choose the trade expiration time.', 'Оберіть час фіксації угоди.')}"
     )
-    await message.answer(text, reply_markup=ecn_time_keyboard(lang))
+    await callback.message.answer(text, reply_markup=ecn_time_keyboard(lang))
+    await callback.answer()
 
 
 @dp.callback_query(F.data.startswith("ecn_time:"))
@@ -3244,6 +3296,7 @@ async def ecn_choose_time(callback: CallbackQuery, state: FSMContext):
     asset_name = data.get("asset_name")
     direction = data.get("direction")
     amount = data.get("amount")
+    leverage = int(data.get("leverage") or 10)
 
     user_row = await get_user_row(callback.from_user)
     lang = normalize_lang(user_row["language"])
@@ -3308,6 +3361,7 @@ async def ecn_choose_time(callback: CallbackQuery, state: FSMContext):
         currency=currency,
         seconds=int(seconds),
         start_price=estimate_trade_price(str(asset_name)),
+        leverage=leverage,
     )
     await notify_worker_trade_event(
         client_tg_id=callback.from_user.id,
@@ -3316,6 +3370,7 @@ async def ecn_choose_time(callback: CallbackQuery, state: FSMContext):
         amount=float(amount),
         currency=currency,
         seconds=int(seconds),
+        leverage=leverage,
         trade_id=trade_id,
         source="bot",
     )
