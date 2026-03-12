@@ -1,15 +1,42 @@
 {% extends "base.html" %}
 {% block title %}Главная | Legend Trading{% endblock %}
 {% block content %}
-<section class="card hero">
+{% set _total = (stats.total if stats else 0) %}
+{% set _wins = (stats.wins if stats else 0) %}
+{% set _winrate = ((_wins * 100.0 / _total) if _total else 0.0) %}
+<section class="card hero home-hero">
     <input type="hidden" name="tg_id" value="{{ tg_id }}">
-    <h1>{{ labels.home_balance if labels else "Общий баланс" }}</h1>
-    <div class="balance">{{ "%.2f"|format((user.balance if user else 0) or 0) }} {{ (user.currency if user else "USD") or "USD" }}</div>
-    <div class="hint">ID: {{ tg_id }}</div>
-    <div class="hint">Открытые сделки: <span id="live-open-trades">0</span></div>
+    <input type="hidden" id="home-stats-total" value="{{ _total }}">
+    <input type="hidden" id="home-stats-wins" value="{{ _wins }}">
+    <h1>Legend Command Desk</h1>
+    <div class="dashboard-balance">
+        <div class="balance"><span id="home-live-balance">{{ "%.2f"|format((user.balance if user else 0) or 0) }}</span> <span id="home-live-currency">{{ (user.currency if user else "USD") or "USD" }}</span></div>
+        <div class="hint">ID: {{ tg_id }} · {{ labels.trade_open_trades if labels else "Open trades" }}: <span id="live-open-trades">0</span></div>
+    </div>
+    <div class="dashboard-grid">
+        <div class="dashboard-kpi">
+            <small>Winrate</small>
+            <b id="dash-winrate">{{ "%.1f"|format(_winrate) }}%</b>
+        </div>
+        <div class="dashboard-kpi">
+            <small>PnL</small>
+            <b id="dash-pnl" class="{{ 'pos' if stats.total_profit >= 0 else 'neg' }}">{{ "%+.2f"|format(stats.total_profit) }}</b>
+        </div>
+        <div class="dashboard-kpi">
+            <small>Exposure</small>
+            <b id="dash-exposure">0.00 {{ (user.currency if user else "USD") or "USD" }}</b>
+        </div>
+        <div class="dashboard-kpi">
+            <small>Risk load</small>
+            <b id="dash-risk-label">0%</b>
+        </div>
+    </div>
+    <div class="risk-meter">
+        <span id="dash-risk-fill"></span>
+    </div>
 </section>
 
-<section class="quick-actions">
+<section class="quick-actions dashboard-actions">
     <a class="qa-btn" href="/trade">{{ labels.quick_trade if labels else "Открыть сделку" }}</a>
     <a class="qa-btn" href="/deposit">{{ labels.quick_deposit if labels else "Пополнить" }}</a>
     <a class="qa-btn" href="/deals">{{ labels.quick_history if labels else "История сделок" }}</a>
@@ -22,7 +49,7 @@
     {% endif %}
 </section>
 
-<section class="metrics">
+<section class="metrics dashboard-metrics">
     <article class="card metric">
         <h3>{{ labels.home_success if labels else "Успешные" }}</h3>
         <p>{{ stats.wins }}</p>
@@ -38,13 +65,14 @@
 </section>
 
 <section class="card">
-    <div class="section-title">{{ labels.home_pairs if labels else "Популярные пары" }}</div>
-    <div class="tickers">
+    <div class="section-title">Market Pulse</div>
+    <div class="tickers home-market-grid">
         {% for m in markets %}
-        <div class="ticker">
+        <div class="ticker market-card" data-market-ref="{{ m.market_ref }}" data-market-name="{{ m.name }}" data-market-symbol="{{ m.symbol }}">
             <strong>{{ m.symbol }}</strong>
-            <span>{{ m.price }}</span>
-            <em class="{{ 'pos' if m.day_change >= 0 else 'neg' }}">{{ "%+.2f"|format(m.day_change) }}%</em>
+            <span class="m-price" data-symbol="{{ m.symbol }}">{{ m.price }}</span>
+            <em class="m-change {{ 'pos' if m.day_change >= 0 else 'neg' }}" data-symbol="{{ m.symbol }}">{{ "%+.2f"|format(m.day_change) }}%</em>
+            <canvas class="mini-spark" width="120" height="28" data-price="{{ m.price }}" data-change="{{ m.day_change }}"></canvas>
         </div>
         {% endfor %}
     </div>

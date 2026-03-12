@@ -18,6 +18,24 @@
     <div class="pulse-wrap"><div id="market-pulse" class="pulse-track"></div></div>
 </section>
 
+<section class="trade-quickdeck">
+    <article class="card quickdeck-card">
+        <small>Risk %</small>
+        <b id="q-risk-pct">0.0%</b>
+        <span id="q-risk-amt">0.00</span>
+    </article>
+    <article class="card quickdeck-card">
+        <small>Market mode</small>
+        <b id="q-market-mode">--</b>
+        <span id="q-market-signal">Awaiting feed</span>
+    </article>
+    <article class="card quickdeck-card">
+        <small>Exposure</small>
+        <b id="q-open-exp">0.00</b>
+        <span id="q-open-count">0 positions</span>
+    </article>
+</section>
+
 <section class="stats-grid">
     <article class="card stat-card">
         <small>MARK</small>
@@ -91,6 +109,12 @@
                 <button type="button" class="chip risk-chip" data-risk="5">5%</button>
                 <button type="button" class="chip risk-chip" data-risk="10">10%</button>
             </div>
+            <div class="chips chips-wide">
+                <button type="button" class="chip risk-chip" data-risk="15">15%</button>
+                <button type="button" class="chip risk-chip" data-risk="25">25%</button>
+                <button type="button" class="chip" data-amt="10000">10k</button>
+                <button type="button" class="chip" data-amt="25000">25k</button>
+            </div>
 
             <label>{{ labels.trade_leverage if labels else "Плечо" }}: <span id="lev-val">10x</span>
                 <input id="lev-range" type="range" min="1" max="50" value="10">
@@ -148,6 +172,11 @@
         <div class="timer-bar"><span id="trade-progress"></span></div>
     </div>
     <div id="trade-result" class="result-box"></div>
+    <div class="trade-insight" id="trade-insight">
+        <div><small>Direction</small><b id="insight-direction">LONG</b></div>
+        <div><small>Potential TP</small><b id="insight-tp">--</b></div>
+        <div><small>Potential SL</small><b id="insight-sl">--</b></div>
+    </div>
 </section>
 <section class="card">
     <div class="section-title">{{ labels.live_tape if labels else "Лента рынка (live)" }}</div>

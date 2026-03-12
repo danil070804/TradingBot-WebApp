@@ -291,6 +291,24 @@ body[data-page="trade"] .lang-switch {
     grid-template-columns: 1fr 1fr;
 }
 
+.dashboard-actions .qa-btn {
+    position: relative;
+    overflow: hidden;
+}
+
+.dashboard-actions .qa-btn::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(120deg, transparent 0%, rgba(113, 198, 241, 0.14) 42%, transparent 70%);
+    transform: translateX(-100%);
+    transition: transform .42s ease;
+}
+
+.dashboard-actions .qa-btn:hover::before {
+    transform: translateX(100%);
+}
+
 .qa-btn {
     text-decoration: none;
     border: 1px solid rgba(116, 200, 244, 0.28);
@@ -366,6 +384,61 @@ body[data-page="trade"] .card {
     text-shadow: 0 10px 24px rgba(110, 182, 226, 0.2);
 }
 .hint { margin-top: 8px; color: var(--muted); font-size: 12px; }
+
+.home-hero {
+    overflow: hidden;
+}
+
+.dashboard-balance {
+    margin-top: 4px;
+}
+
+.dashboard-grid {
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.dashboard-kpi {
+    padding: 10px 12px;
+    border-radius: 14px;
+    border: 1px solid rgba(116, 200, 244, 0.2);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(234, 246, 253, 0.9));
+}
+
+.dashboard-kpi small {
+    display: block;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: #6f8ea8;
+}
+
+.dashboard-kpi b {
+    display: block;
+    margin-top: 6px;
+    font-family: "Oxanium", monospace;
+    font-size: 17px;
+}
+
+.risk-meter {
+    margin-top: 10px;
+    height: 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(116, 200, 244, 0.28);
+    background: rgba(243, 250, 255, 0.9);
+    overflow: hidden;
+}
+
+.risk-meter span {
+    display: block;
+    width: 0;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #78cdf6 0%, #5bb7e7 48%, #eead67 100%);
+    transition: width .35s ease;
+}
 
 .activity-strip {
     margin-top: 8px;
@@ -1236,6 +1309,40 @@ select, input {
     gap: 12px;
 }
 
+.trade-quickdeck {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.quickdeck-card {
+    padding: 12px;
+    display: grid;
+    gap: 4px;
+}
+
+.quickdeck-card small {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: #6e8ba4;
+}
+
+.quickdeck-card b {
+    font-family: "Oxanium", monospace;
+    font-size: 17px;
+    color: #2c6489;
+}
+
+.quickdeck-card span {
+    color: #64859f;
+    font-size: 12px;
+}
+
+.chips-wide {
+    grid-template-columns: repeat(4, 1fr);
+}
+
 .timer-wrap {
     display: grid;
     gap: 10px;
@@ -1321,6 +1428,41 @@ select, input {
     margin-top: 10px;
     min-height: 20px;
     font-size: 13px;
+}
+
+.trade-insight {
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.trade-insight > div {
+    border: 1px solid rgba(116, 200, 244, 0.2);
+    border-radius: 12px;
+    padding: 10px;
+    background: rgba(246, 251, 255, 0.92);
+}
+
+.trade-insight small {
+    display: block;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: #6f8ea8;
+}
+
+.trade-insight b {
+    font-size: 14px;
+    color: #2b6388;
+}
+
+.position-row {
+    border: 1px solid rgba(116, 200, 244, 0.2);
+    border-radius: 14px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.93), rgba(235, 247, 253, 0.9));
 }
 
 .deposit-lead {
@@ -2299,6 +2441,15 @@ body[data-preloader="skip"] .app-preloader {
 }
 
 @media (max-width: 860px) {
+    .trade-quickdeck {
+        grid-template-columns: 1fr;
+    }
+    .trade-insight {
+        grid-template-columns: 1fr;
+    }
+    .dashboard-grid {
+        grid-template-columns: 1fr 1fr;
+    }
     .trade-layout {
         grid-template-columns: 1fr;
     }

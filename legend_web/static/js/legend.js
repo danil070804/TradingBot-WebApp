@@ -4,6 +4,95 @@ let MARKET_SOCKET_RUNTIME = null;
 let LIVE_TRADE_PANEL_ID = null;
 const INITIAL_OPEN_POSITIONS = Array.isArray(window.LEGEND_INITIAL_OPEN_POSITIONS) ? window.LEGEND_INITIAL_OPEN_POSITIONS : [];
 const INITIAL_TRADE_STATUS = window.LEGEND_INITIAL_TRADE_STATUS || null;
+const LIVE_STATE = {
+    mark: null,
+    spread: null,
+    high: null,
+    low: null,
+    mode: null,
+};
+
+function animateNumericText(el, nextValue, options = {}) {
+    if (!el || !Number.isFinite(Number(nextValue))) return;
+    const {
+        decimals = 2,
+        duration = 360,
+        prefix = "",
+        suffix = "",
+        signed = false,
+    } = options;
+    const prevRaw = Number(el.dataset.numValue || 0);
+    const next = Number(nextValue);
+    if (Math.abs(next - prevRaw) < 1e-9) {
+        const sameText = signed
+            ? `${prefix}${next >= 0 ? "+" : ""}${next.toFixed(decimals)}${suffix}`
+            : `${prefix}${next.toFixed(decimals)}${suffix}`;
+        el.textContent = sameText;
+        el.dataset.numValue = String(next);
+        return;
+    }
+    const start = performance.now();
+    const diff = next - prevRaw;
+    const render = (value) => {
+        const text = signed
+            ? `${prefix}${value >= 0 ? "+" : ""}${value.toFixed(decimals)}${suffix}`
+            : `${prefix}${value.toFixed(decimals)}${suffix}`;
+        el.textContent = text;
+    };
+    const tick = (now) => {
+        const t = Math.min(1, (now - start) / duration);
+        const eased = 1 - Math.pow(1 - t, 3);
+        render(prevRaw + diff * eased);
+        if (t < 1) {
+            requestAnimationFrame(tick);
+        } else {
+            el.dataset.numValue = String(next);
+            render(next);
+        }
+    };
+    requestAnimationFrame(tick);
+}
+
+function updateExposureWidgets(items, currency = "USD") {
+    const safe = Array.isArray(items) ? items : [];
+    const exposure = safe.reduce((acc, item) => acc + Number(item.amount || 0), 0);
+    const openCount = safe.length;
+    const liveBalance = Number((document.getElementById("live-balance") || {}).textContent || 0);
+    const homeBalance = Number((document.getElementById("home-live-balance") || {}).textContent || 0);
+    const baseBalance = liveBalance > 0 ? liveBalance : homeBalance;
+    const riskLoad = baseBalance > 0 ? Math.min(100, (exposure / baseBalance) * 100) : 0;
+
+    const dashExposure = document.getElementById("dash-exposure");
+    const dashRiskLabel = document.getElementById("dash-risk-label");
+    const dashRiskFill = document.getElementById("dash-risk-fill");
+    const qOpenExp = document.getElementById("q-open-exp");
+    const qOpenCount = document.getElementById("q-open-count");
+
+    if (dashExposure) dashExposure.textContent = `${exposure.toFixed(2)} ${currency}`;
+    if (dashRiskLabel) dashRiskLabel.textContent = `${riskLoad.toFixed(1)}%`;
+    if (dashRiskFill) dashRiskFill.style.width = `${riskLoad.toFixed(1)}%`;
+    if (qOpenExp) qOpenExp.textContent = `${exposure.toFixed(2)} ${currency}`;
+    if (qOpenCount) qOpenCount.textContent = `${openCount} ${openCount === 1 ? "position" : "positions"}`;
+}
+
+function currentUiCurrency() {
+    const tradeCurrencyEl = document.getElementById("live-currency");
+    const homeCurrencyEl = document.getElementById("home-live-currency");
+    return (tradeCurrencyEl && tradeCurrencyEl.textContent) || (homeCurrencyEl && homeCurrencyEl.textContent) || "USD";
+}
+
+function updateTradeInsight() {
+    const direction = (document.getElementById("direction-input") || {}).value || "up";
+    const amount = Number((document.getElementById("trade-amount-input") || {}).value || 0);
+    const tp = Number((document.querySelector('input[name="tp_percent"]') || {}).value || 0);
+    const sl = Number((document.querySelector('input[name="sl_percent"]') || {}).value || 0);
+    const insightDir = document.getElementById("insight-direction");
+    const insightTp = document.getElementById("insight-tp");
+    const insightSl = document.getElementById("insight-sl");
+    if (insightDir) insightDir.textContent = direction === "up" ? "LONG" : "SHORT";
+    if (insightTp) insightTp.textContent = tp > 0 ? `+${((amount * tp) / 100).toFixed(2)}` : "--";
+    if (insightSl) insightSl.textContent = sl > 0 ? `-${((amount * sl) / 100).toFixed(2)}` : "--";
+}
 
 function initAppPreloader() {
     const overlay = document.getElementById("app-preloader");
@@ -340,11 +429,22 @@ function bindTradeControls() {
     const amountInput = document.getElementById("trade-amount-input");
     const riskInput = document.getElementById("risk-input");
     const balanceRaw = document.getElementById("balance-raw");
+    const riskPctLabel = document.getElementById("q-risk-pct");
+    const riskAmtLabel = document.getElementById("q-risk-amt");
+    const syncRiskDeck = () => {
+        if (!riskInput || !amountInput) return;
+        const rp = Number(riskInput.value || 0);
+        const amt = Number(amountInput.value || 0);
+        if (riskPctLabel) riskPctLabel.textContent = `${rp.toFixed(1)}%`;
+        if (riskAmtLabel) riskAmtLabel.textContent = `${amt.toFixed(2)} ${currentUiCurrency()}`;
+        updateTradeInsight();
+    };
     const chips = document.querySelectorAll(".chip");
     chips.forEach((chip) => {
         chip.addEventListener("click", () => {
             if (!amountInput) return;
             amountInput.value = chip.dataset.amt;
+            syncRiskDeck();
         });
     });
     const riskChips = document.querySelectorAll(".risk-chip");
@@ -356,6 +456,7 @@ function bindTradeControls() {
             riskInput.value = rp.toString();
             const amt = ((bal * rp) / 100).toFixed(2);
             amountInput.value = amt;
+            syncRiskDeck();
         });
     });
 
@@ -364,7 +465,9 @@ function bindTradeControls() {
             const rp = Number(riskInput.value || 0);
             const bal = Number(balanceRaw.value || 0);
             if (rp > 0) amountInput.value = ((bal * rp) / 100).toFixed(2);
+            syncRiskDeck();
         });
+        amountInput.addEventListener("input", syncRiskDeck);
     }
 
     const levRange = document.getElementById("lev-range");
@@ -378,6 +481,14 @@ function bindTradeControls() {
         levRange.addEventListener("input", sync);
         sync();
     }
+    document.querySelectorAll('input[name="tp_percent"], input[name="sl_percent"]').forEach((el) => {
+        el.addEventListener("input", updateTradeInsight);
+    });
+    document.querySelectorAll(".dir-btn").forEach((el) => {
+        el.addEventListener("click", updateTradeInsight);
+    });
+    syncRiskDeck();
+    updateTradeInsight();
 }
 
 function bindExchangeForm() {
@@ -545,6 +656,23 @@ function updateMarketStats(data) {
     setStatValue(s, data.spread);
     setStatValue(h, data.high);
     setStatValue(l, data.low);
+    LIVE_STATE.mark = Number(data.mark || 0);
+    LIVE_STATE.spread = Number(data.spread || 0);
+    LIVE_STATE.high = Number(data.high || 0);
+    LIVE_STATE.low = Number(data.low || 0);
+    LIVE_STATE.mode = data.market_mode || LIVE_STATE.mode;
+    const qMode = document.getElementById("q-market-mode");
+    const qSignal = document.getElementById("q-market-signal");
+    if (qMode) qMode.textContent = LIVE_STATE.mode ? String(LIVE_STATE.mode).toUpperCase() : "LIVE";
+    if (qSignal) {
+        const span = Math.max(0, LIVE_STATE.high - LIVE_STATE.low);
+        if (LIVE_STATE.spread > 0 && span > 0) {
+            const pressure = Math.min(100, (LIVE_STATE.spread / span) * 100);
+            qSignal.textContent = pressure > 34 ? "High volatility" : pressure > 16 ? "Balanced flow" : "Tight spread";
+        } else {
+            qSignal.textContent = "Streaming";
+        }
+    }
 }
 
 function pushMiniTapeTick(tick) {
@@ -1189,12 +1317,17 @@ function bindUserSocket() {
             return;
         }
         if (!data || data.type !== "user") return;
-        if (balEl) balEl.textContent = Number(data.balance || 0).toFixed(2);
+        if (balEl) animateNumericText(balEl, Number(data.balance || 0), { decimals: 2 });
         if (curEl) curEl.textContent = data.currency || "USD";
-        if (openEl) openEl.textContent = String(data.open_trades || 0);
+        if (openEl) animateNumericText(openEl, Number(data.open_trades || 0), { decimals: 0, duration: 260 });
         if (balanceRaw) balanceRaw.value = Number(data.balance || 0).toFixed(4);
+        const homeBal = document.getElementById("home-live-balance");
+        const homeCur = document.getElementById("home-live-currency");
+        if (homeBal) animateNumericText(homeBal, Number(data.balance || 0), { decimals: 2 });
+        if (homeCur) homeCur.textContent = data.currency || "USD";
         if (positionsWrap && Array.isArray(data.open_positions)) {
             renderOpenPositions(data.open_positions, tgId);
+            updateExposureWidgets(data.open_positions, data.currency || currentUiCurrency());
             if (data.open_positions.length) {
                 syncTradePanel(data.open_positions[0].trade_id, tgId);
             }
@@ -1219,11 +1352,12 @@ function renderOpenPositions(items, tgId) {
     wrap.innerHTML = items
         .map((p) => {
             const side = p.direction === "up" ? L("trade_long", "LONG") : L("trade_short", "SHORT");
+            const sideClass = p.direction === "up" ? "pos" : "neg";
             return `
             <div class="row position-row" data-trade-id="${p.trade_id}" data-tg-id="${tgId}">
                 <div>
-                    <b>${p.asset_name} ${side}</b>
-                    <small>${p.amount} · ${p.remaining}s</small>
+                    <b>${p.asset_name} <span class="${sideClass}">${side}</span></b>
+                    <small>${Number(p.amount || 0).toFixed(2)} ${(p.currency || "USD")} · ${p.remaining}s</small>
                 </div>
                 <button class="chip pos-close-btn" data-trade-id="${p.trade_id}" data-tg-id="${tgId}">
                     ${L("trade_close_now", "Close Now")}
@@ -1278,6 +1412,7 @@ function hydrateInitialTradeState() {
     const openEl = document.getElementById("live-open-trades");
     if (tg && positionsWrap && INITIAL_OPEN_POSITIONS.length) {
         renderOpenPositions(INITIAL_OPEN_POSITIONS, Number(tg.value || 0));
+        updateExposureWidgets(INITIAL_OPEN_POSITIONS, currentUiCurrency());
     }
     if (openEl && INITIAL_OPEN_POSITIONS.length) {
         openEl.textContent = String(INITIAL_OPEN_POSITIONS.length);
@@ -1345,6 +1480,7 @@ async function refreshOpenPositions() {
         const data = await resp.json();
         if (!resp.ok || !data.ok) return;
         renderOpenPositions(data.items || [], tgId);
+        updateExposureWidgets(data.items || [], currentUiCurrency());
         if (Array.isArray(data.items) && data.items.length) {
             syncTradePanel(data.items[0].trade_id, tgId);
         }
