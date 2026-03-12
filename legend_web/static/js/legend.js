@@ -607,6 +607,35 @@ function formatExpiration(seconds) {
     return `${sec}s`;
 }
 
+function getRequestedTradeAsset() {
+    return new URLSearchParams(window.location.search).get("asset");
+}
+
+function applyRequestedTradeAsset() {
+    const selectedAsset = getRequestedTradeAsset();
+    if (!selectedAsset) return null;
+    const assetSelect = document.querySelector('#trade-form select[name="asset_name"]');
+    const chartSymbolSelect = document.getElementById("chart-symbol-select");
+    const normalize = (select) => {
+        if (!select) return false;
+        const options = Array.from(select.options || []);
+        const matched = options.find((opt) => String(opt.value) === String(selectedAsset));
+        if (!matched) return false;
+        select.value = matched.value;
+        return true;
+    };
+    const tradeMatched = normalize(assetSelect);
+    const chartMatched = normalize(chartSymbolSelect);
+    return tradeMatched || chartMatched ? selectedAsset : null;
+}
+
+function replaceTradeAssetInUrl(assetName) {
+    if (!assetName || !window.history || typeof window.history.replaceState !== "function") return;
+    const url = new URL(window.location.href);
+    url.searchParams.set("asset", assetName);
+    window.history.replaceState({}, "", url.toString());
+}
+
 function drawTradeScenarioPreview(payload, progress = 1) {
     const canvas = document.getElementById("tc-scenario-canvas");
     if (!canvas) return;
@@ -853,13 +882,7 @@ function bindTradeForm() {
     const progress = document.getElementById("trade-progress");
     const submitBtn = form ? form.querySelector('button[type="submit"]') : null;
     if (!form || !result) return;
-    const selectedAsset = new URLSearchParams(window.location.search).get("asset");
-    if (selectedAsset) {
-        const assetSelect = form.querySelector('select[name="asset_name"]');
-        if (assetSelect) {
-            assetSelect.value = selectedAsset;
-        }
-    }
+    applyRequestedTradeAsset();
     let busy = false;
     form.addEventListener("submit", async (e) => {
         e.preventDefault();
@@ -1350,8 +1373,13 @@ function bindMarketSocket() {
     const maxBars = Math.max(120, chartLimit || 120);
     let liveLockEnabled = true;
     let crosshairEnabled = true;
+    const requestedAsset = applyRequestedTradeAsset();
     if (chartSymbolSelect && pairSelect && !chartSymbolSelect.value) {
         chartSymbolSelect.value = pairSelect.value || "";
+    }
+    if (requestedAsset) {
+        if (pairSelect) pairSelect.value = requestedAsset;
+        if (chartSymbolSelect) chartSymbolSelect.value = requestedAsset;
     }
 
     const getActiveSymbol = () => {
@@ -1817,6 +1845,7 @@ function bindMarketSocket() {
     pairSelect.addEventListener("change", () => {
         if (disposed) return;
         if (chartSymbolSelect && chartSymbolSelect !== pairSelect) chartSymbolSelect.value = pairSelect.value;
+        replaceTradeAssetInUrl(pairSelect.value);
         primeCandleHistory();
         if (ws && ws.readyState === WebSocket.OPEN) subscribe();
     });
@@ -1824,6 +1853,7 @@ function bindMarketSocket() {
         chartSymbolSelect.addEventListener("change", () => {
             if (disposed) return;
             if (pairSelect) pairSelect.value = chartSymbolSelect.value;
+            replaceTradeAssetInUrl(chartSymbolSelect.value);
             primeCandleHistory();
             if (ws && ws.readyState === WebSocket.OPEN) subscribe();
         });
