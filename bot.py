@@ -2363,6 +2363,74 @@ async def get_deposit_request(dep_id: int) -> Optional[aiosqlite.Row]:
         return await cur.fetchone()
 
 
+def normalize_admin_deposit_status(status: str | None) -> str:
+    value = (status or "pending").strip().lower()
+    if value in {"pending", "approved", "rejected", "all"}:
+        return value
+    return "pending"
+
+
+def admin_deposit_status_label(status: str) -> str:
+    return {
+        "pending": "🟡 В ожидании",
+        "approved": "✅ Подтверждены",
+        "rejected": "❌ Отклонены",
+        "all": "🧾 Все заявки",
+    }.get(status, "🟡 В ожидании")
+
+
+def admin_deposit_row_status_label(status: str | None) -> str:
+    value = (status or "").strip().lower()
+    return {
+        "pending": "🟡 pending",
+        "approved": "✅ approved",
+        "rejected": "❌ rejected",
+    }.get(value, f"• {value or 'unknown'}")
+
+
+def format_created_at_short(value) -> str:
+    if value is None:
+        return "—"
+    raw = str(value).replace("T", " ")
+    return raw.split(".", 1)[0]
+
+
+async def get_deposit_requests_for_admin(
+    status: str = "pending",
+    limit: int = 10,
+    offset: int = 0,
+) -> tuple[list[aiosqlite.Row], int, str]:
+    safe_status = normalize_admin_deposit_status(status)
+    safe_limit = max(1, min(int(limit), 50))
+    safe_offset = max(0, int(offset))
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        where_sql = ""
+        params: list[object] = []
+        if safe_status != "all":
+            where_sql = "WHERE dr.status = ?"
+            params.append(safe_status)
+
+        list_query = (
+            "SELECT dr.id, dr.user_tg_id, dr.amount, dr.currency, dr.method, dr.status, dr.created_at, "
+            "u.first_name, u.username "
+            "FROM deposit_requests dr "
+            "LEFT JOIN users u ON u.tg_id = dr.user_tg_id "
+            f"{where_sql} "
+            "ORDER BY dr.id DESC "
+            "LIMIT ? OFFSET ?"
+        )
+        list_params = tuple(params + [safe_limit, safe_offset])
+        cur = await db.execute(list_query, list_params)
+        rows = await cur.fetchall()
+
+        count_query = f"SELECT COUNT(*) AS c FROM deposit_requests dr {where_sql}"
+        cur_cnt = await db.execute(count_query, tuple(params))
+        cnt_row = await cur_cnt.fetchone()
+        total_count = int(cnt_row["c"] or 0) if cnt_row else 0
+        return rows, total_count, safe_status
+
+
 async def set_deposit_request_status(dep_id: int, status: str):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("UPDATE deposit_requests SET status = ? WHERE id = ?", (status, dep_id))
@@ -3123,6 +3191,60 @@ def admin_deposit_check_keyboard(dep_id: int):
     return kb.as_markup()
 
 
+def admin_deposit_requests_keyboard(rows, status: str, offset: int, total_count: int, page_size: int):
+    safe_status = normalize_admin_deposit_status(status)
+    safe_offset = max(0, int(offset))
+    total_pages = max(1, math.ceil(total_count / page_size)) if total_count else 1
+    current_page = min(total_pages, (safe_offset // page_size) + 1)
+
+    kb = InlineKeyboardBuilder()
+    for row in rows:
+        who = (row["first_name"] or "").strip() if row["first_name"] else ""
+        if not who and row["username"]:
+            who = f"@{row['username']}"
+        if not who:
+            who = f"ID {row['user_tg_id']}"
+        kb.button(
+            text=f"#{row['id']} • {float(row['amount']):.2f} {row['currency']} • {who}",
+            callback_data=f"admin_dep_open:{row['id']}:{safe_status}:{safe_offset}",
+        )
+
+    filter_options = [("pending", "🟡"), ("approved", "✅"), ("rejected", "❌"), ("all", "🧾")]
+    for code, icon in filter_options:
+        prefix = "•" if code == safe_status else icon
+        label = admin_deposit_status_label(code).split(" ", 1)[1]
+        kb.button(text=f"{prefix} {label}", callback_data=f"admin_dep_list:{code}:0")
+
+    prev_offset = max(0, safe_offset - page_size)
+    next_offset = safe_offset + page_size
+    if safe_offset > 0:
+        kb.button(text="⬅️", callback_data=f"admin_dep_list:{safe_status}:{prev_offset}")
+    else:
+        kb.button(text="•", callback_data="admin_dep_noop")
+    kb.button(text=f"{current_page}/{total_pages}", callback_data="admin_dep_noop")
+    if next_offset < total_count:
+        kb.button(text="➡️", callback_data=f"admin_dep_list:{safe_status}:{next_offset}")
+    else:
+        kb.button(text="•", callback_data="admin_dep_noop")
+
+    kb.button(text="🔄 Обновить", callback_data=f"admin_dep_list:{safe_status}:{safe_offset}")
+    kb.button(text="⬅️ К админке", callback_data="open_admin_panel")
+    kb.adjust(1, 1, 1, 1, 2, 2, 3, 1, 1)
+    return kb.as_markup()
+
+
+def admin_deposit_actions_keyboard(dep_id: int, status: str, offset: int, request_status: str):
+    safe_status = normalize_admin_deposit_status(status)
+    safe_offset = max(0, int(offset))
+    kb = InlineKeyboardBuilder()
+    if (request_status or "").strip().lower() == "pending":
+        kb.button(text="✅ Подтвердить", callback_data=f"admin_dep_confirm:{dep_id}:{safe_status}:{safe_offset}")
+        kb.button(text="❌ Отклонить", callback_data=f"admin_dep_reject:{dep_id}:{safe_status}:{safe_offset}")
+    kb.button(text="⬅️ К заявкам", callback_data=f"admin_dep_list:{safe_status}:{safe_offset}")
+    kb.adjust(2, 1)
+    return kb.as_markup()
+
+
 
 
 def withdraw_method_keyboard():
@@ -3162,6 +3284,7 @@ def settings_keyboard(lang: str = "ru"):
 def admin_keyboard():
     kb = InlineKeyboardBuilder()
     kb.button(text="📊Статистика", callback_data="admin_stats")
+    kb.button(text="💰Заявки на пополнения", callback_data="admin_dep_list")
     kb.button(text="📘Инструкция админки", callback_data="admin_guide")
     kb.button(text="👷Добавить воркера", callback_data="admin_add_worker")
     kb.button(text="📜Воркеры и лохматые", callback_data="admin_workers")
@@ -3177,10 +3300,11 @@ def admin_stats_keyboard():
     kb = InlineKeyboardBuilder()
     kb.button(text="🔄 Обновить", callback_data="admin_stats")
     kb.button(text="🛰 Действия лохматых", callback_data="admin_ref_activity")
+    kb.button(text="💰 Пополнения", callback_data="admin_dep_list")
     kb.button(text="👷 Воркеры", callback_data="admin_workers")
     kb.button(text="💳 Реквизиты", callback_data="admin_payments")
     kb.button(text="⬅️ К админке", callback_data="open_admin_panel")
-    kb.adjust(1, 2, 1, 1)
+    kb.adjust(1, 2, 2, 1)
     return kb.as_markup()
 
 
@@ -4723,7 +4847,17 @@ async def approve_deposit(callback: CallbackQuery):
     if not is_admin_id(callback.from_user.id):
         await callback.answer("⛔ Нет доступа.")
         return
-    dep_id = int(callback.data.split(":", 1)[1])
+    parts = callback.data.split(":")
+    dep_id = int(parts[1])
+    status_filter = parts[2] if len(parts) > 2 else "pending"
+    try:
+        offset = int(parts[3]) if len(parts) > 3 else 0
+    except ValueError:
+        offset = 0
+    back_markup = admin_back_keyboard(
+        f"admin_dep_list:{normalize_admin_deposit_status(status_filter)}:{max(0, offset)}",
+        "⬅️ К заявкам",
+    )
     dep = await get_deposit_request(dep_id)
     if not dep or dep["status"] != "pending":
         await callback.answer("Заявка не найдена или уже обработана.")
@@ -4758,7 +4892,10 @@ async def approve_deposit(callback: CallbackQuery):
         )
     except Exception:
         pass
-    await callback.message.answer(f"✅ Пополнение <b>#{dep_id}</b> подтверждено.")
+    await callback.message.answer(
+        f"✅ Пополнение <b>#{dep_id}</b> подтверждено.",
+        reply_markup=back_markup,
+    )
     await callback.answer()
 
 
@@ -4767,7 +4904,17 @@ async def reject_deposit(callback: CallbackQuery):
     if not is_admin_id(callback.from_user.id):
         await callback.answer("⛔ Нет доступа.")
         return
-    dep_id = int(callback.data.split(":", 1)[1])
+    parts = callback.data.split(":")
+    dep_id = int(parts[1])
+    status_filter = parts[2] if len(parts) > 2 else "pending"
+    try:
+        offset = int(parts[3]) if len(parts) > 3 else 0
+    except ValueError:
+        offset = 0
+    back_markup = admin_back_keyboard(
+        f"admin_dep_list:{normalize_admin_deposit_status(status_filter)}:{max(0, offset)}",
+        "⬅️ К заявкам",
+    )
     dep = await get_deposit_request(dep_id)
     if not dep or dep["status"] != "pending":
         await callback.answer("Заявка не найдена или уже обработана.")
@@ -4798,7 +4945,10 @@ async def reject_deposit(callback: CallbackQuery):
         )
     except Exception:
         pass
-    await callback.message.answer(f"❌ Пополнение <b>#{dep_id}</b> отклонено.")
+    await callback.message.answer(
+        f"❌ Пополнение <b>#{dep_id}</b> отклонено.",
+        reply_markup=back_markup,
+    )
     await callback.answer()
 
 # ---------- VERIFICATION & SETTINGS ----------
@@ -5571,6 +5721,60 @@ async def send_admin_panel(msg: Message):
     )
 
 
+def build_admin_deposit_request_text(dep, user_row: Optional[aiosqlite.Row] = None) -> str:
+    full_name = "без имени"
+    username = "без username"
+    if user_row:
+        if user_row["first_name"]:
+            full_name = escape(str(user_row["first_name"]))
+        if user_row["username"]:
+            username = f"@{escape(str(user_row['username']))}"
+
+    return (
+        "💰 <b>Заявка на пополнение</b>\n\n"
+        f"├ ID заявки: <b>#{dep['id']}</b>\n"
+        f"├ Статус: <b>{admin_deposit_row_status_label(dep['status'])}</b>\n"
+        f"├ Сумма: <b>{float(dep['amount']):.2f} {dep['currency']}</b>\n"
+        f"├ Метод: <b>{escape(deposit_method_label(dep['method']))}</b>\n"
+        f"├ Лохматый ID: <code>{dep['user_tg_id']}</code>\n"
+        f"├ Имя: <b>{full_name}</b>\n"
+        f"├ Username: {username}\n"
+        f"╰ Создана: <b>{format_created_at_short(dep['created_at'])}</b>"
+    )
+
+
+async def show_admin_deposit_list(
+    callback: CallbackQuery,
+    state: FSMContext,
+    status: str = "pending",
+    offset: int = 0,
+):
+    if not is_admin_id(callback.from_user.id):
+        await callback.answer("⛔ Нет доступа.")
+        return
+    await state.clear()
+    page_size = 10
+    rows, total_count, safe_status = await get_deposit_requests_for_admin(
+        status=status,
+        limit=page_size,
+        offset=offset,
+    )
+    header = (
+        "💰 <b>Заявки на пополнения</b>\n\n"
+        f"Фильтр: <b>{admin_deposit_status_label(safe_status)}</b>\n"
+        f"Всего: <b>{total_count}</b>\n\n"
+    )
+    if not rows:
+        text = header + "Заявок по этому фильтру пока нет."
+    else:
+        text = header + "Выберите заявку из списка ниже:"
+    await callback.message.edit_text(
+        text,
+        reply_markup=admin_deposit_requests_keyboard(rows, safe_status, max(0, int(offset)), total_count, page_size),
+    )
+    await callback.answer()
+
+
 @dp.callback_query(F.data == "admin_guide")
 async def on_admin_guide(callback: CallbackQuery, state: FSMContext):
     if not is_admin_id(callback.from_user.id):
@@ -5581,6 +5785,7 @@ async def on_admin_guide(callback: CallbackQuery, state: FSMContext):
         "📘 <b>Инструкция по админ-панели</b>\n\n"
         "╭ <b>Основные разделы</b>\n"
         "├ <b>📊 Статистика</b> — KPI платформы: пользователи, сделки, заявки, очереди, PnL.\n"
+        "├ <b>💰 Заявки на пополнения</b> — список заявок с фильтром и карточкой подтверждения/отклонения.\n"
         "├ <b>🛰 Действия лохматых</b> — живая лента действий по воркерам и лохматым с фильтрами.\n"
         "├ <b>👷 Добавить воркера</b> — выдаёт роль воркера по Telegram ID.\n"
         "├ <b>📜 Воркеры и лохматые</b> — список воркеров и их закреплённых лохматых.\n"
@@ -5609,6 +5814,58 @@ async def on_admin_stats(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     text = await get_admin_stats_text()
     await send_section_message(callback.message, "platform_stats", text, reply_markup=admin_stats_keyboard())
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "admin_dep_list")
+async def on_admin_deposit_list(callback: CallbackQuery, state: FSMContext):
+    await show_admin_deposit_list(callback, state, "pending", 0)
+
+
+@dp.callback_query(F.data.startswith("admin_dep_list:"))
+async def on_admin_deposit_list_paged(callback: CallbackQuery, state: FSMContext):
+    parts = callback.data.split(":")
+    filter_code = parts[1] if len(parts) > 1 else "pending"
+    try:
+        offset = int(parts[2]) if len(parts) > 2 else 0
+    except ValueError:
+        offset = 0
+    await show_admin_deposit_list(callback, state, filter_code, offset)
+
+
+@dp.callback_query(F.data == "admin_dep_noop")
+async def on_admin_deposit_noop(callback: CallbackQuery):
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("admin_dep_open:"))
+async def on_admin_deposit_open(callback: CallbackQuery, state: FSMContext):
+    if not is_admin_id(callback.from_user.id):
+        await callback.answer("⛔ Нет доступа.")
+        return
+    await state.clear()
+    parts = callback.data.split(":")
+    try:
+        dep_id = int(parts[1])
+    except Exception:
+        await callback.answer()
+        return
+    status_filter = parts[2] if len(parts) > 2 else "pending"
+    try:
+        offset = int(parts[3]) if len(parts) > 3 else 0
+    except ValueError:
+        offset = 0
+
+    dep = await get_deposit_request(dep_id)
+    if not dep:
+        await callback.answer("Заявка не найдена.", show_alert=True)
+        return
+    user_row = await get_user_by_tg_id(int(dep["user_tg_id"]))
+    text = build_admin_deposit_request_text(dep, user_row)
+    await callback.message.edit_text(
+        text,
+        reply_markup=admin_deposit_actions_keyboard(dep_id, status_filter, offset, dep["status"]),
+    )
     await callback.answer()
 
 
