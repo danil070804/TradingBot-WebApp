@@ -4557,7 +4557,6 @@ async def send_profile(callback_or_msg):
             f"└ Verification: {'Yes' if access['verified'] else 'No'}",
             f"└ Верифікація: {'Так' if access['verified'] else 'Ні'}",
         ),
-        t(lang, "profile_worker", worker=worker_id) if worker_id else t(lang, "profile_worker_none"),
         "",
         t(lang, "profile_deals_title"),
         t(lang, "profile_deals_total", total=deal_stats["total"]),
