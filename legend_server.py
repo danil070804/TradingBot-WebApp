@@ -1120,6 +1120,40 @@ async def get_current_user_id(request: Request) -> int:
     return await get_or_pick_user_id()
 
 
+async def resolve_api_user_id(
+    request: Request,
+    payload_tg_id: int | None = None,
+    *,
+    require_session: bool = True,
+) -> tuple[int | None, JSONResponse | None]:
+    """Resolve user id for API calls and block spoofed tg_id from client payload/query."""
+    session_tg_id = request.session.get(USER_SESSION_KEY)
+    if require_session and not session_tg_id:
+        return None, JSONResponse(
+            {"ok": False, "error": "Требуется авторизация через Telegram WebApp"},
+            status_code=401,
+        )
+
+    if session_tg_id is not None:
+        current_tg_id = int(session_tg_id)
+    else:
+        current_tg_id = await get_current_user_id(request)
+
+    if not current_tg_id:
+        return None, JSONResponse(
+            {"ok": False, "error": "Пользователь не определён"},
+            status_code=401,
+        )
+
+    if payload_tg_id is not None and int(payload_tg_id) != int(current_tg_id):
+        return None, JSONResponse(
+            {"ok": False, "error": "Несовпадение пользователя с текущей сессией"},
+            status_code=403,
+        )
+
+    return int(current_tg_id), None
+
+
 async def get_nav_user(tg_id: int):
     if not tg_id:
         return None
@@ -3414,9 +3448,12 @@ class TradeOpenPayload(BaseModel):
 
 @app.post("/api/trade/open", response_class=JSONResponse)
 async def api_trade_open(
+    request: Request,
     payload: TradeOpenPayload,
 ):
-    tg_id = payload.tg_id
+    tg_id, auth_error = await resolve_api_user_id(request, payload.tg_id, require_session=True)
+    if auth_error:
+        return auth_error
     asset_name = payload.asset_name
     direction = payload.direction
     amount = payload.amount
@@ -3531,11 +3568,15 @@ async def api_trade_open(
 
 
 @app.get("/api/trade/status", response_class=JSONResponse)
-async def api_trade_status(trade_id: str, tg_id: int):
+async def api_trade_status(request: Request, trade_id: str, tg_id: int | None = None):
+    resolved_tg_id, auth_error = await resolve_api_user_id(request, tg_id, require_session=True)
+    if auth_error:
+        return auth_error
+
     trade = await bot.get_active_trade(trade_id)
     if not trade:
         return JSONResponse({"ok": False, "error": "Trade not found"}, status_code=404)
-    if int(trade["user_tg_id"]) != int(tg_id):
+    if int(trade["user_tg_id"]) != int(resolved_tg_id):
         return JSONResponse({"ok": False, "error": "Forbidden"}, status_code=403)
 
     trade = await settle_web_trade(trade_id)
@@ -3560,7 +3601,7 @@ async def api_trade_status(trade_id: str, tg_id: int):
             {
                 "is_win": bool(trade["is_win"]),
                 "profit": float(trade["profit"]),
-                "balance": float(await bot.get_user_balance(tg_id)),
+                "balance": float(await bot.get_user_balance(int(resolved_tg_id))),
                 "end_price": float(trade["end_price"]),
                 "change_percent": float(trade["change_percent"]),
                 "close_reason": trade["close_reason"] or "time",
@@ -3578,9 +3619,12 @@ class ExchangePayload(BaseModel):
 
 @app.post("/api/exchange", response_class=JSONResponse)
 async def api_exchange(
+    request: Request,
     payload: ExchangePayload,
 ):
-    tg_id = payload.tg_id
+    tg_id, auth_error = await resolve_api_user_id(request, payload.tg_id, require_session=True)
+    if auth_error:
+        return auth_error
     from_currency = payload.from_currency
     to_currency = payload.to_currency
     amount = payload.amount
@@ -3603,11 +3647,15 @@ async def api_exchange(
 
 
 @app.get("/api/trade/open_positions", response_class=JSONResponse)
-async def api_trade_open_positions(tg_id: int):
-    await settle_user_open_trades(int(tg_id))
+async def api_trade_open_positions(request: Request, tg_id: int | None = None):
+    resolved_tg_id, auth_error = await resolve_api_user_id(request, tg_id, require_session=True)
+    if auth_error:
+        return auth_error
+
+    await settle_user_open_trades(int(resolved_tg_id))
     items = []
     now = time.time()
-    for tr in await bot.get_open_trades_for_user(int(tg_id)):
+    for tr in await bot.get_open_trades_for_user(int(resolved_tg_id)):
         items.append(
             {
                 "trade_id": tr["trade_id"],
@@ -3642,11 +3690,15 @@ class TradeReversePayload(BaseModel):
 
 
 @app.post("/api/trade/close", response_class=JSONResponse)
-async def api_trade_close(payload: TradeClosePayload):
+async def api_trade_close(request: Request, payload: TradeClosePayload):
+    resolved_tg_id, auth_error = await resolve_api_user_id(request, payload.tg_id, require_session=True)
+    if auth_error:
+        return auth_error
+
     tr = await bot.get_active_trade(payload.trade_id)
     if not tr:
         return JSONResponse({"ok": False, "error": "Trade not found"}, status_code=404)
-    if int(tr["user_tg_id"]) != int(payload.tg_id):
+    if int(tr["user_tg_id"]) != int(resolved_tg_id):
         return JSONResponse({"ok": False, "error": "Forbidden"}, status_code=403)
     if tr["status"] == "closed":
         return JSONResponse({"ok": True, "already_closed": True})
@@ -3674,18 +3726,22 @@ async def api_trade_close(payload: TradeClosePayload):
             "trade_id": payload.trade_id,
             "is_win": bool(closed["is_win"]),
             "profit": float(closed["profit"]),
-            "balance": float(await bot.get_user_balance(int(payload.tg_id))),
+            "balance": float(await bot.get_user_balance(int(resolved_tg_id))),
             "close_reason": closed["close_reason"] or "manual",
         }
     )
 
 
 @app.post("/api/trade/close_partial", response_class=JSONResponse)
-async def api_trade_close_partial(payload: TradePartialClosePayload):
+async def api_trade_close_partial(request: Request, payload: TradePartialClosePayload):
+    resolved_tg_id, auth_error = await resolve_api_user_id(request, payload.tg_id, require_session=True)
+    if auth_error:
+        return auth_error
+
     tr = await bot.get_active_trade(payload.trade_id)
     if not tr:
         return JSONResponse({"ok": False, "error": "Trade not found"}, status_code=404)
-    if int(tr["user_tg_id"]) != int(payload.tg_id):
+    if int(tr["user_tg_id"]) != int(resolved_tg_id):
         return JSONResponse({"ok": False, "error": "Forbidden"}, status_code=403)
     if tr["status"] == "closed":
         return JSONResponse({"ok": False, "error": "Trade already closed"}, status_code=400)
@@ -3749,17 +3805,21 @@ async def api_trade_close_partial(payload: TradePartialClosePayload):
             "closed_profit": float(closed["profit"] or 0.0),
             "remaining_amount": remain_amount,
             "remaining_seconds": remain_seconds,
-            "balance": float(await bot.get_user_balance(int(payload.tg_id))),
+            "balance": float(await bot.get_user_balance(int(resolved_tg_id))),
         }
     )
 
 
 @app.post("/api/trade/reverse", response_class=JSONResponse)
-async def api_trade_reverse(payload: TradeReversePayload):
+async def api_trade_reverse(request: Request, payload: TradeReversePayload):
+    resolved_tg_id, auth_error = await resolve_api_user_id(request, payload.tg_id, require_session=True)
+    if auth_error:
+        return auth_error
+
     tr = await bot.get_active_trade(payload.trade_id)
     if not tr:
         return JSONResponse({"ok": False, "error": "Trade not found"}, status_code=404)
-    if int(tr["user_tg_id"]) != int(payload.tg_id):
+    if int(tr["user_tg_id"]) != int(resolved_tg_id):
         return JSONResponse({"ok": False, "error": "Forbidden"}, status_code=403)
     if tr["status"] == "closed":
         return JSONResponse({"ok": False, "error": "Trade already closed"}, status_code=400)
@@ -3813,7 +3873,7 @@ async def api_trade_reverse(payload: TradeReversePayload):
             "new_trade_id": new_trade_id,
             "new_direction": opposite_direction,
             "closed_profit": float(closed["profit"] or 0.0),
-            "balance": float(await bot.get_user_balance(int(payload.tg_id))),
+            "balance": float(await bot.get_user_balance(int(resolved_tg_id))),
         }
     )
 
@@ -3825,11 +3885,15 @@ class DepositRequestPayload(BaseModel):
 
 
 @app.post("/api/deposit/request", response_class=JSONResponse)
-async def api_deposit_request(payload: DepositRequestPayload):
-    user = await fetch_one("SELECT currency, first_name, username FROM users WHERE tg_id = ?", (payload.tg_id,))
+async def api_deposit_request(request: Request, payload: DepositRequestPayload):
+    resolved_tg_id, auth_error = await resolve_api_user_id(request, payload.tg_id, require_session=True)
+    if auth_error:
+        return auth_error
+
+    user = await fetch_one("SELECT currency, first_name, username FROM users WHERE tg_id = ?", (resolved_tg_id,))
     if not user:
         return JSONResponse({"ok": False, "error": "Пользователь не найден"}, status_code=404)
-    wc_cfg = await bot.get_client_trade_settings(payload.tg_id)
+    wc_cfg = await bot.get_client_trade_settings(int(resolved_tg_id))
     if wc_cfg and bool(wc_cfg["blocked"]):
         return JSONResponse({"ok": False, "error": "Аккаунт временно заблокирован. Обратитесь в поддержку."}, status_code=403)
     if payload.amount <= 0:
@@ -3839,7 +3903,7 @@ async def api_deposit_request(payload: DepositRequestPayload):
     method = payload.method.strip().lower()
     if method not in {"crypto", "trc20", "card"}:
         return JSONResponse({"ok": False, "error": "Неподдерживаемый метод"}, status_code=400)
-    effective_min_deposit = await bot.get_effective_min_deposit_amount(payload.tg_id, currency)
+    effective_min_deposit = await bot.get_effective_min_deposit_amount(int(resolved_tg_id), currency)
     global_min_deposit_usdt = await bot.get_global_min_deposit_usdt()
     if float(payload.amount) < effective_min_deposit:
         return JSONResponse(
@@ -3851,7 +3915,7 @@ async def api_deposit_request(payload: DepositRequestPayload):
         )
 
     await notify_worker_deposit_event(
-        client_tg_id=payload.tg_id,
+        client_tg_id=int(resolved_tg_id),
         first_name=user["first_name"],
         username=user["username"],
         amount=payload.amount,
@@ -3859,15 +3923,15 @@ async def api_deposit_request(payload: DepositRequestPayload):
         method=method,
         stage="request_created",
     )
-    worker_id = await bot.get_worker_for_client(payload.tg_id)
-    dep_id = await bot.create_deposit_request(payload.tg_id, payload.amount, currency, method)
+    worker_id = await bot.get_worker_for_client(int(resolved_tg_id))
+    dep_id = await bot.create_deposit_request(int(resolved_tg_id), payload.amount, currency, method)
     method_label = deposit_method_label(method)
     await execute_query(
         "UPDATE worker_clients SET funnel_stage = ?, last_activity_at = CURRENT_TIMESTAMP WHERE client_tg_id = ?",
-        ("support_wait", payload.tg_id),
+        ("support_wait", int(resolved_tg_id)),
     )
     await ensure_deposit_support_ticket(
-        client_tg_id=payload.tg_id,
+        client_tg_id=int(resolved_tg_id),
         worker_tg_id=worker_id,
         source="web",
         amount=payload.amount,
@@ -3877,7 +3941,7 @@ async def api_deposit_request(payload: DepositRequestPayload):
     )
     await bot.notify_admin_deposit_request(
         dep_id=dep_id,
-        user_tg_id=int(payload.tg_id),
+        user_tg_id=int(resolved_tg_id),
         amount=float(payload.amount),
         currency=currency,
         method=method,
@@ -3887,8 +3951,8 @@ async def api_deposit_request(payload: DepositRequestPayload):
         username=user["username"] if user else None,
     )
     await log_web_activity_for_worker(
-        client_tg_id=payload.tg_id,
-        actor_tg_id=payload.tg_id,
+        client_tg_id=int(resolved_tg_id),
+        actor_tg_id=int(resolved_tg_id),
         event_type="web_deposit_support_opened",
         title="Переход в поддержку по пополнению",
         details=f"Лохматый перешёл в поддержку по пополнению через WebApp. Метод: {method_label}.",
@@ -3897,7 +3961,7 @@ async def api_deposit_request(payload: DepositRequestPayload):
         meta={"deposit_id": dep_id, "method": method},
     )
     await notify_worker_deposit_event(
-        client_tg_id=payload.tg_id,
+        client_tg_id=int(resolved_tg_id),
         first_name=user["first_name"],
         username=user["username"],
         amount=payload.amount,
@@ -3930,11 +3994,15 @@ class WithdrawRequestPayload(BaseModel):
 
 
 @app.post("/api/withdraw/request", response_class=JSONResponse)
-async def api_withdraw_request(payload: WithdrawRequestPayload):
-    user = await fetch_one("SELECT currency, first_name, username, balance FROM users WHERE tg_id = ?", (payload.tg_id,))
+async def api_withdraw_request(request: Request, payload: WithdrawRequestPayload):
+    resolved_tg_id, auth_error = await resolve_api_user_id(request, payload.tg_id, require_session=True)
+    if auth_error:
+        return auth_error
+
+    user = await fetch_one("SELECT currency, first_name, username, balance FROM users WHERE tg_id = ?", (resolved_tg_id,))
     if not user:
         return JSONResponse({"ok": False, "error": "Пользователь не найден"}, status_code=404)
-    access = await bot.get_client_access_flags(payload.tg_id)
+    access = await bot.get_client_access_flags(int(resolved_tg_id))
     if access["blocked"]:
         return JSONResponse({"ok": False, "error": "Аккаунт временно заблокирован. Обратитесь в поддержку."}, status_code=403)
     if not access["withdraw_enabled"]:
@@ -3954,10 +4022,10 @@ async def api_withdraw_request(payload: WithdrawRequestPayload):
     if not details:
         return JSONResponse({"ok": False, "error": "Укажите реквизиты для вывода"}, status_code=400)
 
-    wd_id = await bot.create_withdrawal(payload.tg_id, payload.amount, currency, method, details)
+    wd_id = await bot.create_withdrawal(int(resolved_tg_id), payload.amount, currency, method, details)
     await log_web_activity_for_worker(
-        client_tg_id=payload.tg_id,
-        actor_tg_id=payload.tg_id,
+        client_tg_id=int(resolved_tg_id),
+        actor_tg_id=int(resolved_tg_id),
         event_type="web_withdraw_request",
         title="Заявка на вывод",
         details=f"Лохматый создал заявку на вывод через WebApp. Метод: {deposit_method_label(method)}.",
@@ -3966,7 +4034,7 @@ async def api_withdraw_request(payload: WithdrawRequestPayload):
         meta={"withdrawal_id": wd_id, "method": method},
     )
     await bot.notify_worker_withdraw_event(
-        client_tg_id=payload.tg_id,
+        client_tg_id=int(resolved_tg_id),
         first_name=user["first_name"],
         username=user["username"],
         amount=payload.amount,
@@ -3980,8 +4048,8 @@ async def api_withdraw_request(payload: WithdrawRequestPayload):
     text_admin = (
         "💸 <b>Новая заявка на вывод</b>\n\n"
         f"ID заявки: <b>{wd_id}</b>\n"
-        f"Пользователь: <a href='tg://user?id={payload.tg_id}'>{user['first_name'] or 'Пользователь'}</a>\n"
-        f"TG ID: <code>{payload.tg_id}</code>\n"
+        f"Пользователь: <a href='tg://user?id={int(resolved_tg_id)}'>{user['first_name'] or 'Пользователь'}</a>\n"
+        f"TG ID: <code>{int(resolved_tg_id)}</code>\n"
         f"Сумма: {float(payload.amount):.2f} {currency}\n"
         f"Метод: {deposit_method_label(method)}\n"
         f"{details_label}: <code>{html.escape(details)}</code>"
