@@ -8,6 +8,7 @@ const INITIAL_TRADE_STATUS = window.LEGEND_INITIAL_TRADE_STATUS || null;
 function initAppPreloader() {
     const overlay = document.getElementById("app-preloader");
     const fill = document.getElementById("preloader-bar-fill");
+    const stage = document.getElementById("preloader-stage");
     if (!overlay || !fill) return;
     let seen = false;
     try {
@@ -22,7 +23,20 @@ function initAppPreloader() {
     const startedAt = Date.now();
     const minVisibleMs = 3200;
     const maxVisibleMs = 5000;
-    const progressDurationMs = 2800;
+    const progressDurationMs = 3000;
+    const stagePhrases = [
+        "INITIALIZING PLATFORM...",
+        "SYNCING LIVE MARKET...",
+        "CONNECTING TERMINAL...",
+        "LOADING WORKSPACE...",
+        "READY TO TRADE",
+    ];
+    let stageIdx = 0;
+    const stageTimer = window.setInterval(() => {
+        if (!stage) return;
+        stageIdx = Math.min(stagePhrases.length - 1, stageIdx + 1);
+        stage.textContent = stagePhrases[stageIdx];
+    }, 620);
     let closed = false;
     let raf = 0;
 
@@ -42,6 +56,7 @@ function initAppPreloader() {
         if (closed) return;
         closed = true;
         if (raf) window.cancelAnimationFrame(raf);
+        window.clearInterval(stageTimer);
         try {
             sessionStorage.setItem("legend_webapp_loader_seen", "1");
         } catch (_) {
@@ -1455,14 +1470,46 @@ function bindMarketCards() {
 function bindMarketsToolbar() {
     const search = document.getElementById("markets-search");
     const sort = document.getElementById("markets-sort");
-    const list = document.querySelector(".list");
+    const list = document.getElementById("markets-list") || document.querySelector(".list");
     if (!search || !sort || !list) return;
+    const filterChips = Array.from(document.querySelectorAll(".market-filter-chip"));
+    let filterMode = "all";
 
     const allCards = Array.from(list.querySelectorAll(".market-card"));
     if (!allCards.length) return;
 
     const normalize = (v) => String(v || "").trim().toLowerCase();
     const toNum = (v) => Number(String(v || "").replace(",", "."));
+
+    const updateStats = (cards) => {
+        const toSet = (id, value) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = value;
+        };
+        const all = cards.length;
+        let gainers = 0;
+        let losers = 0;
+        let moveSum = 0;
+        let top = null;
+        let calm = null;
+        cards.forEach((card) => {
+            const ch = toNum(card.dataset.marketChange);
+            moveSum += Math.abs(ch);
+            if (ch >= 0) gainers += 1;
+            if (ch < 0) losers += 1;
+            if (!top || ch > top.change) top = { symbol: card.dataset.marketSymbol || "--", change: ch };
+            if (!calm || Math.abs(ch) < Math.abs(calm.change)) calm = { symbol: card.dataset.marketSymbol || "--", change: ch };
+        });
+        const avgMove = all ? `${(moveSum / all).toFixed(2)}%` : "0.00%";
+        toSet("markets-total", String(all));
+        toSet("markets-gainers", String(gainers));
+        toSet("markets-losers", String(losers));
+        toSet("markets-avg-move", avgMove);
+        toSet("insight-top-symbol", top ? top.symbol : "--");
+        toSet("insight-top-move", top ? `${top.change >= 0 ? "+" : ""}${top.change.toFixed(2)}%` : "--");
+        toSet("insight-calm-symbol", calm ? calm.symbol : "--");
+        toSet("insight-calm-move", calm ? `${calm.change >= 0 ? "+" : ""}${calm.change.toFixed(2)}%` : "--");
+    };
 
     const apply = () => {
         const q = normalize(search.value);
@@ -1471,7 +1518,13 @@ function bindMarketsToolbar() {
         const cards = allCards.filter((card) => {
             const name = normalize(card.dataset.marketName);
             const symbol = normalize(card.dataset.marketSymbol);
-            return !q || name.includes(q) || symbol.includes(q);
+            const baseMatch = !q || name.includes(q) || symbol.includes(q);
+            if (!baseMatch) return false;
+            const ch = toNum(card.dataset.marketChange);
+            if (filterMode === "gainers") return ch >= 0;
+            if (filterMode === "losers") return ch < 0;
+            if (filterMode === "volatile") return Math.abs(ch) >= 1.0;
+            return true;
         });
 
         cards.sort((a, b) => {
@@ -1493,12 +1546,24 @@ function bindMarketsToolbar() {
         });
         cards.forEach((card) => {
             card.style.display = "";
+            card.classList.remove("market-enter");
+            void card.offsetWidth;
+            card.classList.add("market-enter");
             list.appendChild(card);
         });
+        updateStats(cards);
     };
 
     search.addEventListener("input", apply);
     sort.addEventListener("change", apply);
+    filterChips.forEach((chip) => {
+        chip.addEventListener("click", () => {
+            filterMode = chip.dataset.filterMode || "all";
+            filterChips.forEach((node) => node.classList.remove("active"));
+            chip.classList.add("active");
+            apply();
+        });
+    });
     apply();
 }
 

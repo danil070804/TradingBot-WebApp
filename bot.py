@@ -1358,21 +1358,80 @@ async def send_blocked_notice(target: Message, lang: str):
     await send_section_message(target, "support", text, reply_markup=support_section_keyboard(lang))
 
 
-def bot_section_media_keyboard():
+BOT_MEDIA_GROUPS = {
+    "core": ("🧩 Базовые разделы", ["portfolio", "settings", "verification", "my_deals", "open_ecn", "support", "info"]),
+    "payments": ("💳 Платежные разделы", ["deposit", "withdraw", "deposit_status", "deposit_status_approved", "deposit_status_rejected", "withdraw_status", "withdraw_status_approved", "withdraw_status_rejected"]),
+    "staff": ("👷 Воркер/Админ", ["worker_panel", "admin_panel", "worker_client_card", "worker_guide", "worker_referrals_base", "platform_stats"]),
+}
+
+
+def bot_section_media_groups_keyboard():
     kb = InlineKeyboardBuilder()
-    for section_key, meta in BOT_SECTION_MEDIA.items():
-        kb.button(text=f"🖼 {meta['title']}", callback_data=f"admin_media:{section_key}")
+    for group_key, (title, keys) in BOT_MEDIA_GROUPS.items():
+        configured = 0
+        for section_key in keys:
+            if BOT_SECTION_MEDIA.get(section_key):
+                configured += 1
+        kb.button(text=f"{title} ({configured})", callback_data=f"admin_media_group:{group_key}:0")
+    kb.button(text="📋 Все разделы", callback_data="admin_media_group:all:0")
     kb.button(text="⬅️ Админ-панель", callback_data="open_admin_panel")
     kb.adjust(1)
     return kb.as_markup()
 
 
-def bot_section_media_actions_keyboard(section_key: str, has_photo: bool):
+def _media_group_sections(group_key: str) -> list[str]:
+    if group_key == "all":
+        return list(BOT_SECTION_MEDIA.keys())
+    group = BOT_MEDIA_GROUPS.get(group_key)
+    if not group:
+        return []
+    return [k for k in group[1] if k in BOT_SECTION_MEDIA]
+
+
+async def bot_section_media_keyboard(group_key: str = "all", page: int = 0, page_size: int = 8):
+    section_keys = _media_group_sections(group_key)
+    total = len(section_keys)
+    safe_page = max(0, int(page))
+    start = safe_page * page_size
+    end = start + page_size
+    chunk = section_keys[start:end]
+
+    kb = InlineKeyboardBuilder()
+    for section_key in chunk:
+        meta = BOT_SECTION_MEDIA[section_key]
+        current = await get_section_photo_file_id(section_key)
+        status_icon = "🟢" if current else "⚪️"
+        kb.button(
+            text=f"{status_icon} {meta['title']}",
+            callback_data=f"admin_media:{section_key}:{group_key}:{safe_page}",
+        )
+
+    has_prev = safe_page > 0
+    has_next = end < total
+    if has_prev:
+        kb.button(text="◀️", callback_data=f"admin_media_group:{group_key}:{safe_page - 1}")
+    kb.button(text=f"📄 {safe_page + 1}/{max(1, math.ceil(total / page_size))}", callback_data="admin_media_noop")
+    if has_next:
+        kb.button(text="▶️", callback_data=f"admin_media_group:{group_key}:{safe_page + 1}")
+
+    kb.button(text="🗂 Категории", callback_data="admin_media")
+    kb.button(text="⬅️ Админ-панель", callback_data="open_admin_panel")
+
+    if has_prev and has_next:
+        kb.adjust(1, 1, 3, 2)
+    elif has_prev or has_next:
+        kb.adjust(1, 1, 2, 2)
+    else:
+        kb.adjust(1, 1, 2)
+    return kb.as_markup()
+
+
+def bot_section_media_actions_keyboard(section_key: str, has_photo: bool, back_callback: str = "admin_media"):
     kb = InlineKeyboardBuilder()
     kb.button(text="📤 Загрузить фото", callback_data=f"admin_media_set:{section_key}")
     if has_photo:
         kb.button(text="🗑 Удалить фото", callback_data=f"admin_media_delete:{section_key}")
-    kb.button(text="⬅️ К разделам", callback_data="admin_media")
+    kb.button(text="⬅️ К разделам", callback_data=back_callback)
     kb.adjust(1)
     return kb.as_markup()
 
@@ -6209,8 +6268,41 @@ async def on_admin_media(callback: CallbackQuery, state: FSMContext):
         status = "установлено" if current else "не задано"
         lines.append(f"• {meta['title']}: <b>{status}</b>")
     lines.append("")
-    lines.append("Выберите раздел, чтобы загрузить новое фото или удалить текущее.")
-    await callback.message.answer("\n".join(lines), reply_markup=bot_section_media_keyboard())
+    lines.append("Выберите категорию, затем раздел. Кнопки собраны по группам и страницам.")
+    await callback.message.answer("\n".join(lines), reply_markup=bot_section_media_groups_keyboard())
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "admin_media_noop")
+async def on_admin_media_noop(callback: CallbackQuery):
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("admin_media_group:"))
+async def on_admin_media_group(callback: CallbackQuery, state: FSMContext):
+    if not is_admin_id(callback.from_user.id):
+        await callback.answer("⛔ Нет доступа.")
+        return
+    await state.clear()
+    parts = callback.data.split(":")
+    group_key = parts[1] if len(parts) > 1 else "all"
+    try:
+        page = int(parts[2]) if len(parts) > 2 else 0
+    except ValueError:
+        page = 0
+    title = BOT_MEDIA_GROUPS.get(group_key, ("📋 Все разделы", []))[0] if group_key != "all" else "📋 Все разделы"
+    section_keys = _media_group_sections(group_key)
+    total = len(section_keys)
+    text = (
+        f"🖼 <b>Фото разделов · {title}</b>\n\n"
+        f"Всего разделов: <b>{total}</b>\n"
+        "Нажмите на раздел, чтобы открыть действия (загрузка/удаление)."
+    )
+    await safe_edit_or_answer(
+        callback.message,
+        text,
+        reply_markup=await bot_section_media_keyboard(group_key=group_key, page=page),
+    )
     await callback.answer()
 
 
@@ -6220,18 +6312,26 @@ async def on_admin_media_section(callback: CallbackQuery, state: FSMContext):
         await callback.answer("⛔ Нет доступа.")
         return
     await state.clear()
-    section_key = callback.data.split(":", 1)[1]
+    parts = callback.data.split(":")
+    section_key = parts[1] if len(parts) > 1 else ""
+    group_key = parts[2] if len(parts) > 2 else "all"
+    page = parts[3] if len(parts) > 3 else "0"
+    back_callback = f"admin_media_group:{group_key}:{page}"
     meta = BOT_SECTION_MEDIA.get(section_key)
     if not meta:
         await callback.answer("Раздел не найден.")
         return
     current = await get_section_photo_file_id(section_key)
+    await state.update_data(section_media_back=back_callback)
     text = (
         f"🖼 <b>{meta['title']}</b>\n\n"
         f"Текущее состояние: <b>{'фото установлено' if current else 'фото не задано'}</b>\n\n"
         "Можно загрузить новое изображение или удалить текущее."
     )
-    await callback.message.answer(text, reply_markup=bot_section_media_actions_keyboard(section_key, bool(current)))
+    await callback.message.answer(
+        text,
+        reply_markup=bot_section_media_actions_keyboard(section_key, bool(current), back_callback=back_callback),
+    )
     await callback.answer()
 
 
@@ -6256,7 +6356,7 @@ async def on_admin_media_set(callback: CallbackQuery, state: FSMContext):
 
 
 @dp.callback_query(F.data.startswith("admin_media_delete:"))
-async def on_admin_media_delete(callback: CallbackQuery):
+async def on_admin_media_delete(callback: CallbackQuery, state: FSMContext):
     if not is_admin_id(callback.from_user.id):
         await callback.answer("⛔ Нет доступа.")
         return
@@ -6265,10 +6365,12 @@ async def on_admin_media_delete(callback: CallbackQuery):
     if not meta:
         await callback.answer("Раздел не найден.")
         return
+    data = await state.get_data()
+    back_callback = data.get("section_media_back", "admin_media")
     await set_setting(meta["setting"], "")
     await callback.message.answer(
         f"🗑 Фото для раздела <b>{meta['title']}</b> удалено.",
-        reply_markup=admin_back_keyboard(f"admin_media:{section_key}", "⬅️ К разделу"),
+        reply_markup=admin_back_keyboard(back_callback, "⬅️ К разделам"),
     )
     await callback.answer()
 
@@ -6323,6 +6425,7 @@ async def admin_save_section_photo(message: Message, state: FSMContext):
         return
     data = await state.get_data()
     section_key = data.get("section_media_key")
+    back_callback = data.get("section_media_back", "admin_media")
     meta = BOT_SECTION_MEDIA.get(section_key or "")
     if not meta:
         await message.answer("❗ Раздел для фото не найден. Попробуйте снова.")
@@ -6332,7 +6435,7 @@ async def admin_save_section_photo(message: Message, state: FSMContext):
     await set_setting(meta["setting"], photo.file_id)
     await message.answer(
         f"✅ Фото для раздела <b>{meta['title']}</b> сохранено.",
-        reply_markup=admin_back_keyboard(f"admin_media:{section_key}", "⬅️ К разделу"),
+        reply_markup=admin_back_keyboard(back_callback, "⬅️ К разделам"),
     )
     await state.clear()
 
@@ -6340,8 +6443,7 @@ async def admin_save_section_photo(message: Message, state: FSMContext):
 @dp.message(AdminMediaStates.waiting_photo)
 async def admin_save_section_photo_invalid(message: Message, state: FSMContext):
     data = await state.get_data()
-    section_key = data.get("section_media_key") or "admin_media"
-    back_target = f"admin_media:{section_key}" if section_key in BOT_SECTION_MEDIA else "admin_media"
+    back_target = data.get("section_media_back", "admin_media")
     await message.answer(
         "❗ Пожалуйста, отправьте именно фотографию одним сообщением.",
         reply_markup=admin_prompt_keyboard(back_target),

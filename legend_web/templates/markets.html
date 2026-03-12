@@ -1,19 +1,36 @@
 {% extends "base.html" %}
-{% block title %}Рынки | Legend Trading{% endblock %}
+{% block title %}{{ labels.markets_title if labels else "Markets" }} | Legend Trading{% endblock %}
 {% block content %}
+<section class="card hero markets-hero">
+    <h1>{{ labels.markets_title if labels else "Markets" }}</h1>
+    <div class="hint">{{ labels.live_tape if labels else "Market Tape (live)" }}</div>
+    <div class="stats-grid markets-stats">
+        <article class="card stat-card"><small>TOTAL</small><b id="markets-total">{{ markets|length }}</b></article>
+        <article class="card stat-card"><small>GAINERS</small><b id="markets-gainers">0</b></article>
+        <article class="card stat-card"><small>LOSERS</small><b id="markets-losers">0</b></article>
+        <article class="card stat-card"><small>AVG MOVE</small><b id="markets-avg-move">0.00%</b></article>
+    </div>
+</section>
+
 <section class="card">
-    <div class="section-title">{{ labels.markets_title if labels else "Рынки" }}</div>
+    <div class="section-title">{{ labels.markets_title if labels else "Markets" }}</div>
+    <div class="markets-filters">
+        <button type="button" class="chip market-filter-chip active" data-filter-mode="all">All</button>
+        <button type="button" class="chip market-filter-chip" data-filter-mode="gainers">Gainers</button>
+        <button type="button" class="chip market-filter-chip" data-filter-mode="losers">Losers</button>
+        <button type="button" class="chip market-filter-chip" data-filter-mode="volatile">Volatile</button>
+    </div>
     <div class="markets-toolbar">
-        <input id="markets-search" class="markets-search" type="text" placeholder="Поиск: BTC, Bitcoin, ETH...">
+        <input id="markets-search" class="markets-search" type="text" placeholder="Search: BTC, Bitcoin, ETH...">
         <select id="markets-sort" class="markets-sort">
-            <option value="change_desc">Лидеры роста</option>
-            <option value="change_asc">Лидеры падения</option>
-            <option value="price_desc">Цена: выше</option>
-            <option value="price_asc">Цена: ниже</option>
-            <option value="name_asc">По алфавиту</option>
+            <option value="change_desc">Top gainers</option>
+            <option value="change_asc">Top losers</option>
+            <option value="price_desc">Price: high</option>
+            <option value="price_asc">Price: low</option>
+            <option value="name_asc">Alphabetical</option>
         </select>
     </div>
-    <div class="list">
+    <div class="list" id="markets-list">
         {% for m in markets %}
         <a
             href="/markets/{{ m.market_ref|urlencode }}"
@@ -34,6 +51,16 @@
             </div>
         </a>
         {% endfor %}
+    </div>
+</section>
+
+<section class="card">
+    <div class="section-title">Market Insights</div>
+    <div class="stats-grid" id="markets-insights">
+        <article class="card stat-card"><small>TOP SYMBOL</small><b id="insight-top-symbol">--</b></article>
+        <article class="card stat-card"><small>TOP MOVE</small><b id="insight-top-move">--</b></article>
+        <article class="card stat-card"><small>CALM SYMBOL</small><b id="insight-calm-symbol">--</b></article>
+        <article class="card stat-card"><small>CALM MOVE</small><b id="insight-calm-move">--</b></article>
     </div>
 </section>
 {% endblock %}
