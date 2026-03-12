@@ -1469,25 +1469,22 @@ def build_candles_from_history(symbol: str, tf_sec: int, limit: int = 80) -> lis
         ordered = prefix + ordered
 
     out = ordered[-n:]
-    spec = ASSET_SPECS.get(symbol, {"vol": 0.006})
-    wick_ratio = max(0.0005, float(spec.get("vol", 0.006)) * 0.9)
     result = []
     for c in out:
         o = float(c["o"])
         close = float(c["c"])
         hi = max(float(c["h"]), o, close)
         lo = min(float(c["l"]), o, close)
-        body = max(abs(close - o), max(abs(o), abs(close), 0.00001) * wick_ratio * 0.35, 0.00001)
-        hi = max(hi, max(o, close) + body * random.uniform(0.08, 0.45))
-        lo = min(lo, min(o, close) - body * random.uniform(0.08, 0.45))
+        span = max(0.000001, hi - lo)
         result.append(
             {
-                "t": c["t"],
+                "t": int(c["t"]),
                 "o": round(o, 6),
-                "h": round(max(hi, o, close), 6),
-                "l": round(max(0.00001, min(lo, o, close)), 6),
+                "h": round(hi, 6),
+                "l": round(max(0.00001, lo), 6),
                 "c": round(close, 6),
-                "v": round(max(1.0, float(c.get("v", 0.0)) * 700.0 + body * 1800.0), 2),
+                # Stable synthetic volume derived from real candle span.
+                "v": round(max(1.0, float(c.get("v", 0.0)) * 160.0 + span * 90.0), 2),
             }
         )
     return result
