@@ -1006,6 +1006,14 @@ async function initTelegramAuth() {
     wa.ready();
     wa.expand();
     if (!wa.initData) return;
+    if (document.body && document.body.dataset.authenticated === "1") {
+        try {
+            sessionStorage.setItem("tg_auth_done", "1");
+        } catch (_) {
+            // no-op
+        }
+        return;
+    }
     if (sessionStorage.getItem("tg_auth_done")) return;
     try {
         const resp = await fetch("/api/auth/telegram", {
@@ -1016,6 +1024,9 @@ async function initTelegramAuth() {
         const data = await resp.json();
         if (resp.ok && data.ok && !sessionStorage.getItem("tg_auth_done")) {
             sessionStorage.setItem("tg_auth_done", "1");
+            if (document.body) {
+                document.body.dataset.authenticated = "1";
+            }
             location.reload();
         }
     } catch (_) {
