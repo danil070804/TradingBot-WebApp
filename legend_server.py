@@ -574,12 +574,12 @@ async def ensure_webapp_user(user_data: dict):
     username = user_data.get("username")
     async with db.connect(bot.DB_PATH) as conn:
         await conn.execute(
-            "INSERT OR IGNORE INTO users(tg_id, first_name, username) VALUES (?, ?, ?)",
-            (tg_id, first_name, username),
+            "INSERT OR IGNORE INTO users(tg_id, first_name, username, language, currency) VALUES (?, ?, ?, ?, ?)",
+            (tg_id, first_name, username, "en", "USD"),
         )
         await conn.execute(
-            "UPDATE users SET first_name = ?, username = ? WHERE tg_id = ?",
-            (first_name, username, tg_id),
+            "UPDATE users SET first_name = ?, username = ?, language = COALESCE(language, ?), currency = COALESCE(currency, ?) WHERE tg_id = ?",
+            (first_name, username, "en", "USD", tg_id),
         )
         await conn.commit()
 
@@ -1093,7 +1093,7 @@ async def build_admin_dashboard_payload() -> dict:
 
 
 def normalize_lang_code(lang: str | None) -> str:
-    code = (lang or "ru").strip().lower()
+    code = (lang or "en").strip().lower()
     if code.startswith("en"):
         return "en"
     if code.startswith("uk"):
@@ -1104,14 +1104,14 @@ def normalize_lang_code(lang: str | None) -> str:
 async def get_lang_and_labels(tg_id: int) -> tuple[str, dict]:
     # session override is handled in route via request.session
     if not tg_id:
-        return "ru", WEB_I18N["ru"]
+        return "en", WEB_I18N["en"]
     row = await fetch_one("SELECT language FROM users WHERE tg_id = ?", (tg_id,))
-    lang = normalize_lang_code(row["language"] if row else "ru")
-    return lang, WEB_I18N.get(lang, WEB_I18N["ru"])
+    lang = normalize_lang_code(row["language"] if row else "en")
+    return lang, WEB_I18N.get(lang, WEB_I18N["en"])
 
 
 def labels_for_lang(lang: str) -> dict:
-    return WEB_I18N.get(normalize_lang_code(lang), WEB_I18N["ru"])
+    return WEB_I18N.get(normalize_lang_code(lang), WEB_I18N["en"])
 
 
 async def get_request_lang_labels(request: Request, tg_id: int) -> tuple[str, dict]:
@@ -1610,8 +1610,11 @@ async def telegram_auth(payload: TelegramAuthPayload, request: Request):
     if not user:
         return JSONResponse({"ok": False, "error": "Invalid initData"}, status_code=401)
     await ensure_webapp_user(user)
-    request.session[USER_SESSION_KEY] = int(user["id"])
-    return JSONResponse({"ok": True, "tg_id": int(user["id"])})
+    tg_id = int(user["id"])
+    request.session[USER_SESSION_KEY] = tg_id
+    lang_row = await fetch_one("SELECT language FROM users WHERE tg_id = ?", (tg_id,))
+    request.session[LANG_SESSION_KEY] = normalize_lang_code(lang_row["language"] if lang_row else "en")
+    return JSONResponse({"ok": True, "tg_id": tg_id})
 
 
 class SetLangPayload(BaseModel):
@@ -1622,6 +1625,9 @@ class SetLangPayload(BaseModel):
 async def api_set_lang(payload: SetLangPayload, request: Request):
     lang = normalize_lang_code(payload.lang)
     request.session[LANG_SESSION_KEY] = lang
+    tg_id = await get_current_user_id(request)
+    if tg_id:
+        await execute_query("UPDATE users SET language = ? WHERE tg_id = ?", (lang, tg_id))
     return JSONResponse({"ok": True, "lang": lang})
 
 
@@ -2152,7 +2158,7 @@ async def api_worker_client_update(payload: WorkerClientUpdatePayload, request: 
         "SELECT tg_id, language, currency, balance FROM users WHERE tg_id = ?",
         (int(wc["client_tg_id"]),),
     )
-    client_lang = bot.normalize_lang(client_user["language"] if client_user else "ru")
+    client_lang = bot.normalize_lang(client_user["language"] if client_user else "en")
     support_markup = bot.support_section_keyboard(client_lang)
     if action == "toggle_verified":
         new_val = 0 if wc["verified"] else 1
@@ -2634,7 +2640,7 @@ async def admin_process_deposit(payload: AdminProcessPayload, request: Request):
         return JSONResponse({"ok": False, "error": "Unsupported action"}, status_code=400)
     new_status = "approved" if action == "approve" else "rejected"
     client_user = await fetch_one("SELECT language FROM users WHERE tg_id = ?", (int(dep["user_tg_id"]),))
-    client_lang = bot.normalize_lang(client_user["language"] if client_user else "ru")
+    client_lang = bot.normalize_lang(client_user["language"] if client_user else "en")
     await execute_query(
         "UPDATE deposit_requests SET status = ?, processed_by = ? WHERE id = ?",
         (new_status, "admin_web", payload.entity_id),
