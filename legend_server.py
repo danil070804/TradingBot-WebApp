@@ -8,6 +8,7 @@ import hashlib
 import time
 import secrets
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from collections import deque
 from urllib.parse import parse_qsl, urlencode
 from contextlib import asynccontextmanager
@@ -793,6 +794,20 @@ def row_to_dict(row):
     return dict(row) if row is not None else None
 
 
+def to_json_safe(value):
+    if isinstance(value, dict):
+        return {k: to_json_safe(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [to_json_safe(v) for v in value]
+    if isinstance(value, tuple):
+        return [to_json_safe(v) for v in value]
+    if isinstance(value, datetime):
+        return value.replace(tzinfo=None).isoformat(sep=" ", timespec="seconds")
+    if isinstance(value, Decimal):
+        return float(value)
+    return value
+
+
 async def ensure_deposit_support_ticket(
     client_tg_id: int,
     worker_tg_id: int | None,
@@ -1065,7 +1080,7 @@ async def build_worker_client_snapshot_payload(worker_tg_id: int, wc_id: int) ->
 
 async def build_admin_dashboard_payload() -> dict:
     snapshot = await fetch_admin_dashboard_snapshot()
-    return {
+    payload = {
         "ok": True,
         "metrics": snapshot["metrics"],
         "deposits": [dict(r) for r in snapshot["deposits"]],
@@ -1074,6 +1089,7 @@ async def build_admin_dashboard_payload() -> dict:
         "audit": [dict(r) for r in snapshot["audit"]],
         "worker_stats": [dict(r) for r in snapshot["worker_stats"]],
     }
+    return to_json_safe(payload)
 
 
 def normalize_lang_code(lang: str | None) -> str:

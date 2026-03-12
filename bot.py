@@ -96,6 +96,13 @@ async def safe_callback_answer(callback: CallbackQuery, *args, **kwargs):
         await callback.answer(*args, **kwargs)
 
 
+async def safe_edit_or_answer(message: Message, text: str, reply_markup=None):
+    try:
+        await message.edit_text(text, reply_markup=reply_markup)
+    except Exception:
+        await message.answer(text, reply_markup=reply_markup)
+
+
 I18N = {
     "ru": {
         "open_app": "🚀 Открыть приложение",
@@ -5768,7 +5775,8 @@ async def show_admin_deposit_list(
         text = header + "Заявок по этому фильтру пока нет."
     else:
         text = header + "Выберите заявку из списка ниже:"
-    await callback.message.edit_text(
+    await safe_edit_or_answer(
+        callback.message,
         text,
         reply_markup=admin_deposit_requests_keyboard(rows, safe_status, max(0, int(offset)), total_count, page_size),
     )
@@ -5862,7 +5870,8 @@ async def on_admin_deposit_open(callback: CallbackQuery, state: FSMContext):
         return
     user_row = await get_user_by_tg_id(int(dep["user_tg_id"]))
     text = build_admin_deposit_request_text(dep, user_row)
-    await callback.message.edit_text(
+    await safe_edit_or_answer(
+        callback.message,
         text,
         reply_markup=admin_deposit_actions_keyboard(dep_id, status_filter, offset, dep["status"]),
     )
