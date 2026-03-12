@@ -2940,6 +2940,7 @@ async def on_language_selected(callback: CallbackQuery, state: FSMContext):
     current_state = await state.get_state()
     if current_state == SettingsFlowStates.choosing_lang.state:
         await state.clear()
+        await refresh_reply_keyboard(callback.message, lang_code)
         user_row = await get_user_row(callback.from_user)
         cur = user_row["currency"] or "не выбрана"
         text = t(lang_code, "settings_title", lang_value=lang_code.upper(), cur=cur)
@@ -2985,6 +2986,18 @@ async def send_main_menu(message: Message):
     lang = normalize_lang(user_row["language"])
     text = t(lang, "menu_welcome", name=message.from_user.first_name)
     await message.answer(text, reply_markup=main_menu_keyboard(lang))
+
+
+async def refresh_reply_keyboard(message: Message, lang: str):
+    await message.answer(
+        tr(
+            lang,
+            "✅ Язык меню обновлён.",
+            "✅ Menu language updated.",
+            "✅ Мову меню оновлено.",
+        ),
+        reply_markup=main_menu_keyboard(lang),
+    )
 
 
 # ---------- MAIN MENU BUTTONS & ECN DEMO ----------
