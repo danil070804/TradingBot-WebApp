@@ -475,6 +475,21 @@ async def add_column_if_missing(
     await db.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}")
 
 
+async def get_pg_column_data_type(db, table_name: str, column_name: str) -> str | None:
+    cur = await db.execute(
+        """
+        SELECT data_type
+        FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = ? AND column_name = ?
+        """,
+        (table_name, column_name),
+    )
+    row = await cur.fetchone()
+    if not row:
+        return None
+    return str(row["data_type"]).lower()
+
+
 async def init_db():
     is_pg = aiosqlite.using_postgres()
 
@@ -850,11 +865,20 @@ async def init_db():
         await db.execute(worker_clients_ddl)
 
         await db.execute(
-            """CREATE TABLE IF NOT EXISTS worker_settings(
-                worker_tg_id INTEGER PRIMARY KEY,
-                min_deposit REAL DEFAULT 0,
-                min_withdraw REAL DEFAULT 0
-            )"""
+            (
+                """CREATE TABLE IF NOT EXISTS worker_settings(
+                    worker_tg_id BIGINT PRIMARY KEY,
+                    min_deposit DOUBLE PRECISION DEFAULT 0,
+                    min_withdraw DOUBLE PRECISION DEFAULT 0
+                )"""
+                if is_pg
+                else
+                """CREATE TABLE IF NOT EXISTS worker_settings(
+                    worker_tg_id INTEGER PRIMARY KEY,
+                    min_deposit REAL DEFAULT 0,
+                    min_withdraw REAL DEFAULT 0
+                )"""
+            )
         )
 
         await db.execute(client_luck_ddl)
@@ -908,6 +932,15 @@ async def init_db():
                 sqlite_definition,
                 is_pg,
             )
+
+        if is_pg:
+            # Old PostgreSQL deployments could have worker_settings.worker_tg_id as int4.
+            # Telegram IDs exceed int32 and cause asyncpg DataError on SELECT/INSERT.
+            data_type = await get_pg_column_data_type(db, "worker_settings", "worker_tg_id")
+            if data_type and data_type != "bigint":
+                await db.execute(
+                    "ALTER TABLE worker_settings ALTER COLUMN worker_tg_id TYPE BIGINT USING worker_tg_id::BIGINT"
+                )
 
         # Расширяем список активов ECN (insert-ignore для уже существующих)
         default_assets = [
@@ -2042,6 +2075,7 @@ async def notify_worker_bot_deposit_event(
     if not worker_id:
         return
     stage_text = {
+        "section_opened": "зашёл в раздел пополнения баланса",
         "request_created": "создал заявку на пополнение через бота",
         "support_opened": "перешёл в техподдержку по пополнению через бота",
     }.get(stage, stage)
@@ -2422,6 +2456,37 @@ async def get_admin_stats_text() -> str:
         f"╰ Топ воркеры:\n{top_block}"
     )
 
+
+async def get_recent_referral_activity_for_admin(limit: int = 25):
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            """
+            SELECT
+                al.id,
+                al.worker_tg_id,
+                al.client_tg_id,
+                al.title,
+                al.details,
+                al.event_type,
+                al.created_at,
+                wu.first_name AS worker_first_name,
+                wu.username AS worker_username,
+                cu.first_name AS client_first_name,
+                cu.username AS client_username
+            FROM activity_log al
+            LEFT JOIN users wu ON wu.tg_id = al.worker_tg_id
+            LEFT JOIN users cu ON cu.tg_id = al.client_tg_id
+            WHERE al.worker_tg_id IS NOT NULL
+              AND al.client_tg_id IS NOT NULL
+            ORDER BY al.id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        )
+        return await cur.fetchall()
+
+
 async def get_workers_with_ref_counts():
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
@@ -2674,6 +2739,8 @@ BOT_SECTION_MEDIA = {
     "worker_panel": {"setting": "bot_photo_worker_panel", "title": "Панель воркера"},
     "admin_panel": {"setting": "bot_photo_admin_panel", "title": "Админка"},
     "worker_client_card": {"setting": "bot_photo_worker_client_card", "title": "Карточка реферала"},
+    "worker_guide": {"setting": "bot_photo_worker_guide", "title": "Инструкция по функциям воркер панели"},
+    "worker_referrals_base": {"setting": "bot_photo_worker_referrals_base", "title": "База рефералов"},
     "platform_stats": {"setting": "bot_photo_platform_stats", "title": "Статистика платформы"},
 }
 CURRENCY_PER_USDT = {
@@ -3001,10 +3068,20 @@ def admin_keyboard():
 def admin_stats_keyboard():
     kb = InlineKeyboardBuilder()
     kb.button(text="🔄 Обновить", callback_data="admin_stats")
+    kb.button(text="🛰 Действия рефералов", callback_data="admin_ref_activity")
     kb.button(text="👷 Воркеры", callback_data="admin_workers")
     kb.button(text="💳 Реквизиты", callback_data="admin_payments")
     kb.button(text="⬅️ К админке", callback_data="open_admin_panel")
-    kb.adjust(2, 1, 1)
+    kb.adjust(1, 2, 1, 1)
+    return kb.as_markup()
+
+
+def admin_referral_activity_keyboard():
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🔄 Обновить", callback_data="admin_ref_activity")
+    kb.button(text="📊 К статистике", callback_data="admin_stats")
+    kb.button(text="⬅️ К админке", callback_data="open_admin_panel")
+    kb.adjust(2, 1)
     return kb.as_markup()
 
 
@@ -3348,6 +3425,23 @@ async def menu_deposit(message: Message, state: FSMContext):
         await send_blocked_notice(message, lang)
         return
     currency = user_row["currency"] or "USD"
+    await log_activity_for_worker_client(
+        client_tg_id=message.from_user.id,
+        actor_tg_id=message.from_user.id,
+        actor_source="bot",
+        event_type="bot_deposit_section_opened",
+        title="Открыто пополнение баланса",
+        details="Реферал открыл раздел пополнения баланса в Telegram-боте.",
+    )
+    await notify_worker_bot_deposit_event(
+        client_tg_id=message.from_user.id,
+        first_name=user_row["first_name"] if user_row else message.from_user.first_name,
+        username=user_row["username"] if user_row else message.from_user.username,
+        amount=None,
+        currency=currency,
+        method=None,
+        stage="section_opened",
+    )
     await send_section_message(
         message,
         "deposit",
@@ -3994,6 +4088,23 @@ async def on_deposit(callback: CallbackQuery, state: FSMContext):
         await callback.answer()
         return
     currency = user_row["currency"] or "USD"
+    await log_activity_for_worker_client(
+        client_tg_id=callback.from_user.id,
+        actor_tg_id=callback.from_user.id,
+        actor_source="bot",
+        event_type="bot_deposit_section_opened",
+        title="Открыто пополнение баланса",
+        details="Реферал открыл раздел пополнения баланса в Telegram-боте.",
+    )
+    await notify_worker_bot_deposit_event(
+        client_tg_id=callback.from_user.id,
+        first_name=user_row["first_name"] if user_row else callback.from_user.first_name,
+        username=user_row["username"] if user_row else callback.from_user.username,
+        amount=None,
+        currency=currency,
+        method=None,
+        stage="section_opened",
+    )
     await send_section_message(
         callback.message,
         "deposit",
@@ -4693,7 +4804,12 @@ async def worker_guide_cb(callback: CallbackQuery):
         "╰ <b>Мин. вывод</b> — лимит по выводу для клиентов вашей ветки.\n\n"
         "Все изменения из карточки должны отражаться и в боте, и в вебе, потому что логика работает через одну общую базу."
     )
-    await callback.message.answer(text, reply_markup=worker_back_keyboard("open_worker_panel", "⬅️ К панели воркера"))
+    await send_section_message(
+        callback.message,
+        "worker_guide",
+        text,
+        reply_markup=worker_back_keyboard("open_worker_panel", "⬅️ К панели воркера"),
+    )
     await callback.answer()
 
 @dp.callback_query(F.data == "worker_sheeps")
@@ -4713,7 +4829,12 @@ async def worker_sheeps(callback: CallbackQuery):
             f"├ Последняя активная карточка: <code>/n{first['id']}</code>\n"
             f"╰ Telegram ID клиента: <code>{first['client_tg_id']}</code>"
         )
-    await callback.message.answer(text, reply_markup=worker_sheeps_keyboard(rows))
+    await send_section_message(
+        callback.message,
+        "worker_referrals_base",
+        text,
+        reply_markup=worker_sheeps_keyboard(rows),
+    )
     await callback.answer()
 
 
@@ -5307,6 +5428,37 @@ async def on_admin_stats(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
+@dp.callback_query(F.data == "admin_ref_activity")
+async def on_admin_ref_activity(callback: CallbackQuery, state: FSMContext):
+    if not is_admin_id(callback.from_user.id):
+        await callback.answer("⛔ Нет доступа.")
+        return
+    await state.clear()
+    rows = await get_recent_referral_activity_for_admin(limit=25)
+    if not rows:
+        await callback.message.answer(
+            "🛰 <b>Действия рефералов воркеров</b>\n\nПока событий нет.",
+            reply_markup=admin_referral_activity_keyboard(),
+        )
+        await callback.answer()
+        return
+
+    lines = ["🛰 <b>Действия рефералов воркеров</b>", ""]
+    for row in rows:
+        worker_label = (row["worker_first_name"] or "").strip() or (f"@{row['worker_username']}" if row["worker_username"] else "без имени")
+        client_label = (row["client_first_name"] or "").strip() or (f"@{row['client_username']}" if row["client_username"] else "без имени")
+        created_at = str(row["created_at"] or "").strip()[:19]
+        lines.append(
+            f"• <b>{row['title'] or 'Событие'}</b>\n"
+            f"  Воркер: <code>{row['worker_tg_id']}</code> ({worker_label})\n"
+            f"  Реферал: <code>{row['client_tg_id']}</code> ({client_label})\n"
+            f"  Время: <code>{created_at}</code>\n"
+            f"  Детали: {row['details'] or '—'}"
+        )
+    await callback.message.answer("\n\n".join(lines), reply_markup=admin_referral_activity_keyboard())
+    await callback.answer()
+
+
 @dp.callback_query(F.data == "admin_media")
 async def on_admin_media(callback: CallbackQuery, state: FSMContext):
     if not is_admin_id(callback.from_user.id):
@@ -5408,8 +5560,18 @@ async def admin_set_worker(message: Message, state: FSMContext):
         await message.answer("❗ Введите корректный числовой Telegram ID.", reply_markup=admin_prompt_keyboard("open_admin_panel"))
         return
     await set_worker_flag(user_id, True)
+    delivered = False
+    with contextlib.suppress(Exception):
+        await bot.send_message(
+            user_id,
+            "🎉 <b>Роль обновлена</b>\n\n"
+            "Вам выдан доступ к <b>панели воркера</b>.\n"
+            "Откройте профиль и нажмите «⚒ Панель воркера», либо используйте команду <code>/worker</code>.",
+        )
+        delivered = True
+    delivery_text = "Уведомление пользователю отправлено." if delivered else "Не удалось отправить уведомление пользователю (возможно, нет активного чата с ботом)."
     await message.answer(
-        f"✅ Пользователь <code>{user_id}</code> назначен воркером.",
+        f"✅ Пользователь <code>{user_id}</code> назначен воркером.\n{delivery_text}",
         reply_markup=admin_back_keyboard("open_admin_panel", "⬅️ К админке"),
     )
     await state.clear()
