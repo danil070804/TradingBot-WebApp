@@ -3133,7 +3133,6 @@ async def api_deposit_request(payload: DepositRequestPayload):
         )
 
     dep_id = await bot.create_deposit_request(payload.tg_id, payload.amount, currency, method)
-    worker_info_line = f"Реферал воркера: <code>{worker_id}</code>\n" if worker_id else "Реферал воркера: нет данных\n"
     method_label = deposit_method_label(method)
     await ensure_deposit_support_ticket(
         client_tg_id=payload.tg_id,
@@ -3144,24 +3143,17 @@ async def api_deposit_request(payload: DepositRequestPayload):
         method=method,
         deposit_id=dep_id,
     )
-    text_admin = (
-        "🔔 <b>Заявка на проверку оплаты (WebApp)</b>\n\n"
-        f"ID заявки: <b>{dep_id}</b>\n"
-        f"Пользователь ID: <code>{payload.tg_id}</code>\n"
-        f"Сумма: {payload.amount:.2f} {currency}\n"
-        f"Метод: {method_label}\n"
-        f"{worker_info_line}"
+    await bot.notify_admin_deposit_request(
+        dep_id=dep_id,
+        user_tg_id=int(payload.tg_id),
+        amount=float(payload.amount),
+        currency=currency,
+        method=method,
+        source="web",
+        worker_tg_id=worker_id,
+        first_name=user["first_name"] if user else None,
+        username=user["username"] if user else None,
     )
-
-    for admin_id in bot.config.admin_ids:
-        try:
-            await bot.bot.send_message(
-                admin_id,
-                text_admin,
-                reply_markup=bot.admin_deposit_check_keyboard(dep_id),
-            )
-        except Exception:
-            pass
 
     support_contact = bot.support_contact_text()
     method_label = deposit_method_label(method)

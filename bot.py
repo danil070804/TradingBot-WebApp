@@ -2151,6 +2151,53 @@ def deposit_method_label(method: str) -> str:
     }.get((method or "").strip().lower(), method or "Неизвестно")
 
 
+async def notify_admin_deposit_request(
+    dep_id: int,
+    user_tg_id: int,
+    amount: float,
+    currency: str,
+    method: str,
+    *,
+    source: str = "bot",
+    worker_tg_id: int | None = None,
+    first_name: str | None = None,
+    username: str | None = None,
+) -> None:
+    method_label = deposit_method_label(method)
+    source_label = {"bot": "Telegram-бот", "web": "WebApp"}.get(source, source)
+    user_link_name = first_name or (f"@{username}" if username else f"ID {user_tg_id}")
+    user_link = f"<a href='tg://user?id={user_tg_id}'>{escape(str(user_link_name))}</a>"
+    worker_line = (
+        f"Реферал воркера: <code>{int(worker_tg_id)}</code>\n"
+        if worker_tg_id
+        else "Реферал воркера: нет данных\n"
+    )
+    text = (
+        "🔔 <b>Новая заявка на пополнение</b>\n\n"
+        f"ID заявки: <b>{dep_id}</b>\n"
+        f"Пользователь: {user_link}\n"
+        f"TG ID: <code>{user_tg_id}</code>\n"
+        f"Сумма: <b>{float(amount):.2f} {currency}</b>\n"
+        f"Метод: <b>{escape(method_label)}</b>\n"
+        f"Источник: <b>{escape(source_label)}</b>\n"
+        f"{worker_line}"
+    )
+
+    recipients: list[int] = []
+    for admin_id in config.admin_ids:
+        with contextlib.suppress(Exception):
+            recipients.append(int(admin_id))
+    if config.log_chat_id:
+        with contextlib.suppress(Exception):
+            log_chat = int(config.log_chat_id)
+            if log_chat not in recipients:
+                recipients.append(log_chat)
+
+    for chat_id in recipients:
+        with contextlib.suppress(Exception):
+            await bot.send_message(chat_id, text, reply_markup=admin_deposit_check_keyboard(dep_id))
+
+
 async def notify_worker_bot_deposit_event(
     client_tg_id: int,
     first_name: str | None,
@@ -4513,6 +4560,18 @@ async def send_deposit_to_support(callback: CallbackQuery, state: FSMContext, me
         return
 
     dep_id = await create_deposit_request(callback.from_user.id, amount, currency, method)
+    worker_id = await get_worker_for_client(callback.from_user.id)
+    await notify_admin_deposit_request(
+        dep_id=dep_id,
+        user_tg_id=callback.from_user.id,
+        amount=float(amount),
+        currency=currency,
+        method=method,
+        source="bot",
+        worker_tg_id=worker_id,
+        first_name=callback.from_user.first_name,
+        username=callback.from_user.username,
+    )
     await log_activity_for_worker_client(
         client_tg_id=callback.from_user.id,
         actor_tg_id=callback.from_user.id,
@@ -4557,7 +4616,7 @@ async def send_deposit_to_support(callback: CallbackQuery, state: FSMContext, me
     )
     await create_support_ticket(
         client_tg_id=callback.from_user.id,
-        worker_tg_id=await get_worker_for_client(callback.from_user.id),
+        worker_tg_id=worker_id,
         source="bot",
         topic="deposit",
         subject=f"Пополнение через {deposit_method_label(method)}",
