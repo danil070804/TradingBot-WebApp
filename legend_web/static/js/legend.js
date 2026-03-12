@@ -20,16 +20,28 @@ function initAppPreloader() {
         return;
     }
     const startedAt = Date.now();
-    const minVisibleMs = 3600;
-    const steps = [8, 16, 24, 33, 41, 52, 63, 72, 81, 89, 95];
-    let idx = 0;
-    const t = setInterval(() => {
-        fill.style.width = `${steps[Math.min(idx, steps.length - 1)]}%`;
-        idx += 1;
-        if (idx >= steps.length) clearInterval(t);
-    }, 240);
+    const minVisibleMs = 3200;
+    const maxVisibleMs = 5000;
+    const progressDurationMs = 2800;
+    let closed = false;
+    let raf = 0;
+
+    const easeOut = (x) => 1 - Math.pow(1 - x, 3);
+    const tick = () => {
+        if (closed) return;
+        const elapsed = Date.now() - startedAt;
+        const ratio = Math.max(0, Math.min(1, elapsed / progressDurationMs));
+        const eased = easeOut(ratio);
+        const pct = 8 + (eased * 88);
+        fill.style.width = `${Math.min(96, pct).toFixed(2)}%`;
+        raf = window.requestAnimationFrame(tick);
+    };
+    raf = window.requestAnimationFrame(tick);
 
     const close = () => {
+        if (closed) return;
+        closed = true;
+        if (raf) window.cancelAnimationFrame(raf);
         try {
             sessionStorage.setItem("legend_webapp_loader_seen", "1");
         } catch (_) {
@@ -38,10 +50,15 @@ function initAppPreloader() {
         fill.style.width = "100%";
         const elapsed = Date.now() - startedAt;
         const waitMore = Math.max(0, minVisibleMs - elapsed);
-        window.setTimeout(() => overlay.classList.add("done"), waitMore + 120);
+        window.setTimeout(() => overlay.classList.add("done"), waitMore + 80);
     };
-    window.addEventListener("load", close, { once: true });
-    window.setTimeout(close, 5200);
+
+    if (document.readyState === "complete") {
+        window.setTimeout(close, 700);
+    } else {
+        window.addEventListener("load", () => window.setTimeout(close, 700), { once: true });
+    }
+    window.setTimeout(close, maxVisibleMs);
 }
 
 function applyRuntimeProfile() {
@@ -1540,12 +1557,30 @@ function bindPageTransitions() {
 
             event.preventDefault();
             haptic();
+            try {
+                sessionStorage.setItem("legend_nav_transition", "1");
+            } catch (_) {
+                // no-op
+            }
             document.body.classList.add("page-leaving");
             window.setTimeout(() => {
                 window.location.href = url.href;
-            }, 180);
+            }, 95);
         });
     });
+}
+
+function initPageArrivalFx() {
+    let fromInternalNav = false;
+    try {
+        fromInternalNav = sessionStorage.getItem("legend_nav_transition") === "1";
+        if (fromInternalNav) sessionStorage.removeItem("legend_nav_transition");
+    } catch (_) {
+        // no-op
+    }
+    if (!fromInternalNav || !document.body) return;
+    document.body.classList.add("page-enter");
+    window.setTimeout(() => document.body.classList.remove("page-enter"), 260);
 }
 
 function bindWorkerPanel() {
@@ -2135,6 +2170,7 @@ hydrateInitialTradeState();
 bindTradeQuickActions();
 initInteractiveFeedback();
 bindPageTransitions();
+initPageArrivalFx();
 
 const tapeWrap = document.getElementById("market-tape-list");
 if (tapeWrap) {

@@ -7,11 +7,15 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Oxanium:wght@500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/legend.css?v=20260312e">
+    <link rel="stylesheet" href="/static/css/legend.css?v=20260312f">
 </head>
 <body data-lang="{{ lang if lang else 'ru' }}" data-page="{{ page if page else '' }}">
 <script>
 try {
+    const sameOriginReferrer = !!document.referrer && document.referrer.startsWith(window.location.origin + "/");
+    if (sameOriginReferrer) {
+        document.body.setAttribute("data-preloader", "skip");
+    }
     if (sessionStorage.getItem("legend_webapp_loader_seen") === "1") {
         document.body.setAttribute("data-preloader", "skip");
     }
@@ -67,6 +71,6 @@ try {
 window.LEGEND_LABELS = {{ labels|tojson if labels else '{}' }};
 </script>
 {% block extra_scripts %}{% endblock %}
-<script src="/static/js/legend.js?v=20260312e"></script>
+<script src="/static/js/legend.js?v=20260312f"></script>
 </body>
 </html>
