@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ labels.trade_chart_title if labels else "График" }} | Legend Trading{% endblock %}
 {% block content %}
-<section class="card chart-terminal-shell">
+<section class="card chart-terminal-shell chart-clean">
     <div class="chart-fs-head chart-terminal-head">
         <a class="chip chart-back-btn" href="/trade">{{ labels.trade_chart_back if labels else "Назад к торговле" }}</a>
         <div class="chart-terminal-title">
@@ -29,17 +29,13 @@
                 <button type="button" class="chip chart-tf-btn" data-tf="3600">1h</button>
             </div>
         </div>
-
-        <label class="chart-control-card">
-            <span>{{ labels.trade_chart_timeframe if labels else "Таймфрейм" }}</span>
-            <select id="chart-tf" class="chart-tf chart-tf-terminal">
-                <option value="60" selected>1m</option>
-                <option value="300">5m</option>
-                <option value="900">15m</option>
-                <option value="3600">1h</option>
-            </select>
-        </label>
     </div>
+    <select id="chart-tf" class="chart-tf chart-tf-hidden" aria-hidden="true">
+        <option value="60" selected>1m</option>
+        <option value="300">5m</option>
+        <option value="900">15m</option>
+        <option value="3600">1h</option>
+    </select>
 
     <div class="chart-tools chart-tools-terminal">
         <button type="button" id="chart-reset-btn" class="chip">{{ labels.chart_reset if labels else "Сброс" }}</button>

@@ -148,6 +148,10 @@ body.perf-lite .card:hover {
     gap: 6px;
 }
 
+body[data-page="trade"] .lang-switch {
+    display: none;
+}
+
 .lang-btn {
     border: 1px solid rgba(116, 200, 244, 0.22);
     background: rgba(255, 255, 255, 0.72);
@@ -429,7 +433,7 @@ body.perf-lite .card:hover {
 }
 
 .chart-terminal-shell {
-    padding: 14px;
+    padding: 12px;
     background:
         radial-gradient(circle at top left, rgba(34, 92, 128, 0.24), transparent 32%),
         linear-gradient(180deg, rgba(7, 14, 20, 0.98), rgba(9, 18, 28, 0.98));
@@ -438,7 +442,8 @@ body.perf-lite .card:hover {
 }
 
 .chart-terminal-head {
-    margin-bottom: 12px;
+    margin-bottom: 10px;
+    gap: 10px;
 }
 
 .chart-terminal-title {
@@ -464,11 +469,15 @@ body.perf-lite .card:hover {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
 }
 
 .chart-back-btn {
     text-decoration: none;
+    min-height: 36px;
+    padding: 8px 14px;
+    border-radius: 12px;
+    font-weight: 800;
 }
 
 .chart-controls {
@@ -481,8 +490,8 @@ body.perf-lite .card:hover {
 
 .chart-toolbar-grid {
     display: grid;
-    grid-template-columns: 1.3fr 1.6fr .9fr;
-    gap: 10px;
+    grid-template-columns: 1.2fr 1.8fr;
+    gap: 8px;
     margin-bottom: 10px;
 }
 
@@ -501,6 +510,10 @@ body.perf-lite .card:hover {
     letter-spacing: .08em;
     text-transform: uppercase;
     color: #6f8ca5;
+}
+
+.chart-tf-hidden {
+    display: none;
 }
 
 .chart-tf-pills {
@@ -585,6 +598,7 @@ body.perf-lite .card:hover {
     border-color: rgba(110, 198, 243, 0.12);
     border-radius: 16px;
     background: #05090e;
+    min-height: 360px;
 }
 
 .chart-terminal-market {
@@ -1772,7 +1786,18 @@ select, input {
         flex-wrap: wrap;
     }
     .tv-chart-fullscreen {
-        height: min(70vh, 760px);
+        height: min(58vh, 640px);
+    }
+    .chart-terminal-head {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .chart-terminal-title {
+        align-items: flex-start;
+    }
+    .chart-back-btn {
+        width: 100%;
+        justify-content: center;
     }
 }
 
