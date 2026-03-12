@@ -1139,6 +1139,44 @@ async def send_section_chat_message(chat_id: int, section_key: str, text: str, r
     return await bot.send_message(chat_id, text, reply_markup=reply_markup, disable_web_page_preview=True)
 
 
+async def edit_section_message(chat_id: int, message_id: int, section_key: str, text: str, reply_markup=None) -> bool:
+    photo_id = await get_section_photo_file_id(section_key)
+    if photo_id and len(text or "") <= 1024:
+        with contextlib.suppress(Exception):
+            await bot.edit_message_caption(
+                chat_id=chat_id,
+                message_id=message_id,
+                caption=text,
+                reply_markup=reply_markup,
+            )
+            return True
+
+    with contextlib.suppress(Exception):
+        await bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=message_id,
+            text=text,
+            reply_markup=reply_markup,
+            disable_web_page_preview=True,
+        )
+        return True
+    return False
+
+
+async def upsert_ecn_section_message(target: Message, state: FSMContext, section_key: str, text: str, reply_markup=None):
+    data = await state.get_data()
+    chat_id = int(data.get("ecn_ui_chat_id") or 0)
+    message_id = int(data.get("ecn_ui_message_id") or 0)
+
+    if chat_id and message_id:
+        edited = await edit_section_message(chat_id, message_id, section_key, text, reply_markup=reply_markup)
+        if edited:
+            return
+
+    sent = await send_section_message(target, section_key, text, reply_markup=reply_markup)
+    await state.update_data(ecn_ui_chat_id=sent.chat.id, ecn_ui_message_id=sent.message_id)
+
+
 async def notify_client_setting_change(client_tg_id: int, text: str, reply_markup=None):
     with contextlib.suppress(Exception):
         await bot.send_message(client_tg_id, text, reply_markup=reply_markup)
@@ -3860,8 +3898,9 @@ async def start_ecn_flow(msg, state: FSMContext):
         "╰ Список поділено на сторінки для зручної навігації",
     )
 
-    await send_section_message(message, "open_ecn", text, reply_markup=ecn_assets_page_keyboard(assets, page=0))
     await state.clear()
+    sent = await send_section_message(message, "open_ecn", text, reply_markup=ecn_assets_page_keyboard(assets, page=0))
+    await state.update_data(ecn_ui_chat_id=sent.chat.id, ecn_ui_message_id=sent.message_id)
 
 
 @dp.callback_query(F.data.startswith("ecn_assets_page:"))
@@ -3912,7 +3951,13 @@ async def ecn_choose_asset(callback: CallbackQuery, state: FSMContext):
         f"╰ <code>{asset['name']}</code>\n\n"
         f"{tr(lang, 'Выберите направление движения графика.', 'Choose the chart direction.', 'Оберіть напрям руху графіка.')}"
     )
-    await send_section_message(callback.message, "open_ecn", text, reply_markup=ecn_direction_keyboard(asset_id, lang))
+    await upsert_ecn_section_message(
+        callback.message,
+        state,
+        "open_ecn",
+        text,
+        reply_markup=ecn_direction_keyboard(asset_id, lang),
+    )
     await callback.answer()
 
 
@@ -3948,7 +3993,7 @@ async def ecn_choose_direction(callback: CallbackQuery, state: FSMContext):
         f"{tr(lang, 'Введите сумму сделки в валюте счёта.', 'Enter the trade amount in your account currency.', 'Введіть суму угоди у валюті рахунку.')}\n"
         f"<b>{currency}</b>:"
     )
-    await send_section_message(callback.message, "open_ecn", text)
+    await upsert_ecn_section_message(callback.message, state, "open_ecn", text)
     await callback.answer()
 
 
@@ -4010,7 +4055,13 @@ async def ecn_enter_amount(message: Message, state: FSMContext):
         f"╰ {tr(lang, 'Сумма', 'Amount', 'Сума')}: <b>{amount:.2f} {currency}</b>\n\n"
         f"{tr(lang, 'Выберите плечо сделки.', 'Choose leverage for the trade.', 'Оберіть плече угоди.')}"
     )
-    await send_section_message(message, "open_ecn", text, reply_markup=ecn_leverage_keyboard(lang, leverage))
+    await upsert_ecn_section_message(
+        message,
+        state,
+        "open_ecn",
+        text,
+        reply_markup=ecn_leverage_keyboard(lang, leverage),
+    )
 
 
 @dp.callback_query(F.data.startswith("ecn_lev:"))
@@ -4041,7 +4092,13 @@ async def ecn_choose_leverage(callback: CallbackQuery, state: FSMContext):
         f"╰ {tr(lang, 'Плечо', 'Leverage', 'Плече')}: <b>{int(leverage)}x</b>\n\n"
         f"{tr(lang, 'Выберите время фиксации сделки.', 'Choose the trade expiration time.', 'Оберіть час фіксації угоди.')}"
     )
-    await send_section_message(callback.message, "open_ecn", text, reply_markup=ecn_time_keyboard(lang))
+    await upsert_ecn_section_message(
+        callback.message,
+        state,
+        "open_ecn",
+        text,
+        reply_markup=ecn_time_keyboard(lang),
+    )
     await callback.answer()
 
 
