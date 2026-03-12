@@ -13,18 +13,18 @@
     <div class="hint">{{ client.first_name if client.first_name else "User" }} · ID {{ client.client_tg_id }} · @{{ client.username if client.username else "-" }}</div>
     <div class="worker-meta">
         <span id="worker-client-live-status">{{ labels.client_feed_online if labels else "Лента клиента: онлайн" }}</span>
-        <span>{{ labels.get('worker_stage', 'Stage') if labels else "Stage" }}: {{ client.funnel_stage if client.funnel_stage else "new" }}</span>
+        <span>{{ labels.worker_stage if labels else "Stage" }}: {{ client.funnel_stage if client.funnel_stage else "new" }}</span>
     </div>
     <div id="worker-client-live-meta" data-worker-id="{{ worker_id }}" data-wc-id="{{ client.id }}"></div>
     <div class="quick-actions">
-        <a class="qa-btn" href="/worker">{{ labels.get('worker_back_to_panel', 'Back to panel') if labels else "Back to panel" }}</a>
-        <a class="qa-btn" href="/profile?tg_id={{ client.client_tg_id }}">{{ labels.get('nav_profile', 'Profile') if labels else "Profile" }}</a>
+        <a class="qa-btn" href="/worker">{{ labels.worker_back_to_panel if labels else "Back to panel" }}</a>
+        <a class="qa-btn" href="/profile?tg_id={{ client.client_tg_id }}">{{ labels.nav_profile if labels else "Profile" }}</a>
     </div>
 </section>
 
 <section class="stats-grid">
     <article class="card stat-card">
-        <small>{{ labels.get('worker_stat_deals', 'DEALS') if labels else "DEALS" }}</small>
+        <small>{{ labels.worker_stat_deals if labels else "DEALS" }}</small>
         <b>{{ stats.total if stats else 0 }}</b>
     </article>
     <article class="card stat-card">
@@ -32,17 +32,17 @@
         <b>{{ "%.2f"|format((stats.total_profit if stats else 0) or 0) }}</b>
     </article>
     <article class="card stat-card">
-        <small>{{ labels.get('profile_pending', 'Pending withdraw') if labels else "Pending withdraw" }}</small>
+        <small>{{ labels.profile_pending if labels else "Pending withdraw" }}</small>
         <b>{{ "%.2f"|format(pending or 0) }}</b>
     </article>
     <article class="card stat-card">
-        <small>{{ labels.get('worker_luck', 'LUCK') if labels else "LUCK" }}</small>
+        <small>{{ labels.worker_luck if labels else "LUCK" }}</small>
         <b id="worker-client-luck" class="luck-value {% if (luck or 0) >= 75 %}high{% elif (luck or 0) >= 40 %}mid{% else %}low{% endif %}">{{ "%.2f"|format(luck or 0) }}%</b>
     </article>
 </section>
 
 <section class="card worker-stage-panel">
-    <div class="section-title">{{ labels.get('worker_client_path', 'Client path') if labels else "Client path" }}</div>
+    <div class="section-title">{{ labels.worker_client_path if labels else "Client path" }}</div>
     <div class="funnel-track">
         {% for stage in funnel_stages %}
         <span class="funnel-step {% if stage == client.funnel_stage %}current{% endif %}">{{ stage }}</span>
@@ -51,19 +51,19 @@
 </section>
 
 <section class="card">
-    <div class="section-title">{{ labels.get('worker_status_limits', 'Statuses and limits') if labels else "Statuses and limits" }}</div>
+    <div class="section-title">{{ labels.worker_status_limits if labels else "Statuses and limits" }}</div>
     <div class="worker-meta detail-meta">
-        <span id="worker-client-min-deposit">{{ labels.get('worker_min_deposit', 'Min deposit') if labels else "Min deposit" }}: {{ "%.2f"|format((client.min_deposit or 0)) }}</span>
-        <span id="worker-client-min-withdraw">{{ labels.get('worker_min_withdraw', 'Min withdraw') if labels else "Min withdraw" }}: {{ "%.2f"|format((client.min_withdraw or 0)) }}</span>
-        <span id="worker-client-min-trade">{{ labels.get('worker_min_trade', 'Min trade') if labels else "Min trade" }}: {{ "%.2f"|format((client.min_trade_amount or 100)) }}</span>
-        <span id="worker-client-trade-coefficient">{{ labels.get('worker_coeff', 'Coeff') if labels else "Coeff" }}: {{ "%.2f"|format((client.trade_coefficient or 1)) }}</span>
+        <span id="worker-client-min-deposit">{{ labels.worker_min_deposit if labels else "Min deposit" }}: {{ "%.2f"|format((client.min_deposit or 0)) }}</span>
+        <span id="worker-client-min-withdraw">{{ labels.worker_min_withdraw if labels else "Min withdraw" }}: {{ "%.2f"|format((client.min_withdraw or 0)) }}</span>
+        <span id="worker-client-min-trade">{{ labels.worker_min_trade if labels else "Min trade" }}: {{ "%.2f"|format((client.min_trade_amount or 100)) }}</span>
+        <span id="worker-client-trade-coefficient">{{ labels.worker_coeff if labels else "Coeff" }}: {{ "%.2f"|format((client.trade_coefficient or 1)) }}</span>
         <span id="worker-client-auto-reject">Auto-reject: {{ "ON" if client.auto_reject_trades else "OFF" }}</span>
-        <span id="worker-client-stage">{{ labels.get('worker_stage', 'Stage') if labels else "Stage" }}: {{ client.funnel_stage if client.funnel_stage else "new" }}</span>
+        <span id="worker-client-stage">{{ labels.worker_stage if labels else "Stage" }}: {{ client.funnel_stage if client.funnel_stage else "new" }}</span>
         <span id="worker-client-verified">KYC: {{ "ON" if client.verified else "OFF" }}</span>
-        <span id="worker-client-trading">{{ labels.get('nav_trade', 'Trade') if labels else "Trade" }}: {{ "ON" if client.trading_enabled else "OFF" }}</span>
-        <span id="worker-client-withdraw">{{ labels.get('nav_withdraw', 'Withdraw') if labels else "Withdraw" }}: {{ "ON" if client.withdraw_enabled else "OFF" }}</span>
-        <span id="worker-client-favorite">{{ labels.get('worker_badge_favorite', 'Favorite') if labels else "Favorite" }}: {{ "YES" if client.favorite else "NO" }}</span>
-        <span id="worker-client-blocked">{{ labels.get('worker_block_btn', 'Block') if labels else "Block" }}: {{ "YES" if client.blocked else "NO" }}</span>
+        <span id="worker-client-trading">{{ labels.nav_trade if labels else "Trade" }}: {{ "ON" if client.trading_enabled else "OFF" }}</span>
+        <span id="worker-client-withdraw">{{ labels.nav_withdraw if labels else "Withdraw" }}: {{ "ON" if client.withdraw_enabled else "OFF" }}</span>
+        <span id="worker-client-favorite">{{ labels.worker_badge_favorite if labels else "Favorite" }}: {{ "YES" if client.favorite else "NO" }}</span>
+        <span id="worker-client-blocked">{{ labels.worker_block_btn if labels else "Block" }}: {{ "YES" if client.blocked else "NO" }}</span>
         {% if client.last_activity_at %}<span>Last activity: {{ client.last_activity_at }}</span>{% endif %}
     </div>
 </section>
@@ -97,13 +97,13 @@
 </section>
 
 <section class="card">
-    <div class="section-title">{{ labels.get('worker_manage_client', 'Client controls') if labels else "Client controls" }}</div>
+    <div class="section-title">{{ labels.worker_manage_client if labels else "Client controls" }}</div>
     <div id="worker-client-controls" class="worker-actions worker-client-actions" data-wc-id="{{ client.id }}">
-        <button class="chip worker-client-toggle {% if client.trading_enabled %}state-on{% else %}state-off{% endif %}" data-action="toggle_trade">{{ labels.get('nav_trade', 'Trade') if labels else "Trade" }}</button>
-        <button class="chip worker-client-toggle {% if client.withdraw_enabled %}state-on{% else %}state-off{% endif %}" data-action="toggle_withdraw">{{ labels.get('nav_withdraw', 'Withdraw') if labels else "Withdraw" }}</button>
+        <button class="chip worker-client-toggle {% if client.trading_enabled %}state-on{% else %}state-off{% endif %}" data-action="toggle_trade">{{ labels.nav_trade if labels else "Trade" }}</button>
+        <button class="chip worker-client-toggle {% if client.withdraw_enabled %}state-on{% else %}state-off{% endif %}" data-action="toggle_withdraw">{{ labels.nav_withdraw if labels else "Withdraw" }}</button>
         <button class="chip worker-client-toggle {% if client.verified %}state-on{% else %}state-off{% endif %}" data-action="toggle_verified">KYC</button>
-        <button class="chip worker-client-toggle {% if client.favorite %}state-fav{% else %}state-off{% endif %}" data-action="toggle_favorite">{{ labels.get('worker_badge_favorite', 'Favorite') if labels else "Favorite" }}</button>
-        <button class="chip worker-client-toggle {% if client.blocked %}state-block{% else %}state-on{% endif %}" data-action="toggle_block">{{ (labels.get('worker_unblock_btn', 'Unblock') if labels else 'Unblock') if client.blocked else (labels.get('worker_block_btn', 'Block') if labels else 'Block') }}</button>
+        <button class="chip worker-client-toggle {% if client.favorite %}state-fav{% else %}state-off{% endif %}" data-action="toggle_favorite">{{ labels.worker_badge_favorite if labels else "Favorite" }}</button>
+        <button class="chip worker-client-toggle {% if client.blocked %}state-block{% else %}state-on{% endif %}" data-action="toggle_block">{{ (labels.worker_unblock_btn if labels else 'Unblock') if client.blocked else (labels.worker_block_btn if labels else 'Block') }}</button>
         <button class="chip worker-client-prompt" data-action="set_luck" data-label="Luck 0-100">Luck</button>
         <button class="chip worker-client-prompt" data-action="set_min_deposit" data-label="Minimum deposit">Min dep</button>
         <button class="chip worker-client-prompt" data-action="set_min_withdraw" data-label="Minimum withdraw">Min wd</button>
@@ -122,7 +122,7 @@
 </section>
 
 <section class="card">
-    <div class="section-title">{{ labels.get('worker_event_history', 'Event history') if labels else "Event history" }}</div>
+    <div class="section-title">{{ labels.worker_event_history if labels else "Event history" }}</div>
     <div id="worker-client-activity" class="list">
         {% for item in activity %}
         <div class="row worker-event-row">
@@ -139,7 +139,7 @@
             {% endif %}
         </div>
         {% else %}
-        <div class="empty">{{ labels.get('worker_events_empty', 'No events yet.') if labels else "No events yet." }}</div>
+        <div class="empty">{{ labels.worker_events_empty if labels else "No events yet." }}</div>
         {% endfor %}
     </div>
 </section>
@@ -165,7 +165,7 @@
 </section>
 
 <section class="card">
-    <div class="section-title">{{ labels.get('nav_deposit', 'Deposit') if labels else "Deposit" }}</div>
+    <div class="section-title">{{ labels.nav_deposit if labels else "Deposit" }}</div>
     <div class="list">
         {% for item in deposits %}
         <div class="row">
@@ -173,13 +173,13 @@
             <div>{{ item.created_at }}</div>
         </div>
         {% else %}
-        <div class="empty">{{ labels.get('profile_no_deposits', 'No deposits yet.') if labels else "No deposits yet." }}</div>
+        <div class="empty">{{ labels.profile_no_deposits if labels else "No deposits yet." }}</div>
         {% endfor %}
     </div>
 </section>
 
 <section class="card">
-    <div class="section-title">{{ labels.get('nav_withdraw', 'Withdraw') if labels else "Withdraw" }}</div>
+    <div class="section-title">{{ labels.nav_withdraw if labels else "Withdraw" }}</div>
     <div class="list">
         {% for item in withdrawals %}
         <div class="row">
@@ -187,24 +187,24 @@
             <div>{{ item.created_at }}</div>
         </div>
         {% else %}
-        <div class="empty">{{ labels.get('profile_no_withdraws', 'No withdrawals yet.') if labels else "No withdrawals yet." }}</div>
+        <div class="empty">{{ labels.profile_no_withdraws if labels else "No withdrawals yet." }}</div>
         {% endfor %}
     </div>
 </section>
 
 <section class="card">
-    <div class="section-title">{{ labels.get('nav_deals', 'Deals') if labels else "Deals" }}</div>
+    <div class="section-title">{{ labels.nav_deals if labels else "Deals" }}</div>
     <div class="list">
         {% for item in deals %}
         <div class="row">
             <div>
                 <b>{{ item.asset_name }}</b>
-                <small>{{ (labels.get('trade_long', 'LONG') if labels else "LONG") if item.direction == "up" else (labels.get('trade_short', 'SHORT') if labels else "SHORT") }} · {{ "%.2f"|format((item.amount or 0)) }} {{ item.currency if item.currency else "USD" }}</small>
+                <small>{{ (labels.trade_long if labels else "LONG") if item.direction == "up" else (labels.trade_short if labels else "SHORT") }} · {{ "%.2f"|format((item.amount or 0)) }} {{ item.currency if item.currency else "USD" }}</small>
             </div>
             <div class="{% if (item.profit or 0) >= 0 %}pos{% else %}neg{% endif %}">{{ "%+.2f"|format((item.profit or 0)) }}</div>
         </div>
         {% else %}
-        <div class="empty">{{ labels.get('deals_empty', 'No history yet.') if labels else "No history yet." }}</div>
+        <div class="empty">{{ labels.deals_empty if labels else "No history yet." }}</div>
         {% endfor %}
     </div>
 </section>

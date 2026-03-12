@@ -23,10 +23,10 @@
 </section>
 
 <section class="stats-grid" id="worker-summary-grid">
-    <article class="card stat-card"><small>{{ labels.get('worker_stat_referrals', 'REFERRALS') if labels else "REFERRALS" }}</small><b>{{ summary.total_clients if summary else 0 }}</b></article>
-    <article class="card stat-card"><small>{{ labels.get('worker_stat_active_day', 'ACTIVE 24H') if labels else "ACTIVE 24H" }}</small><b>{{ summary.active_day if summary else 0 }}</b></article>
-    <article class="card stat-card"><small>{{ labels.get('worker_stat_with_deposit', 'WITH DEPOSIT') if labels else "WITH DEPOSIT" }}</small><b>{{ summary.deposited if summary else 0 }}</b></article>
-    <article class="card stat-card"><small>{{ labels.get('worker_stat_vip_trade', 'VIP / TRADE') if labels else "VIP / TRADE" }}</small><b>{{ (summary.vip if summary else 0) }}/{{ (summary.trading if summary else 0) }}</b></article>
+    <article class="card stat-card"><small>{{ labels.worker_stat_referrals if labels else "REFERRALS" }}</small><b>{{ summary.total_clients if summary else 0 }}</b></article>
+    <article class="card stat-card"><small>{{ labels.worker_stat_active_day if labels else "ACTIVE 24H" }}</small><b>{{ summary.active_day if summary else 0 }}</b></article>
+    <article class="card stat-card"><small>{{ labels.worker_stat_with_deposit if labels else "WITH DEPOSIT" }}</small><b>{{ summary.deposited if summary else 0 }}</b></article>
+    <article class="card stat-card"><small>{{ labels.worker_stat_vip_trade if labels else "VIP / TRADE" }}</small><b>{{ (summary.vip if summary else 0) }}/{{ (summary.trading if summary else 0) }}</b></article>
 </section>
 
 <section class="card worker-stage-panel">
@@ -45,19 +45,19 @@
     <div class="section-title">{{ labels.worker_title if labels else "Панель воркера" }}</div>
     <p class="deposit-lead">{{ labels.worker_manage_lead if labels else "Manage clients, limits, and statuses in one view. Click a client card to open profile." }}</p>
     <div class="worker-toolbar">
-        <input id="worker-search" type="search" placeholder="{{ labels.get('worker_search_placeholder', 'Search by name, ID or username') if labels else 'Search by name, ID or username' }}">
+        <input id="worker-search" type="search" placeholder="{{ labels.worker_search_placeholder if labels else 'Search by name, ID or username' }}">
         <select id="worker-filter">
-            <option value="all">{{ labels.get('worker_filter_all', 'All') if labels else "All" }}</option>
-            <option value="favorite">{{ labels.get('worker_filter_favorite', 'Favorites') if labels else "Favorites" }}</option>
-            <option value="blocked">{{ labels.get('worker_filter_blocked', 'Blocked') if labels else "Blocked" }}</option>
-            <option value="verified">{{ labels.get('worker_filter_verified', 'KYC') if labels else "KYC" }}</option>
-            <option value="trade_off">{{ labels.get('worker_filter_trade_off', 'Trade off') if labels else "Trade off" }}</option>
-            <option value="withdraw_off">{{ labels.get('worker_filter_withdraw_off', 'Withdraw off') if labels else "Withdraw off" }}</option>
+            <option value="all">{{ labels.worker_filter_all if labels else "All" }}</option>
+            <option value="favorite">{{ labels.worker_filter_favorite if labels else "Favorites" }}</option>
+            <option value="blocked">{{ labels.worker_filter_blocked if labels else "Blocked" }}</option>
+            <option value="verified">{{ labels.worker_filter_verified if labels else "KYC" }}</option>
+            <option value="trade_off">{{ labels.worker_filter_trade_off if labels else "Trade off" }}</option>
+            <option value="withdraw_off">{{ labels.worker_filter_withdraw_off if labels else "Withdraw off" }}</option>
             <option value="vip">VIP</option>
-            <option value="support">{{ labels.get('worker_filter_support', 'Support') if labels else "Support" }}</option>
+            <option value="support">{{ labels.worker_filter_support if labels else "Support" }}</option>
         </select>
         <select id="worker-transfer-target">
-            <option value="">{{ labels.get('worker_transfer_to', 'Transfer to worker') if labels else "Transfer to worker" }}</option>
+            <option value="">{{ labels.worker_transfer_to if labels else "Transfer to worker" }}</option>
             {% for w in worker_choices %}
             {% if w.tg_id != worker_id %}
             <option value="{{ w.tg_id }}">{{ ("@" ~ w.username) if w.username else (w.first_name if w.first_name else ("Воркер" if lang == "ru" else ("Воркер" if lang == "uk" else "Worker"))) }} · {{ w.tg_id }}</option>
@@ -83,11 +83,11 @@
                 <div class="worker-head">
                     <b>#{{ c.id }} {{ c.first_name if c.first_name else ("Пользователь" if lang == "ru" else ("Користувач" if lang == "uk" else "User")) }}</b>
                     <span class="worker-badge {% if c.blocked %}blocked{% elif c.favorite %}favorite{% else %}active{% endif %}">
-                        {% if c.blocked %}{{ labels.get('worker_badge_blocked', 'Blocked') if labels else "Blocked" }}{% elif c.favorite %}{{ labels.get('worker_badge_favorite', 'Favorite') if labels else "Favorite" }}{% else %}{{ labels.get('worker_badge_active', 'Active') if labels else "Active" }}{% endif %}
+                        {% if c.blocked %}{{ labels.worker_badge_blocked if labels else "Blocked" }}{% elif c.favorite %}{{ labels.worker_badge_favorite if labels else "Favorite" }}{% else %}{{ labels.worker_badge_active if labels else "Active" }}{% endif %}
                     </span>
                 </div>
                 <small>ID {{ c.client_tg_id }} · @{{ c.username if c.username else "-" }}</small>
-                <small>{{ labels.get('trade_balance', 'Balance') if labels else "Balance" }}: {{ "%.2f"|format((c.balance or 0)) }} {{ c.currency if c.currency else "USD" }}</small>
+                <small>{{ labels.trade_balance if labels else "Balance" }}: {{ "%.2f"|format((c.balance or 0)) }} {{ c.currency if c.currency else "USD" }}</small>
                 <div class="worker-meta">
                     <span>{{ "Мин. пополнение" if lang == "ru" else ("Мін. поповнення" if lang == "uk" else "Min deposit") }}: {{ "%.2f"|format((c.min_deposit or 0)) }}</span>
                     <span>{{ "Мин. вывод" if lang == "ru" else ("Мін. вивід" if lang == "uk" else "Min withdraw") }}: {{ "%.2f"|format((c.min_withdraw or 0)) }}</span>
@@ -103,11 +103,11 @@
                 {% endif %}
             </a>
             <div class="worker-actions">
-                <button class="chip worker-act {% if c.trading_enabled %}state-on{% else %}state-off{% endif %}" data-action="toggle_trade">{{ labels.get('nav_trade', 'Trade') if labels else "Trade" }}</button>
+                <button class="chip worker-act {% if c.trading_enabled %}state-on{% else %}state-off{% endif %}" data-action="toggle_trade">{{ labels.nav_trade if labels else "Trade" }}</button>
                 <button class="chip worker-act {% if c.withdraw_enabled %}state-on{% else %}state-off{% endif %}" data-action="toggle_withdraw">{{ "Вывод" if lang == "ru" else ("Вивід" if lang == "uk" else "Withdraw") }}</button>
                 <button class="chip worker-act {% if c.verified %}state-on{% else %}state-off{% endif %}" data-action="toggle_verified">KYC</button>
-                <button class="chip worker-act {% if c.favorite %}state-fav{% else %}state-off{% endif %}" data-action="toggle_favorite">{{ labels.get('worker_badge_favorite', 'Favorite') if labels else "Favorite" }}</button>
-                <button class="chip worker-act {% if c.blocked %}state-block{% else %}state-on{% endif %}" data-action="toggle_block">{{ (labels.get('worker_unblock_btn', 'Unblock') if labels else 'Unblock') if c.blocked else (labels.get('worker_block_btn', 'Block') if labels else 'Block') }}</button>
+                <button class="chip worker-act {% if c.favorite %}state-fav{% else %}state-off{% endif %}" data-action="toggle_favorite">{{ labels.worker_badge_favorite if labels else "Favorite" }}</button>
+                <button class="chip worker-act {% if c.blocked %}state-block{% else %}state-on{% endif %}" data-action="toggle_block">{{ (labels.worker_unblock_btn if labels else 'Unblock') if c.blocked else (labels.worker_block_btn if labels else 'Block') }}</button>
                 <button class="chip worker-prompt" data-action="set_luck" data-label="{{ ('Удача' if lang == 'ru' else ('Удача' if lang == 'uk' else 'Luck')) ~ ' 0-100' }}">{{ "Удача" if lang == "ru" else ("Удача" if lang == "uk" else "Luck") }}</button>
                 <button class="chip worker-prompt" data-action="set_min_deposit" data-label="{{ 'Мин. пополнение' if lang == 'ru' else ('Мін. поповнення' if lang == 'uk' else 'Minimum deposit') }}">{{ "Мин. деп" if lang == "ru" else ("Мін. деп" if lang == "uk" else "Min dep") }}</button>
                 <button class="chip worker-prompt" data-action="set_min_withdraw" data-label="{{ 'Мин. вывод' if lang == 'ru' else ('Мін. вивід' if lang == 'uk' else 'Minimum withdraw') }}">{{ "Мин. выд" if lang == "ru" else ("Мін. вив" if lang == "uk" else "Min wd") }}</button>
@@ -120,8 +120,8 @@
                 <button class="chip worker-text" data-action="set_funnel_stage" data-label="{{ 'Этап воронки' if lang == 'ru' else ('Етап воронки' if lang == 'uk' else 'Funnel stage') }}">{{ "Этап" if lang == "ru" else ("Етап" if lang == "uk" else "Stage") }}</button>
                 <button class="chip worker-text" data-action="set_tags" data-label="{{ 'Теги через запятую' if lang == 'ru' else ('Теги через кому' if lang == 'uk' else 'Tags comma-separated') }}">{{ "Теги" if lang == "ru" else ("Теги" if lang == "uk" else "Tags") }}</button>
                 <button class="chip worker-text" data-action="set_note" data-label="{{ 'Заметка клиента' if lang == 'ru' else ('Нотатка клієнта' if lang == 'uk' else 'Client note') }}">{{ "Заметка" if lang == "ru" else ("Нотатка" if lang == "uk" else "Note") }}</button>
-                <button class="chip worker-transfer">{{ labels.get('worker_transfer_btn', 'Transfer') if labels else "Transfer" }}</button>
-                <a class="chip worker-open" href="/worker/client/{{ c.id }}">{{ labels.get('worker_card_btn', 'Card') if labels else "Card" }}</a>
+                <button class="chip worker-transfer">{{ labels.worker_transfer_btn if labels else "Transfer" }}</button>
+                <a class="chip worker-open" href="/worker/client/{{ c.id }}">{{ labels.worker_card_btn if labels else "Card" }}</a>
             </div>
         </div>
         {% else %}
@@ -154,7 +154,7 @@
 </section>
 
 <section class="card">
-    <div class="section-title">{{ labels.get('worker_recent_events', 'Recent referral events') if labels else "Recent referral events" }}</div>
+    <div class="section-title">{{ labels.worker_recent_events if labels else "Recent referral events" }}</div>
     <div id="worker-activity-list" class="list">
         {% for item in activity %}
         <div class="row worker-event-row">
