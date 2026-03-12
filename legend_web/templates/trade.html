@@ -40,43 +40,6 @@
     </article>
 </section>
 
-<section class="trade-quickdeck">
-    <article class="card quickdeck-card">
-        <small>{% if lang == "ru" %}Риск %{% elif lang == "uk" %}Ризик %{% else %}Risk %{% endif %}</small>
-        <b id="q-risk-pct">0.0%</b>
-        <span id="q-risk-amt">0.00</span>
-    </article>
-    <article class="card quickdeck-card">
-        <small>{{ labels.trade_market_mode if labels else "Режим рынка" }}</small>
-        <b id="q-market-mode">--</b>
-        <span id="q-market-signal">{{ labels.trade_awaiting_feed if labels else "Ожидание потока" }}</span>
-    </article>
-    <article class="card quickdeck-card">
-        <small>{% if lang == "ru" %}Экспозиция{% elif lang == "uk" %}Експозиція{% else %}Exposure{% endif %}</small>
-        <b id="q-open-exp">0.00</b>
-        <span id="q-open-count">{{ labels.trade_zero_positions if labels else "0 позиций" }}</span>
-    </article>
-</section>
-
-<section class="stats-grid">
-    <article class="card stat-card">
-        <small>{% if lang == "ru" %}ЦЕНА{% elif lang == "uk" %}ЦІНА{% else %}MARK{% endif %}</small>
-        <b id="stat-mark">--</b>
-    </article>
-    <article class="card stat-card">
-        <small>{% if lang == "ru" %}СПРЕД{% elif lang == "uk" %}СПРЕД{% else %}SPREAD{% endif %}</small>
-        <b id="stat-spread">--</b>
-    </article>
-    <article class="card stat-card">
-        <small>{% if lang == "ru" %}МАКС. 24Ч{% elif lang == "uk" %}МАКС. 24Г{% else %}24H HIGH{% endif %}</small>
-        <b id="stat-high">--</b>
-    </article>
-    <article class="card stat-card">
-        <small>{% if lang == "ru" %}МИН. 24Ч{% elif lang == "uk" %}МІН. 24Г{% else %}24H LOW{% endif %}</small>
-        <b id="stat-low">--</b>
-    </article>
-</section>
-
 <section class="card">
     <div class="chart-top">
         <div class="chart-top-left">
@@ -233,12 +196,6 @@
         <div><small>{{ labels.trade_direction if labels else "Направление" }}</small><b id="insight-direction">LONG</b></div>
         <div><small>{{ labels.trade_potential_tp if labels else "Потенциал TP" }}</small><b id="insight-tp">--</b></div>
         <div><small>{{ labels.trade_potential_sl if labels else "Потенциал SL" }}</small><b id="insight-sl">--</b></div>
-    </div>
-</section>
-<section class="card">
-    <div class="section-title">{{ labels.live_tape if labels else "Лента рынка (live)" }}</div>
-    <div class="list" id="market-tape-list">
-        <div class="empty">{{ labels.js_loading if labels else "Загрузка..." }}</div>
     </div>
 </section>
 <section class="card">
