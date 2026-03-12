@@ -3772,7 +3772,7 @@ def ecn_assets_keyboard(rows):
 ECN_ASSETS_PER_PAGE = 10
 
 
-def ecn_assets_page_keyboard(rows, page: int = 0):
+def ecn_assets_page_keyboard(rows, page: int = 0, lang: str = "ru"):
     total = len(rows)
     total_pages = max(1, (total + ECN_ASSETS_PER_PAGE - 1) // ECN_ASSETS_PER_PAGE)
     safe_page = max(0, min(page, total_pages - 1))
@@ -3792,9 +3792,11 @@ def ecn_assets_page_keyboard(rows, page: int = 0):
         kb.button(text="‹", callback_data=f"ecn_assets_page:{prev_page}")
         kb.button(text=f"{safe_page + 1}/{total_pages}", callback_data="ecn_assets_page:stay")
         kb.button(text="›", callback_data=f"ecn_assets_page:{next_page}")
-        kb.adjust(2, 2, 2, 2, 2, 3)
+        kb.button(text=tr(lang, "⬅️ В портфель", "⬅️ Back to portfolio", "⬅️ До портфеля"), callback_data="open_profile")
+        kb.adjust(2, 2, 2, 2, 2, 3, 1)
     else:
-        kb.adjust(2, 2, 2, 2, 2)
+        kb.button(text=tr(lang, "⬅️ В портфель", "⬅️ Back to portfolio", "⬅️ До портфеля"), callback_data="open_profile")
+        kb.adjust(2, 2, 2, 2, 2, 1)
 
     return kb.as_markup()
 
@@ -4080,7 +4082,7 @@ async def start_ecn_flow(msg, state: FSMContext):
     )
 
     await state.clear()
-    sent = await send_section_message(message, "open_ecn", text, reply_markup=ecn_assets_page_keyboard(assets, page=0))
+    sent = await send_section_message(message, "open_ecn", text, reply_markup=ecn_assets_page_keyboard(assets, page=0, lang=lang))
     await state.update_data(ecn_ui_chat_id=sent.chat.id, ecn_ui_message_id=sent.message_id)
 
 
@@ -4108,7 +4110,7 @@ async def ecn_assets_page(callback: CallbackQuery):
         await callback.answer()
         return
 
-    await callback.message.edit_reply_markup(reply_markup=ecn_assets_page_keyboard(assets, page=page))
+    await callback.message.edit_reply_markup(reply_markup=ecn_assets_page_keyboard(assets, page=page, lang=lang))
     await callback.answer()
 
 
