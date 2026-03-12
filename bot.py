@@ -1214,21 +1214,39 @@ def build_deposit_status_notice(lang: str, approved: bool, amount: float, curren
         lang,
         (
             "✅ <b>Пополнение подтверждено</b>\n\n"
-            f"На баланс зачислено <b>+{amount:.2f} {currency}</b>."
+            "╭ <b>Статус заявки</b>\n"
+            "├ Операция: <b>успешно</b>\n"
+            f"╰ Зачислено на баланс: <b>+{amount:.2f} {currency}</b>\n\n"
+            "Если сумма не отобразилась или возникла ошибка, откройте техподдержку по кнопке ниже."
             if approved
-            else "❌ <b>Пополнение отклонено</b>\n\nЕсли вы уже оплатили заявку, свяжитесь с поддержкой и приложите подтверждение."
+            else "❌ <b>Пополнение отклонено</b>\n\n"
+            "╭ <b>Статус заявки</b>\n"
+            "├ Операция: <b>отклонена</b>\n"
+            "╰ Если оплата уже была выполнена, обратитесь в техподдержку и приложите подтверждение платежа."
         ),
         (
             "✅ <b>Deposit approved</b>\n\n"
-            f"Your balance has been credited with <b>+{amount:.2f} {currency}</b>."
+            "╭ <b>Request status</b>\n"
+            "├ Operation: <b>successful</b>\n"
+            f"╰ Credited to balance: <b>+{amount:.2f} {currency}</b>\n\n"
+            "If the amount is not shown or you see an error, open support using the button below."
             if approved
-            else "❌ <b>Deposit rejected</b>\n\nIf you have already paid, contact support and attach your payment confirmation."
+            else "❌ <b>Deposit rejected</b>\n\n"
+            "╭ <b>Request status</b>\n"
+            "├ Operation: <b>rejected</b>\n"
+            "╰ If payment was already made, contact support and attach payment confirmation."
         ),
         (
             "✅ <b>Поповнення підтверджено</b>\n\n"
-            f"На баланс зараховано <b>+{amount:.2f} {currency}</b>."
+            "╭ <b>Статус заявки</b>\n"
+            "├ Операція: <b>успішно</b>\n"
+            f"╰ Зараховано на баланс: <b>+{amount:.2f} {currency}</b>\n\n"
+            "Якщо сума не відобразилась або виникла помилка, відкрийте техпідтримку кнопкою нижче."
             if approved
-            else "❌ <b>Поповнення відхилено</b>\n\nЯкщо ви вже оплатили заявку, зверніться в підтримку та додайте підтвердження платежу."
+            else "❌ <b>Поповнення відхилено</b>\n\n"
+            "╭ <b>Статус заявки</b>\n"
+            "├ Операція: <b>відхилено</b>\n"
+            "╰ Якщо оплата вже була виконана, зверніться в підтримку та додайте підтвердження платежу."
         ),
     )
 
@@ -4726,7 +4744,11 @@ async def approve_deposit(callback: CallbackQuery):
         meta={"deposit_id": dep_id},
     )
     try:
-        await bot.send_message(user_id, build_deposit_status_notice(lang, True, amount, currency))
+        await bot.send_message(
+            user_id,
+            build_deposit_status_notice(lang, True, amount, currency),
+            reply_markup=support_section_keyboard(lang),
+        )
     except Exception:
         pass
     await callback.message.answer(f"✅ Пополнение <b>#{dep_id}</b> подтверждено.")
@@ -4761,6 +4783,7 @@ async def reject_deposit(callback: CallbackQuery):
         await bot.send_message(
             int(dep["user_tg_id"]),
             build_deposit_status_notice(lang, False, float(dep["amount"] or 0.0), dep["currency"] or "USD"),
+            reply_markup=support_section_keyboard(lang),
         )
     except Exception:
         pass
