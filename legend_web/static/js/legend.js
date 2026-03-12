@@ -9,6 +9,7 @@ function initAppPreloader() {
     const overlay = document.getElementById("app-preloader");
     const fill = document.getElementById("preloader-bar-fill");
     const stage = document.getElementById("preloader-stage");
+    const percent = document.getElementById("preloader-percent");
     if (!overlay || !fill) return;
     let seen = false;
     try {
@@ -20,34 +21,84 @@ function initAppPreloader() {
         overlay.classList.add("done");
         return;
     }
+
+    const lang = (document.body?.dataset?.lang || "en").toLowerCase();
+    const isUk = lang === "uk";
+    const isRu = lang === "ru";
+    const stagePhrases = isRu
+        ? [
+            "ИНИЦИАЛИЗАЦИЯ ПЛАТФОРМЫ...",
+            "СИНХРОНИЗАЦИЯ РЫНКА...",
+            "ПОДКЛЮЧЕНИЕ ТЕРМИНАЛА...",
+            "ЗАГРУЗКА РАБОЧЕГО СТОЛА...",
+            "ГОТОВО К РАБОТЕ",
+        ]
+        : isUk
+            ? [
+                "ІНІЦІАЛІЗАЦІЯ ПЛАТФОРМИ...",
+                "СИНХРОНІЗАЦІЯ РИНКУ...",
+                "ПІДКЛЮЧЕННЯ ТЕРМІНАЛУ...",
+                "ЗАВАНТАЖЕННЯ РОБОЧОГО ПРОСТОРУ...",
+                "ГОТОВО ДО РОБОТИ",
+            ]
+            : [
+                "INITIALIZING PLATFORM...",
+                "SYNCING LIVE MARKET...",
+                "CONNECTING TERMINAL...",
+                "LOADING WORKSPACE...",
+                "READY TO TRADE",
+            ];
+
+    const conn = navigator.connection || {};
+    const slowNetwork = ["slow-2g", "2g", "3g"].includes(conn.effectiveType || "");
+    const reducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
     const startedAt = Date.now();
-    const minVisibleMs = 3200;
-    const maxVisibleMs = 5000;
-    const progressDurationMs = 3000;
-    const stagePhrases = [
-        "INITIALIZING PLATFORM...",
-        "SYNCING LIVE MARKET...",
-        "CONNECTING TERMINAL...",
-        "LOADING WORKSPACE...",
-        "READY TO TRADE",
-    ];
+    const minVisibleMs = reducedMotion ? 900 : (slowNetwork ? 2600 : 1800);
+    const maxVisibleMs = reducedMotion ? 2200 : (slowNetwork ? 6400 : 4800);
+    const progressDurationMs = reducedMotion ? 1200 : (slowNetwork ? 3900 : 2800);
     let stageIdx = 0;
+    let visualPct = 2;
+    overlay.dataset.stage = "0";
+    if (stage) stage.textContent = stagePhrases[0];
+    if (percent) percent.textContent = "2%";
+
     const stageTimer = window.setInterval(() => {
         if (!stage) return;
         stageIdx = Math.min(stagePhrases.length - 1, stageIdx + 1);
         stage.textContent = stagePhrases[stageIdx];
-    }, 620);
+        overlay.dataset.stage = String(stageIdx);
+    }, reducedMotion ? 420 : 600);
+
     let closed = false;
     let raf = 0;
 
-    const easeOut = (x) => 1 - Math.pow(1 - x, 3);
+    const easeOut = (x) => 1 - Math.pow(1 - x, 3.2);
     const tick = () => {
         if (closed) return;
         const elapsed = Date.now() - startedAt;
         const ratio = Math.max(0, Math.min(1, elapsed / progressDurationMs));
         const eased = easeOut(ratio);
-        const pct = 8 + (eased * 88);
-        fill.style.width = `${Math.min(96, pct).toFixed(2)}%`;
+        const base = 4 + (eased * 86);
+        const micro = reducedMotion ? 0 : (Math.sin(elapsed / 140) * 0.45 + Math.sin(elapsed / 70) * 0.25);
+        const pct = Math.max(2, Math.min(95, base + micro));
+        visualPct = Math.max(visualPct, pct);
+        const rounded = Math.min(95, Math.floor(visualPct));
+        fill.style.width = `${visualPct.toFixed(2)}%`;
+        if (percent) percent.textContent = `${rounded}%`;
+        if (rounded > 22 && stageIdx < 1) {
+            stageIdx = 1;
+            if (stage) stage.textContent = stagePhrases[stageIdx];
+            overlay.dataset.stage = String(stageIdx);
+        } else if (rounded > 47 && stageIdx < 2) {
+            stageIdx = 2;
+            if (stage) stage.textContent = stagePhrases[stageIdx];
+            overlay.dataset.stage = String(stageIdx);
+        } else if (rounded > 72 && stageIdx < 3) {
+            stageIdx = 3;
+            if (stage) stage.textContent = stagePhrases[stageIdx];
+            overlay.dataset.stage = String(stageIdx);
+        }
         raf = window.requestAnimationFrame(tick);
     };
     raf = window.requestAnimationFrame(tick);
@@ -57,21 +108,25 @@ function initAppPreloader() {
         closed = true;
         if (raf) window.cancelAnimationFrame(raf);
         window.clearInterval(stageTimer);
+        overlay.classList.add("finalizing");
+        overlay.dataset.stage = "4";
+        if (stage) stage.textContent = stagePhrases[4];
         try {
             sessionStorage.setItem("legend_webapp_loader_seen", "1");
         } catch (_) {
             // no-op
         }
         fill.style.width = "100%";
+        if (percent) percent.textContent = "100%";
         const elapsed = Date.now() - startedAt;
         const waitMore = Math.max(0, minVisibleMs - elapsed);
-        window.setTimeout(() => overlay.classList.add("done"), waitMore + 80);
+        window.setTimeout(() => overlay.classList.add("done"), waitMore + (reducedMotion ? 30 : 120));
     };
 
     if (document.readyState === "complete") {
-        window.setTimeout(close, 700);
+        window.setTimeout(close, reducedMotion ? 180 : 520);
     } else {
-        window.addEventListener("load", () => window.setTimeout(close, 700), { once: true });
+        window.addEventListener("load", () => window.setTimeout(close, reducedMotion ? 180 : 520), { once: true });
     }
     window.setTimeout(close, maxVisibleMs);
 }

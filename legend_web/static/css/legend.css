@@ -95,7 +95,13 @@ body.perf-lite .hero::after,
 body.perf-lite .pulse-track,
 body.perf-lite .brand-mark,
 body.perf-lite .activity-dot.live,
-body.perf-lite .bottom-nav a.active {
+body.perf-lite .bottom-nav a.active,
+body.perf-lite .app-preloader::before,
+body.perf-lite .preloader-core,
+body.perf-lite .preloader-core::after,
+body.perf-lite .preloader-halo,
+body.perf-lite .logo-bars i,
+body.perf-lite .preloader-ping i {
     animation: none !important;
 }
 
@@ -1868,6 +1874,17 @@ body[data-page="trade"] .bottom-nav a.active {
     transition: opacity .34s ease, transform .34s ease, visibility .34s ease;
 }
 
+.app-preloader::before {
+    content: "";
+    position: absolute;
+    inset: -22%;
+    pointer-events: none;
+    background:
+        radial-gradient(500px 300px at 18% 14%, rgba(113, 198, 241, 0.16), transparent 72%),
+        radial-gradient(520px 320px at 84% 84%, rgba(255, 206, 125, 0.14), transparent 72%);
+    animation: splashBreathe 4.8s ease-in-out infinite;
+}
+
 .app-preloader.done {
     opacity: 0;
     transform: scale(1.02);
@@ -1896,6 +1913,26 @@ body[data-preloader="skip"] .app-preloader {
     position: relative;
     overflow: hidden;
     animation: splashFloat 2.8s ease-in-out infinite;
+}
+
+.app-preloader[data-stage="1"] .preloader-core {
+    border-color: rgba(104, 188, 236, 0.38);
+}
+
+.app-preloader[data-stage="2"] .preloader-core {
+    border-color: rgba(91, 179, 230, 0.44);
+}
+
+.app-preloader[data-stage="3"] .preloader-core {
+    border-color: rgba(80, 170, 225, 0.52);
+}
+
+.app-preloader[data-stage="4"] .preloader-core,
+.app-preloader.finalizing .preloader-core {
+    box-shadow:
+        0 30px 72px rgba(92, 142, 179, 0.34),
+        inset 0 1px 0 rgba(255, 255, 255, 0.82),
+        0 0 0 1px rgba(99, 184, 234, 0.42);
 }
 
 .preloader-core::after {
@@ -2039,6 +2076,45 @@ body[data-preloader="skip"] .app-preloader {
     margin-top: 3px;
 }
 
+.preloader-meta {
+    width: 100%;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.preloader-percent {
+    font-family: "Oxanium", sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: #2b6084;
+    letter-spacing: .02em;
+}
+
+.preloader-ping {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.preloader-ping i {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: rgba(87, 171, 218, 0.72);
+    box-shadow: 0 0 10px rgba(88, 172, 219, 0.45);
+    animation: preloaderPing 1.2s ease-in-out infinite;
+}
+
+.preloader-ping i:nth-child(2) {
+    animation-delay: .16s;
+}
+
+.preloader-ping i:nth-child(3) {
+    animation-delay: .32s;
+}
+
 .preloader-bar {
     width: 100%;
     margin-top: 8px;
@@ -2057,6 +2133,11 @@ body[data-preloader="skip"] .app-preloader {
     background: linear-gradient(90deg, #7cd1fb, #4daee2);
     box-shadow: 0 0 14px rgba(77, 174, 226, 0.4);
     transition: width .22s ease;
+}
+
+.app-preloader.finalizing .preloader-bar span {
+    background: linear-gradient(90deg, #86dcff, #52b6ea 48%, #3e9dd2 100%);
+    box-shadow: 0 0 20px rgba(78, 174, 224, 0.45);
 }
 
 .interactive {
@@ -2160,9 +2241,19 @@ body[data-preloader="skip"] .app-preloader {
     50% { transform: translateY(-2px); }
 }
 
+@keyframes splashBreathe {
+    0%, 100% { transform: scale(1); opacity: .8; }
+    50% { transform: scale(1.03); opacity: 1; }
+}
+
 @keyframes logoBars {
     0%, 100% { transform: scaleY(.86); opacity: .8; }
     50% { transform: scaleY(1.18); opacity: 1; }
+}
+
+@keyframes preloaderPing {
+    0%, 100% { opacity: .45; transform: translateY(0); }
+    50% { opacity: 1; transform: translateY(-3px); }
 }
 
 @keyframes panelFade {
@@ -2271,6 +2362,18 @@ body[data-preloader="skip"] .app-preloader {
     .chart-back-btn {
         width: 100%;
         justify-content: center;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .app-preloader::before,
+    .preloader-core,
+    .preloader-core::after,
+    .preloader-halo,
+    .preloader-mark,
+    .logo-bars i,
+    .preloader-ping i {
+        animation: none !important;
     }
 }
 
