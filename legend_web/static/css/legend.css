@@ -2513,6 +2513,71 @@ select, input {
     padding: 8px 10px;
 }
 
+.toast-stack {
+    position: fixed;
+    left: 50%;
+    bottom: calc(86px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    width: min(470px, calc(100vw - 20px));
+    z-index: 2400;
+    display: grid;
+    gap: 8px;
+    pointer-events: none;
+}
+
+.toast {
+    pointer-events: auto;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    border: 1px solid rgba(116, 200, 244, 0.24);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(233, 246, 253, 0.92));
+    color: #2c5f80;
+    box-shadow: 0 16px 30px rgba(24, 55, 78, 0.18);
+    transform: translateY(8px) scale(.995);
+    opacity: 0;
+    transition: transform .2s ease, opacity .2s ease;
+}
+
+.toast.show {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+}
+
+.toast.success {
+    border-color: rgba(84, 193, 143, 0.36);
+    background: linear-gradient(180deg, rgba(240, 253, 247, 0.98), rgba(221, 247, 236, 0.92));
+    color: #1f7c56;
+}
+
+.toast.error {
+    border-color: rgba(223, 102, 124, 0.34);
+    background: linear-gradient(180deg, rgba(255, 244, 247, 0.98), rgba(251, 228, 234, 0.92));
+    color: #a74256;
+}
+
+.toast.info {
+    border-color: rgba(116, 200, 244, 0.24);
+}
+
+.toast-msg {
+    font-size: 12px;
+    line-height: 1.35;
+}
+
+.toast-close {
+    min-width: 30px;
+    min-height: 30px;
+    border-radius: 10px;
+    border: 1px solid rgba(116, 200, 244, 0.24);
+    background: rgba(255, 255, 255, 0.76);
+    color: #63839f;
+    font-size: 14px;
+}
+
 .bottom-nav {
     position: fixed;
     bottom: 0;

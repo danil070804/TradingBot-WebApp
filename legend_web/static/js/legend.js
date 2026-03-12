@@ -17,6 +17,31 @@ function uiLang() {
     return String(document.body?.dataset?.lang || "en").toLowerCase();
 }
 
+function showToast(message, type = "info", timeoutMs = 2600) {
+    const stack = document.getElementById("toast-stack");
+    if (!stack || !message) return;
+    const toast = document.createElement("div");
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `<div class="toast-msg">${String(message)}</div><button type="button" class="toast-close">✕</button>`;
+    stack.prepend(toast);
+    requestAnimationFrame(() => toast.classList.add("show"));
+    const remove = () => {
+        toast.classList.remove("show");
+        window.setTimeout(() => toast.remove(), 180);
+    };
+    toast.querySelector(".toast-close")?.addEventListener("click", remove, { once: true });
+    window.setTimeout(remove, timeoutMs);
+    while (stack.children.length > 4) {
+        stack.lastElementChild.remove();
+    }
+    try {
+        const h = type === "error" ? "heavy" : type === "success" ? "medium" : "light";
+        window.Telegram?.WebApp?.HapticFeedback?.impactOccurred?.(h);
+    } catch (_) {
+        // no-op
+    }
+}
+
 function emptyStateConfig(kind) {
     const lang = uiLang();
     const dict = {
@@ -759,11 +784,13 @@ function bindTradeForm() {
             const data = await resp.json();
             if (!resp.ok || !data.ok) {
                 result.innerHTML = `<span class="neg">Error: ${data.error || L("js_trade_error", "failed to open trade")}</span>`;
+                showToast(data.error || L("js_trade_error", "failed to open trade"), "error");
                 busy = false;
                 if (submitBtn) submitBtn.disabled = false;
                 return;
             }
             result.innerHTML = `<span class="pos">${L("js_trade_started", "Trade opened, countdown started")}</span>`;
+            showToast(L("js_trade_started", "Trade opened, countdown started"), "success", 1800);
             const started = Math.floor(Date.now() / 1000);
             const closeAt = Number(data.close_at);
             const total = Math.max(1, Number(data.seconds || 1));
@@ -808,6 +835,7 @@ function bindTradeForm() {
                 done = await poll();
                 if (!done && Math.floor(Date.now() / 1000) > hardStopAt) {
                     result.innerHTML = `<span class="neg">${L("js_trade_error", "failed to open trade")}</span>`;
+                    showToast(L("js_trade_error", "failed to open trade"), "error");
                     break;
                 }
                 if (!done) {
@@ -818,6 +846,7 @@ function bindTradeForm() {
             if (submitBtn) submitBtn.disabled = false;
         } catch (_) {
             result.innerHTML = `<span class="neg">${L("js_network_error", "Network error")}</span>`;
+            showToast(L("js_network_error", "Network error"), "error");
             busy = false;
             if (submitBtn) submitBtn.disabled = false;
         }
@@ -909,11 +938,14 @@ function bindExchangeForm() {
             const data = await resp.json();
             if (!resp.ok || !data.ok) {
                 result.innerHTML = `<span class="neg">Error: ${data.error || L("js_exchange_error", "failed to exchange")}</span>`;
+                showToast(data.error || L("js_exchange_error", "failed to exchange"), "error");
                 return;
             }
             result.innerHTML = `${L("js_exchange_rate", "Rate")}: ${data.rate}<br>${L("js_exchange_received", "Received")}: <span class="pos">${data.received} ${data.to}</span>`;
+            showToast(L("js_exchange_done", "Exchange completed"), "success", 1400);
         } catch (_) {
             result.innerHTML = `<span class="neg">${L("js_network_error", "Network error")}</span>`;
+            showToast(L("js_network_error", "Network error"), "error");
         }
     });
 }
@@ -959,6 +991,7 @@ function bindDepositForm() {
             const data = await resp.json();
             if (!resp.ok || !data.ok) {
                 result.innerHTML = `<span class="neg">Error: ${data.error || L("js_deposit_error", "failed to send")}</span>`;
+                showToast(data.error || L("js_deposit_error", "failed to send"), "error");
                 return;
             }
             if (data.requires_support) {
@@ -967,6 +1000,7 @@ function bindDepositForm() {
                     ? `<div class="result-action"><a class="qa-btn" href="${supportEntryUrl}">${L("js_support_btn", "Open Support")}</a></div>`
                     : "";
                 result.innerHTML = `<span class="pos">${data.message || L("js_card_support_msg", "For bank card payment, contact support.")}</span>${button}`;
+                showToast(data.message || L("js_card_support_msg", "For bank card payment, contact support."), "info");
                 if (data.redirect_to_support && supportEntryUrl) {
                     window.setTimeout(() => {
                         window.location.href = supportEntryUrl;
@@ -975,8 +1009,10 @@ function bindDepositForm() {
                 return;
             }
             result.innerHTML = `<span class="pos">${L("js_deposit_sent", "Request #{id} sent to admin").replace("{id}", data.deposit_id)}</span>`;
+            showToast(L("js_deposit_sent", "Request #{id} sent to admin").replace("{id}", data.deposit_id), "success");
         } catch (_) {
             result.innerHTML = `<span class="neg">${L("js_network_error", "Network error")}</span>`;
+            showToast(L("js_network_error", "Network error"), "error");
         }
     });
 }
@@ -1862,17 +1898,18 @@ function bindOpenPositionsActions() {
             });
             const data = await resp.json();
             if (!resp.ok || !data.ok) {
-                alert(data.error || "Failed to close");
+                showToast(data.error || "Failed to close", "error");
                 actionBtn.disabled = false;
                 return;
             }
+            showToast(L("js_trade_done", "Deal completed"), "success", 1500);
             await refreshOpenPositions();
             if (data.new_trade_id) {
                 LIVE_TRADE_PANEL_ID = data.new_trade_id;
                 await syncTradePanel(data.new_trade_id, tgId);
             }
         } catch (_) {
-            alert("Network error");
+            showToast(L("js_network_error", "Network error"), "error");
             actionBtn.disabled = false;
         }
     });
@@ -2735,7 +2772,7 @@ function bindWorkerPanel() {
                 if (valRaw === null) return;
                 const val = Number(valRaw);
                 if (Number.isNaN(val)) {
-                    alert("Enter a valid number");
+                    showToast("Enter a valid number", "error");
                     return;
                 }
                 await doUpdate(row.dataset.wcId, btn.dataset.action, val);
@@ -2759,7 +2796,7 @@ function bindWorkerPanel() {
                 if (!row) return;
                 const target = transferTarget ? transferTarget.value : "";
                 if (!target) {
-                    alert("Select a worker in the top list first");
+                    showToast("Select a worker in the top list first", "error");
                     return;
                 }
                 await doUpdate(row.dataset.wcId, "transfer_worker", Number(target));
@@ -2793,9 +2830,10 @@ function bindWorkerPanel() {
         });
         const data = await resp.json();
         if (!resp.ok || !data.ok) {
-            alert(data.error || "Failed to update data");
+            showToast(data.error || "Failed to update data", "error");
             return false;
         }
+        showToast(data.details || "Saved", "success", 1300);
         patchRowState(wrap.querySelector(`.worker-row[data-wc-id="${wcId}"]`), action, value);
         await pollWorkerDashboard();
         return true;
