@@ -7,12 +7,20 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Oxanium:wght@500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/legend.css?v=20260312b">
+    <link rel="stylesheet" href="/static/css/legend.css?v=20260312c">
 </head>
 <body data-lang="{{ lang if lang else 'ru' }}" data-page="{{ page if page else '' }}">
+<script>
+try {
+    if (sessionStorage.getItem("legend_webapp_loader_seen") === "1") {
+        document.body.setAttribute("data-preloader", "skip");
+    }
+} catch (_) {}
+</script>
 <div class="page-bg"></div>
 <div id="app-preloader" class="app-preloader" aria-hidden="true">
     <div class="preloader-core">
+        <div class="preloader-halo"></div>
         <div class="preloader-mark">L</div>
         <div class="preloader-title">Legend Trading</div>
         <div class="preloader-sub">BOT WEBAPP</div>
@@ -56,6 +64,6 @@
 window.LEGEND_LABELS = {{ labels|tojson if labels else '{}' }};
 </script>
 {% block extra_scripts %}{% endblock %}
-<script src="/static/js/legend.js?v=20260312b"></script>
+<script src="/static/js/legend.js?v=20260312c"></script>
 </body>
 </html>

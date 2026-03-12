@@ -9,6 +9,16 @@ function initAppPreloader() {
     const overlay = document.getElementById("app-preloader");
     const fill = document.getElementById("preloader-bar-fill");
     if (!overlay || !fill) return;
+    let seen = false;
+    try {
+        seen = sessionStorage.getItem("legend_webapp_loader_seen") === "1";
+    } catch (_) {
+        // no-op
+    }
+    if (document.body?.dataset?.preloader === "skip" || seen) {
+        overlay.classList.add("done");
+        return;
+    }
     const startedAt = Date.now();
     const minVisibleMs = 1300;
     const steps = [18, 36, 58, 78, 92];
@@ -20,6 +30,11 @@ function initAppPreloader() {
     }, 90);
 
     const close = () => {
+        try {
+            sessionStorage.setItem("legend_webapp_loader_seen", "1");
+        } catch (_) {
+            // no-op
+        }
         fill.style.width = "100%";
         const elapsed = Date.now() - startedAt;
         const waitMore = Math.max(0, minVisibleMs - elapsed);

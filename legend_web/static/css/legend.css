@@ -1813,6 +1813,10 @@ body[data-page="trade"] .bottom-nav a.active {
     visibility: hidden;
 }
 
+body[data-preloader="skip"] .app-preloader {
+    display: none;
+}
+
 .preloader-core {
     width: min(320px, calc(100vw - 54px));
     border-radius: 24px;
@@ -1825,6 +1829,20 @@ body[data-page="trade"] .bottom-nav a.active {
     display: grid;
     gap: 8px;
     justify-items: center;
+    position: relative;
+}
+
+.preloader-halo {
+    position: absolute;
+    top: 8px;
+    width: 92px;
+    height: 92px;
+    border-radius: 50%;
+    border: 2px solid rgba(113, 198, 241, 0.34);
+    border-top-color: rgba(58, 154, 206, 0.88);
+    border-right-color: rgba(88, 179, 228, 0.68);
+    animation: preloaderSpin 1.35s linear infinite;
+    box-shadow: 0 0 26px rgba(98, 185, 231, 0.2);
 }
 
 .preloader-mark {
@@ -1956,6 +1974,11 @@ body[data-page="trade"] .bottom-nav a.active {
 @keyframes ripple {
     0% { transform: translate(-50%, -50%) scale(0); opacity: .42; }
     100% { transform: translate(-50%, -50%) scale(24); opacity: 0; }
+}
+
+@keyframes preloaderSpin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
 @keyframes ticker {
