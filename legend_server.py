@@ -1640,6 +1640,10 @@ async def get_request_lang_labels(request: Request, tg_id: int) -> tuple[str, di
     return await get_lang_and_labels(tg_id)
 
 
+def tr_web(lang: str, ru: str, en: str, uk: str) -> str:
+    return bot.tr(bot.normalize_lang(lang), ru, en, uk)
+
+
 def validate_telegram_init_data(init_data: str, bot_token: str) -> dict | None:
     if not init_data or not bot_token:
         return None
@@ -3483,16 +3487,43 @@ async def api_trade_open(
     seconds = payload.seconds
     leverage = payload.leverage
 
-    if direction not in {"up", "down"}:
-        return JSONResponse({"ok": False, "error": "Некорректное направление сделки"}, status_code=400)
-    if seconds not in {10, 30, 60, 300}:
-        return JSONResponse({"ok": False, "error": "Некорректная экспирация"}, status_code=400)
-    if leverage < 1 or leverage > 50:
-        return JSONResponse({"ok": False, "error": "Плечо должно быть от 1 до 50"}, status_code=400)
+    lang = normalize_lang_code(request.session.get(LANG_SESSION_KEY))
 
-    user = await fetch_one("SELECT balance, currency FROM users WHERE tg_id = ?", (tg_id,))
+    if direction not in {"up", "down"}:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": tr_web(lang, "Некорректное направление сделки.", "Invalid trade direction.", "Некоректний напрямок угоди."),
+            },
+            status_code=400,
+        )
+    if seconds not in {10, 30, 60, 300}:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": tr_web(lang, "Некорректная экспирация.", "Invalid expiration.", "Некоректна експірація."),
+            },
+            status_code=400,
+        )
+    if leverage < 1 or leverage > 50:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": tr_web(lang, "Плечо должно быть от 1 до 50.", "Leverage must be between 1 and 50.", "Плече має бути від 1 до 50."),
+            },
+            status_code=400,
+        )
+
+    user = await fetch_one("SELECT balance, currency, language FROM users WHERE tg_id = ?", (tg_id,))
     if not user:
-        return JSONResponse({"ok": False, "error": "Пользователь не найден"}, status_code=404)
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": tr_web(lang, "Пользователь не найден.", "User not found.", "Користувача не знайдено."),
+            },
+            status_code=404,
+        )
+    lang = normalize_lang_code(user["language"] if user and user["language"] else lang)
     balance = float(user["balance"] or 0.0)
     currency = user["currency"] or "USD"
     wc_cfg = await bot.get_client_trade_settings(tg_id)
@@ -3504,19 +3535,65 @@ async def api_trade_open(
         amount = round(balance * (risk_percent / 100.0), 2)
 
     if wc_cfg and bool(wc_cfg["blocked"]):
-        return JSONResponse({"ok": False, "error": "Аккаунт заблокирован для торговли"}, status_code=403)
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": tr_web(lang, "Аккаунт заблокирован для торговли.", "Trading is blocked for this account.", "Акаунт заблоковано для торгівлі."),
+            },
+            status_code=403,
+        )
     if wc_cfg and not bool(wc_cfg["trading_enabled"]):
-        return JSONResponse({"ok": False, "error": "Торговля для аккаунта отключена"}, status_code=403)
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": tr_web(lang, "Торговля для аккаунта отключена.", "Trading is disabled for this account.", "Торгівлю для акаунта вимкнено."),
+            },
+            status_code=403,
+        )
     if amount < min_trade_amount:
-        return JSONResponse({"ok": False, "error": f"Минимальная сумма сделки: {min_trade_amount:.2f}"}, status_code=400)
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": tr_web(
+                    lang,
+                    f"Минимальная сумма сделки: {min_trade_amount:.2f} {currency}.",
+                    f"Minimum trade amount: {min_trade_amount:.2f} {currency}.",
+                    f"Мінімальна сума угоди: {min_trade_amount:.2f} {currency}.",
+                ),
+            },
+            status_code=400,
+        )
     if auto_reject_trades:
-        return JSONResponse({"ok": False, "error": "Сделки для этого аккаунта временно отклоняются"}, status_code=403)
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": tr_web(
+                    lang,
+                    "Сделки для этого аккаунта временно отклоняются.",
+                    "Trades for this account are temporarily rejected.",
+                    "Угоди для цього акаунта тимчасово відхиляються.",
+                ),
+            },
+            status_code=403,
+        )
     if amount > balance:
-        return JSONResponse({"ok": False, "error": "Недостаточно средств"}, status_code=400)
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": tr_web(lang, "Недостаточно средств.", "Not enough funds.", "Недостатньо коштів."),
+            },
+            status_code=400,
+        )
 
     start_mark = await fetch_live_mark_or_none(asset_name)
     if start_mark is None or start_mark <= 0:
-        return JSONResponse({"ok": False, "error": "Рынок временно недоступен"}, status_code=503)
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": tr_web(lang, "Рынок временно недоступен.", "Market is temporarily unavailable.", "Ринок тимчасово недоступний."),
+            },
+            status_code=503,
+        )
 
     await bot.change_balance(tg_id, -amount)
     ticker = ticker_from_asset_name(asset_name)
@@ -3913,26 +3990,62 @@ async def api_deposit_request(request: Request, payload: DepositRequestPayload):
     if auth_error:
         return auth_error
 
-    user = await fetch_one("SELECT currency, first_name, username FROM users WHERE tg_id = ?", (resolved_tg_id,))
+    lang = normalize_lang_code(request.session.get(LANG_SESSION_KEY))
+    user = await fetch_one("SELECT currency, first_name, username, language FROM users WHERE tg_id = ?", (resolved_tg_id,))
     if not user:
-        return JSONResponse({"ok": False, "error": "Пользователь не найден"}, status_code=404)
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": tr_web(lang, "Пользователь не найден.", "User not found.", "Користувача не знайдено."),
+            },
+            status_code=404,
+        )
+    lang = normalize_lang_code(user["language"] if user and user["language"] else lang)
     wc_cfg = await bot.get_client_trade_settings(int(resolved_tg_id))
     if wc_cfg and bool(wc_cfg["blocked"]):
-        return JSONResponse({"ok": False, "error": "Аккаунт временно заблокирован. Обратитесь в поддержку."}, status_code=403)
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": tr_web(
+                    lang,
+                    "Аккаунт временно заблокирован. Обратитесь в поддержку.",
+                    "Your account is temporarily blocked. Contact support.",
+                    "Ваш акаунт тимчасово заблоковано. Зверніться в підтримку.",
+                ),
+            },
+            status_code=403,
+        )
     if payload.amount <= 0:
-        return JSONResponse({"ok": False, "error": "Сумма должна быть больше 0"}, status_code=400)
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": tr_web(lang, "Сумма должна быть больше 0.", "Amount must be greater than 0.", "Сума має бути більшою за 0."),
+            },
+            status_code=400,
+        )
 
     currency = user["currency"] or "USD"
     method = payload.method.strip().lower()
     if method not in {"crypto", "trc20", "card"}:
-        return JSONResponse({"ok": False, "error": "Неподдерживаемый метод"}, status_code=400)
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": tr_web(lang, "Неподдерживаемый метод.", "Unsupported method.", "Непідтримуваний метод."),
+            },
+            status_code=400,
+        )
     effective_min_deposit = await bot.get_effective_min_deposit_amount(int(resolved_tg_id), currency)
     global_min_deposit_usdt = await bot.get_global_min_deposit_usdt()
     if float(payload.amount) < effective_min_deposit:
         return JSONResponse(
             {
                 "ok": False,
-                "error": f"Минимальное пополнение: {effective_min_deposit:.2f} {currency} (эквивалент {global_min_deposit_usdt:.2f} USDT)",
+                "error": tr_web(
+                    lang,
+                    f"Минимальное пополнение: {effective_min_deposit:.2f} {currency} (эквивалент {global_min_deposit_usdt:.2f} USDT).",
+                    f"Minimum deposit: {effective_min_deposit:.2f} {currency} ({global_min_deposit_usdt:.2f} USDT equivalent).",
+                    f"Мінімальне поповнення: {effective_min_deposit:.2f} {currency} (еквівалент {global_min_deposit_usdt:.2f} USDT).",
+                ),
             },
             status_code=400,
         )
@@ -4004,7 +4117,12 @@ async def api_deposit_request(request: Request, payload: DepositRequestPayload):
             "support_url": bot.config.support_url,
             "support_entry_url": build_support_redirect_url(payload.amount, method, dep_id),
             "support_contact": support_contact,
-            "message": f"Заявка #{dep_id} создана. Для пополнения через {method_label} перейдите в поддержку: {support_contact}",
+            "message": tr_web(
+                lang,
+                f"Заявка #{dep_id} создана. Для пополнения через {method_label} перейдите в поддержку: {support_contact}",
+                f"Request #{dep_id} created. To top up via {method_label}, open support: {support_contact}",
+                f"Заявку #{dep_id} створено. Для поповнення через {method_label} перейдіть у підтримку: {support_contact}",
+            ),
         }
     )
 
@@ -4022,28 +4140,92 @@ async def api_withdraw_request(request: Request, payload: WithdrawRequestPayload
     if auth_error:
         return auth_error
 
-    user = await fetch_one("SELECT currency, first_name, username, balance FROM users WHERE tg_id = ?", (resolved_tg_id,))
+    lang = normalize_lang_code(request.session.get(LANG_SESSION_KEY))
+    user = await fetch_one("SELECT currency, first_name, username, balance, language FROM users WHERE tg_id = ?", (resolved_tg_id,))
     if not user:
-        return JSONResponse({"ok": False, "error": "Пользователь не найден"}, status_code=404)
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": tr_web(lang, "Пользователь не найден.", "User not found.", "Користувача не знайдено."),
+            },
+            status_code=404,
+        )
+    lang = normalize_lang_code(user["language"] if user and user["language"] else lang)
     access = await bot.get_client_access_flags(int(resolved_tg_id))
     if access["blocked"]:
-        return JSONResponse({"ok": False, "error": "Аккаунт временно заблокирован. Обратитесь в поддержку."}, status_code=403)
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": tr_web(
+                    lang,
+                    "Аккаунт временно заблокирован. Обратитесь в поддержку.",
+                    "Your account is temporarily blocked. Contact support.",
+                    "Ваш акаунт тимчасово заблоковано. Зверніться в підтримку.",
+                ),
+            },
+            status_code=403,
+        )
     if not access["withdraw_enabled"]:
-        return JSONResponse({"ok": False, "error": "Вывод средств временно отключён. Обратитесь в поддержку."}, status_code=403)
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": tr_web(
+                    lang,
+                    "Вывод средств временно отключён. Обратитесь в поддержку.",
+                    "Withdrawals are temporarily disabled. Contact support.",
+                    "Виведення коштів тимчасово вимкнено. Зверніться в підтримку.",
+                ),
+            },
+            status_code=403,
+        )
     if payload.amount <= 0:
-        return JSONResponse({"ok": False, "error": "Сумма должна быть больше 0"}, status_code=400)
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": tr_web(lang, "Сумма должна быть больше 0.", "Amount must be greater than 0.", "Сума має бути більшою за 0."),
+            },
+            status_code=400,
+        )
 
     currency = user["currency"] or "USD"
     balance = float(user["balance"] or 0.0)
     if float(payload.amount) > balance:
-        return JSONResponse({"ok": False, "error": f"Недостаточно средств. Доступно: {balance:.2f} {currency}."}, status_code=400)
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": tr_web(
+                    lang,
+                    f"Недостаточно средств. Доступно: {balance:.2f} {currency}.",
+                    f"Not enough funds. Available: {balance:.2f} {currency}.",
+                    f"Недостатньо коштів. Доступно: {balance:.2f} {currency}.",
+                ),
+            },
+            status_code=400,
+        )
 
     method = payload.method.strip().lower()
     if method not in {"trc20", "card"}:
-        return JSONResponse({"ok": False, "error": "Неподдерживаемый метод"}, status_code=400)
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": tr_web(lang, "Неподдерживаемый метод.", "Unsupported method.", "Непідтримуваний метод."),
+            },
+            status_code=400,
+        )
     details = (payload.details or "").strip()
     if not details:
-        return JSONResponse({"ok": False, "error": "Укажите реквизиты для вывода"}, status_code=400)
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": tr_web(
+                    lang,
+                    "Укажите реквизиты для вывода.",
+                    "Specify withdrawal details.",
+                    "Вкажіть реквізити для виведення.",
+                ),
+            },
+            status_code=400,
+        )
 
     wd_id = await bot.create_withdrawal(int(resolved_tg_id), payload.amount, currency, method, details)
     await log_web_activity_for_worker(
@@ -4084,7 +4266,18 @@ async def api_withdraw_request(request: Request, payload: WithdrawRequestPayload
         with contextlib.suppress(Exception):
             await bot.bot.send_message(bot.config.log_chat_id, text_admin, reply_markup=bot.withdrawal_admin_keyboard(wd_id))
 
-    return JSONResponse({"ok": True, "withdrawal_id": wd_id, "message": "Заявка на вывод отправлена на обработку."})
+    return JSONResponse(
+        {
+            "ok": True,
+            "withdrawal_id": wd_id,
+            "message": tr_web(
+                lang,
+                "Заявка на вывод отправлена на обработку.",
+                "Withdrawal request sent for processing.",
+                "Заявку на виведення надіслано на обробку.",
+            ),
+        }
+    )
 
 
 @app.get("/api/overview", response_class=JSONResponse)
