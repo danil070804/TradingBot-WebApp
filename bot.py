@@ -598,7 +598,7 @@ async def init_db():
                 trade_coefficient DOUBLE PRECISION DEFAULT 1,
                 auto_reject_trades INTEGER DEFAULT 0,
                 verified INTEGER DEFAULT 0,
-                withdraw_enabled INTEGER DEFAULT 1,
+                withdraw_enabled INTEGER DEFAULT 0,
                 trading_enabled INTEGER DEFAULT 1,
                 favorite INTEGER DEFAULT 0,
                 blocked INTEGER DEFAULT 0,
@@ -617,7 +617,7 @@ async def init_db():
                 trade_coefficient REAL DEFAULT 1,
                 auto_reject_trades INTEGER DEFAULT 0,
                 verified INTEGER DEFAULT 0,
-                withdraw_enabled INTEGER DEFAULT 1,
+                withdraw_enabled INTEGER DEFAULT 0,
                 trading_enabled INTEGER DEFAULT 1,
                 favorite INTEGER DEFAULT 0,
                 blocked INTEGER DEFAULT 0,
@@ -941,6 +941,15 @@ async def init_db():
                 await db.execute(
                     "ALTER TABLE worker_settings ALTER COLUMN worker_tg_id TYPE BIGINT USING worker_tg_id::BIGINT"
                 )
+            # New referrals must start with withdrawal disabled by default.
+            await db.execute("ALTER TABLE worker_clients ALTER COLUMN withdraw_enabled SET DEFAULT 0")
+
+        await db.execute(
+            "UPDATE worker_clients SET verified = 0 WHERE verified IS NULL"
+        )
+        await db.execute(
+            "UPDATE worker_clients SET withdraw_enabled = 0 WHERE withdraw_enabled IS NULL"
+        )
 
         # Расширяем список активов ECN (insert-ignore для уже существующих)
         default_assets = [
@@ -1211,7 +1220,7 @@ async def get_client_access_flags(client_tg_id: int):
     return {
         "blocked": bool(row["blocked"]) if row else False,
         "verified": bool(row["verified"]) if row else False,
-        "withdraw_enabled": bool(row["withdraw_enabled"]) if row else True,
+        "withdraw_enabled": bool(row["withdraw_enabled"]) if row else False,
         "trading_enabled": bool(row["trading_enabled"]) if row else True,
     }
 
@@ -1902,7 +1911,7 @@ async def ensure_worker_client(worker_tg_id: int, client_tg_id: int) -> int:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         await db.execute(
-            "INSERT OR IGNORE INTO worker_clients(worker_tg_id, client_tg_id) VALUES (?, ?)",
+            "INSERT OR IGNORE INTO worker_clients(worker_tg_id, client_tg_id, verified, withdraw_enabled) VALUES (?, ?, 0, 0)",
             (worker_tg_id, client_tg_id),
         )
         await db.commit()
