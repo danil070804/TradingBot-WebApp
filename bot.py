@@ -4,6 +4,7 @@ import contextlib
 import math
 import secrets
 import time
+from html import escape
 from dataclasses import dataclass
 from typing import Optional
 
@@ -2466,11 +2467,68 @@ async def get_admin_stats_text() -> str:
     )
 
 
-async def get_recent_referral_activity_for_admin(limit: int = 25):
+REF_ACTIVITY_FILTERS: dict[str, tuple[str, str]] = {
+    "all": ("🧭 Все", "1=1"),
+    "trd": ("📈 Сделки", "(LOWER(al.event_type) LIKE 'bot_trade%' OR LOWER(al.title) LIKE '%сделк%')"),
+    "dep": ("📥 Пополнения", "(LOWER(al.event_type) LIKE 'bot_deposit%' OR LOWER(al.title) LIKE '%пополн%')"),
+    "wdr": ("📤 Выводы", "(LOWER(al.event_type) LIKE 'bot_withdraw%' OR LOWER(al.title) LIKE '%вывод%')"),
+    "sup": ("💬 Поддержка", "(LOWER(al.event_type) LIKE 'bot_support%' OR LOWER(al.title) LIKE '%поддерж%')"),
+}
+
+
+def normalize_ref_activity_filter(filter_code: str) -> str:
+    return filter_code if filter_code in REF_ACTIVITY_FILTERS else "all"
+
+
+def get_ref_activity_icon(row) -> str:
+    event_type = str(row["event_type"] or "").lower()
+    title = str(row["title"] or "").lower()
+    if "withdraw" in event_type or "вывод" in title:
+        return "📤"
+    if "deposit" in event_type or "пополн" in title:
+        return "📥"
+    if "support" in event_type or "поддерж" in title:
+        return "💬"
+    if "trade" in event_type or "сделк" in title:
+        return "📈"
+    return "🛰"
+
+
+def build_ref_activity_title(row) -> str:
+    title = (row["title"] or "").strip()
+    return escape(title) if title else "Событие"
+
+
+def build_ref_activity_details(row, max_len: int = 120) -> str:
+    raw = (row["details"] or "").strip()
+    if not raw:
+        return "—"
+    cleaned = " ".join(raw.split())
+    if len(cleaned) > max_len:
+        cleaned = cleaned[: max_len - 1].rstrip() + "…"
+    return escape(cleaned)
+
+
+async def get_recent_referral_activity_for_admin(limit: int = 8, offset: int = 0, filter_code: str = "all"):
+    safe_filter = normalize_ref_activity_filter(filter_code)
+    _, where_filter = REF_ACTIVITY_FILTERS[safe_filter]
+    safe_limit = max(1, min(limit, 30))
+    safe_offset = max(0, int(offset))
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
-        cur = await db.execute(
+        count_cur = await db.execute(
+            f"""
+            SELECT COUNT(*) AS total_count
+            FROM activity_log al
+            WHERE al.worker_tg_id IS NOT NULL
+              AND al.client_tg_id IS NOT NULL
+              AND {where_filter}
             """
+        )
+        count_row = await count_cur.fetchone()
+        total_count = int(count_row["total_count"] or 0) if count_row else 0
+        cur = await db.execute(
+            f"""
             SELECT
                 al.id,
                 al.worker_tg_id,
@@ -2488,12 +2546,14 @@ async def get_recent_referral_activity_for_admin(limit: int = 25):
             LEFT JOIN users cu ON cu.tg_id = al.client_tg_id
             WHERE al.worker_tg_id IS NOT NULL
               AND al.client_tg_id IS NOT NULL
+              AND {where_filter}
             ORDER BY al.id DESC
-            LIMIT ?
+            LIMIT ? OFFSET ?
             """,
-            (limit,),
+            (safe_limit, safe_offset),
         )
-        return await cur.fetchall()
+        rows = await cur.fetchall()
+        return rows, total_count, safe_filter
 
 
 async def get_workers_with_ref_counts():
@@ -3085,12 +3145,36 @@ def admin_stats_keyboard():
     return kb.as_markup()
 
 
-def admin_referral_activity_keyboard():
+def admin_referral_activity_keyboard(filter_code: str, offset: int, total_count: int, page_size: int):
+    safe_filter = normalize_ref_activity_filter(filter_code)
+    safe_offset = max(0, int(offset))
+    total_pages = max(1, math.ceil(total_count / page_size)) if total_count else 1
+    current_page = min(total_pages, (safe_offset // page_size) + 1)
+
     kb = InlineKeyboardBuilder()
-    kb.button(text="🔄 Обновить", callback_data="admin_ref_activity")
+    filter_buttons = [("all", "🧭"), ("trd", "📈"), ("dep", "📥"), ("wdr", "📤"), ("sup", "💬")]
+    for code, icon in filter_buttons:
+        label = REF_ACTIVITY_FILTERS[code][0].split(" ", 1)[1]
+        prefix = "•" if code == safe_filter else icon
+        kb.button(text=f"{prefix} {label}", callback_data=f"admin_ref_activity:{code}:0")
+
+    prev_offset = max(0, safe_offset - page_size)
+    next_offset = safe_offset + page_size
+    if safe_offset > 0:
+        kb.button(text="⬅️", callback_data=f"admin_ref_activity:{safe_filter}:{prev_offset}")
+    else:
+        kb.button(text="•", callback_data="admin_ref_activity_noop")
+
+    kb.button(text=f"{current_page}/{total_pages}", callback_data="admin_ref_activity_noop")
+    if next_offset < total_count:
+        kb.button(text="➡️", callback_data=f"admin_ref_activity:{safe_filter}:{next_offset}")
+    else:
+        kb.button(text="•", callback_data="admin_ref_activity_noop")
+
+    kb.button(text="🔄 Обновить", callback_data=f"admin_ref_activity:{safe_filter}:{safe_offset}")
     kb.button(text="📊 К статистике", callback_data="admin_stats")
     kb.button(text="⬅️ К админке", callback_data="open_admin_panel")
-    kb.adjust(2, 1)
+    kb.adjust(3, 2, 3, 2, 1)
     return kb.as_markup()
 
 
@@ -5439,32 +5523,82 @@ async def on_admin_stats(callback: CallbackQuery, state: FSMContext):
 
 @dp.callback_query(F.data == "admin_ref_activity")
 async def on_admin_ref_activity(callback: CallbackQuery, state: FSMContext):
+    await on_admin_ref_activity_page(callback, state, "all", 0)
+
+
+@dp.callback_query(F.data.startswith("admin_ref_activity:"))
+async def on_admin_ref_activity_paged(callback: CallbackQuery, state: FSMContext):
+    parts = callback.data.split(":")
+    filter_code = parts[1] if len(parts) > 1 else "all"
+    try:
+        offset = int(parts[2]) if len(parts) > 2 else 0
+    except ValueError:
+        offset = 0
+    await on_admin_ref_activity_page(callback, state, filter_code, offset)
+
+
+@dp.callback_query(F.data == "admin_ref_activity_noop")
+async def on_admin_ref_activity_noop(callback: CallbackQuery):
+    await callback.answer()
+
+
+async def on_admin_ref_activity_page(callback: CallbackQuery, state: FSMContext, filter_code: str, offset: int):
     if not is_admin_id(callback.from_user.id):
         await callback.answer("⛔ Нет доступа.")
         return
     await state.clear()
-    rows = await get_recent_referral_activity_for_admin(limit=25)
+    page_size = 8
+    rows, total_count, safe_filter = await get_recent_referral_activity_for_admin(
+        limit=page_size,
+        offset=offset,
+        filter_code=filter_code,
+    )
+    total_pages = max(1, math.ceil(total_count / page_size)) if total_count else 1
+    current_page = min(total_pages, (max(0, offset) // page_size) + 1)
+    filter_label = REF_ACTIVITY_FILTERS[safe_filter][0]
+
     if not rows:
-        await callback.message.answer(
-            "🛰 <b>Действия рефералов воркеров</b>\n\nПока событий нет.",
-            reply_markup=admin_referral_activity_keyboard(),
+        text = (
+            "🛰 <b>Действия рефералов воркеров</b>\n\n"
+            f"Фильтр: <b>{filter_label}</b>\n"
+            "Событий пока нет."
+        )
+        await callback.message.edit_text(
+            text,
+            reply_markup=admin_referral_activity_keyboard(safe_filter, 0, total_count, page_size),
         )
         await callback.answer()
         return
 
-    lines = ["🛰 <b>Действия рефералов воркеров</b>", ""]
-    for row in rows:
-        worker_label = (row["worker_first_name"] or "").strip() or (f"@{row['worker_username']}" if row["worker_username"] else "без имени")
-        client_label = (row["client_first_name"] or "").strip() or (f"@{row['client_username']}" if row["client_username"] else "без имени")
-        created_at = str(row["created_at"] or "").strip()[:19]
+    lines = [
+        "🛰 <b>Действия рефералов воркеров</b>",
+        (
+            f"Фильтр: <b>{filter_label}</b> · "
+            f"Событий: <b>{total_count}</b> · "
+            f"Страница: <b>{current_page}/{total_pages}</b>"
+        ),
+        "",
+    ]
+    for idx, row in enumerate(rows, start=1 + max(0, offset)):
+        worker_name = ((row["worker_first_name"] or "").strip() or (f"@{row['worker_username']}" if row["worker_username"] else "без имени"))
+        client_name = ((row["client_first_name"] or "").strip() or (f"@{row['client_username']}" if row["client_username"] else "без имени"))
+        worker_name = escape(worker_name)
+        client_name = escape(client_name)
+        created_at = escape(str(row["created_at"] or "").strip().replace("T", " ")[:19] or "—")
         lines.append(
-            f"• <b>{row['title'] or 'Событие'}</b>\n"
-            f"  Воркер: <code>{row['worker_tg_id']}</code> ({worker_label})\n"
-            f"  Реферал: <code>{row['client_tg_id']}</code> ({client_label})\n"
-            f"  Время: <code>{created_at}</code>\n"
-            f"  Детали: {row['details'] or '—'}"
+            f"{get_ref_activity_icon(row)} <b>{idx}. {build_ref_activity_title(row)}</b>\n"
+            f"👷 <code>{row['worker_tg_id']}</code> · {worker_name}\n"
+            f"👤 <code>{row['client_tg_id']}</code> · {client_name}\n"
+            f"🕒 <code>{created_at}</code>\n"
+            f"📝 {build_ref_activity_details(row)}"
         )
-    await callback.message.answer("\n\n".join(lines), reply_markup=admin_referral_activity_keyboard())
+    text = "\n\n".join(lines)
+    markup = admin_referral_activity_keyboard(safe_filter, max(0, offset), total_count, page_size)
+    with contextlib.suppress(Exception):
+        await callback.message.edit_text(text, reply_markup=markup)
+        await callback.answer()
+        return
+    await callback.message.answer(text, reply_markup=markup)
     await callback.answer()
 
 
