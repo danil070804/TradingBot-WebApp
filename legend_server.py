@@ -3435,7 +3435,7 @@ async def admin_process_support(payload: AdminProcessPayload, request: Request):
 
 
 class TradeOpenPayload(BaseModel):
-    tg_id: int
+    tg_id: int | None = None
     asset_name: str
     direction: str
     amount: float
@@ -3611,7 +3611,7 @@ async def api_trade_status(request: Request, trade_id: str, tg_id: int | None = 
 
 
 class ExchangePayload(BaseModel):
-    tg_id: int
+    tg_id: int | None = None
     from_currency: str
     to_currency: str
     amount: float
@@ -3674,18 +3674,18 @@ async def api_trade_open_positions(request: Request, tg_id: int | None = None):
 
 
 class TradeClosePayload(BaseModel):
-    tg_id: int
+    tg_id: int | None = None
     trade_id: str
 
 
 class TradePartialClosePayload(BaseModel):
-    tg_id: int
+    tg_id: int | None = None
     trade_id: str
     ratio: float = 0.5
 
 
 class TradeReversePayload(BaseModel):
-    tg_id: int
+    tg_id: int | None = None
     trade_id: str
 
 
@@ -3879,7 +3879,7 @@ async def api_trade_reverse(request: Request, payload: TradeReversePayload):
 
 
 class DepositRequestPayload(BaseModel):
-    tg_id: int
+    tg_id: int | None = None
     amount: float
     method: str  # crypto | trc20 | card
 
@@ -3987,7 +3987,7 @@ async def api_deposit_request(request: Request, payload: DepositRequestPayload):
 
 
 class WithdrawRequestPayload(BaseModel):
-    tg_id: int
+    tg_id: int | None = None
     amount: float
     method: str  # trc20 | card
     details: str

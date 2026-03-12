@@ -495,8 +495,8 @@ function updateTradePanelFromStatus(status) {
         `${status.asset_name} ${side} · ${Number(status.amount || 0).toFixed(2)} ${status.currency || "USD"}`;
 }
 
-async function syncTradePanel(tradeId, tgId) {
-    if (!tradeId || !tgId) return;
+async function syncTradePanel(tradeId) {
+    if (!tradeId) return;
     const now = Date.now();
     if (LIVE_TRADE_STATUS_SYNC.tradeId === tradeId && (now - LIVE_TRADE_STATUS_SYNC.requestedAt) < 900) {
         return;
@@ -504,7 +504,7 @@ async function syncTradePanel(tradeId, tgId) {
     LIVE_TRADE_PANEL_ID = tradeId;
     LIVE_TRADE_STATUS_SYNC = { tradeId, requestedAt: now };
     try {
-        const statusResp = await fetch(`/api/trade/status?trade_id=${encodeURIComponent(tradeId)}&tg_id=${tgId}`);
+        const statusResp = await fetch(`/api/trade/status?trade_id=${encodeURIComponent(tradeId)}`);
         const status = await statusResp.json();
         if (!statusResp.ok || !status.ok) return;
         updateTradePanelFromStatus(status);
@@ -527,7 +527,7 @@ function updateTradePanelFromPosition(position) {
     });
 }
 
-function syncTradePanelFromPositions(items, tgId) {
+function syncTradePanelFromPositions(items) {
     if (!Array.isArray(items)) return;
     const tradeId = LIVE_TRADE_PANEL_ID || (items[0] && items[0].trade_id) || null;
     if (!tradeId) {
@@ -548,7 +548,7 @@ function syncTradePanelFromPositions(items, tgId) {
     }
     if (APP_RUNTIME.trade.pendingStatusTradeId !== tradeId) {
         APP_RUNTIME.trade.pendingStatusTradeId = tradeId;
-        syncTradePanel(tradeId, tgId);
+        syncTradePanel(tradeId);
     }
 }
 
@@ -1007,7 +1007,6 @@ function bindTradeForm() {
         if (submitBtn) submitBtn.disabled = true;
         result.textContent = L("js_trade_opening", "Opening trade...");
         const body = Object.fromEntries(new FormData(form).entries());
-        body.tg_id = Number(body.tg_id);
         body.amount = Number(body.amount);
         body.seconds = Number(body.seconds);
         body.leverage = Number(body.leverage);
@@ -1157,7 +1156,6 @@ function bindExchangeForm() {
         e.preventDefault();
         result.textContent = L("js_exchange_processing", "Processing exchange...");
         const body = Object.fromEntries(new FormData(form).entries());
-        body.tg_id = Number(body.tg_id);
         body.amount = Number(body.amount);
         try {
             const resp = await fetch("/api/exchange", {
@@ -1222,7 +1220,6 @@ function bindDepositForm() {
         e.preventDefault();
         result.textContent = L("js_deposit_processing", "Processing...");
         const body = Object.fromEntries(new FormData(form).entries());
-        body.tg_id = Number(body.tg_id);
         body.amount = Number(body.amount);
         try {
             const resp = await fetch("/api/deposit/request", {
@@ -1345,7 +1342,6 @@ function bindWithdrawForm() {
         e.preventDefault();
         result.textContent = L("js_withdraw_processing", "Sending request...");
         const body = Object.fromEntries(new FormData(form).entries());
-        body.tg_id = Number(body.tg_id);
         body.amount = Number(body.amount);
         try {
             const resp = await fetch("/api/withdraw/request", {
@@ -2184,7 +2180,7 @@ function bindUserSocket() {
     connect();
 }
 
-function renderOpenPositions(items, tgId) {
+function renderOpenPositions(items) {
     const wrap = document.getElementById("open-positions-list");
     if (!wrap) return;
     if (!items.length) {
@@ -2203,19 +2199,19 @@ function renderOpenPositions(items, tgId) {
             const side = p.direction === "up" ? L("trade_long", "LONG") : L("trade_short", "SHORT");
             const sideClass = p.direction === "up" ? "pos" : "neg";
             return `
-            <div class="row position-row" data-trade-id="${p.trade_id}" data-tg-id="${tgId}">
+            <div class="row position-row" data-trade-id="${p.trade_id}">
                 <div>
                     <b>${p.asset_name} <span class="${sideClass}">${side}</span></b>
                     <small>${Number(p.amount || 0).toFixed(2)} ${(p.currency || "USD")} · ${p.remaining}s · ${Number(p.leverage || 10)}x</small>
                 </div>
                 <div class="position-actions">
-                    <button class="chip pos-close-btn" data-trade-id="${p.trade_id}" data-tg-id="${tgId}">
+                    <button class="chip pos-close-btn" data-trade-id="${p.trade_id}">
                         ${L("trade_close_now", "Close Now")}
                     </button>
-                    <button class="chip pos-partial-btn" data-trade-id="${p.trade_id}" data-tg-id="${tgId}" data-ratio="0.5">
+                    <button class="chip pos-partial-btn" data-trade-id="${p.trade_id}" data-ratio="0.5">
                         50%
                     </button>
-                    <button class="chip pos-reverse-btn" data-trade-id="${p.trade_id}" data-tg-id="${tgId}">
+                    <button class="chip pos-reverse-btn" data-trade-id="${p.trade_id}">
                         Reverse
                     </button>
                 </div>
@@ -2232,10 +2228,9 @@ function bindOpenPositionsActions() {
         const clickedClose = e.target.closest(".pos-close-btn");
         if (row && !clickedClose) {
             const tradeId = row.dataset.tradeId;
-            const tgId = Number(row.dataset.tgId || 0);
-            if (tradeId && tgId) {
+            if (tradeId) {
                 LIVE_TRADE_PANEL_ID = tradeId;
-                syncTradePanel(tradeId, tgId);
+                syncTradePanel(tradeId);
             }
         }
         const btn = e.target.closest(".pos-close-btn");
@@ -2244,18 +2239,17 @@ function bindOpenPositionsActions() {
         const actionBtn = btn || partialBtn || reverseBtn;
         if (!actionBtn) return;
         const tradeId = actionBtn.dataset.tradeId;
-        const tgId = Number(actionBtn.dataset.tgId || 0);
-        if (!tradeId || !tgId) return;
+        if (!tradeId) return;
         actionBtn.disabled = true;
         try {
             let endpoint = "/api/trade/close";
-            let body = { trade_id: tradeId, tg_id: tgId };
+            let body = { trade_id: tradeId };
             if (partialBtn) {
                 endpoint = "/api/trade/close_partial";
-                body = { trade_id: tradeId, tg_id: tgId, ratio: Number(partialBtn.dataset.ratio || 0.5) };
+                body = { trade_id: tradeId, ratio: Number(partialBtn.dataset.ratio || 0.5) };
             } else if (reverseBtn) {
                 endpoint = "/api/trade/reverse";
-                body = { trade_id: tradeId, tg_id: tgId };
+                body = { trade_id: tradeId };
             }
             const resp = await fetch(endpoint, {
                 method: "POST",
@@ -2275,7 +2269,7 @@ function bindOpenPositionsActions() {
             if (data.new_trade_id) {
                 LIVE_TRADE_PANEL_ID = data.new_trade_id;
                 if (!APP_RUNTIME.userFeed.connected) {
-                    await syncTradePanel(data.new_trade_id, tgId);
+                    await syncTradePanel(data.new_trade_id);
                 }
             }
         } catch (_) {
@@ -2286,12 +2280,11 @@ function bindOpenPositionsActions() {
 }
 
 function hydrateInitialTradeState() {
-    const tg = document.querySelector('input[name="tg_id"]');
     const positionsWrap = document.getElementById("open-positions-list");
     const openEl = document.getElementById("live-open-trades");
     if (APP_RUNTIME.trade.hydrated) return;
-    if (tg && positionsWrap && INITIAL_OPEN_POSITIONS.length) {
-        renderOpenPositions(INITIAL_OPEN_POSITIONS, Number(tg.value || 0));
+    if (positionsWrap && INITIAL_OPEN_POSITIONS.length) {
+        renderOpenPositions(INITIAL_OPEN_POSITIONS);
         updateExposureWidgets(INITIAL_OPEN_POSITIONS, currentUiCurrency());
     }
     if (openEl && INITIAL_OPEN_POSITIONS.length) {
@@ -2355,17 +2348,14 @@ function bindTradeQuickActions() {
 
 async function refreshOpenPositions() {
     const wrap = document.getElementById("open-positions-list");
-    const tg = document.querySelector('input[name="tg_id"]');
-    if (!wrap || !tg) return;
-    const tgId = Number(tg.value || 0);
-    if (!tgId) return;
+    if (!wrap) return;
     try {
-        const resp = await fetch(`/api/trade/open_positions?tg_id=${tgId}`);
+        const resp = await fetch("/api/trade/open_positions");
         const data = await resp.json();
         if (!resp.ok || !data.ok) return;
-        renderOpenPositions(data.items || [], tgId);
+        renderOpenPositions(data.items || []);
         updateExposureWidgets(data.items || [], currentUiCurrency());
-        syncTradePanelFromPositions(data.items || [], tgId);
+        syncTradePanelFromPositions(data.items || []);
     } catch (_) {
         // no-op
     }
