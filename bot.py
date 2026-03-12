@@ -5920,7 +5920,8 @@ async def on_admin_ref_activity_page(callback: CallbackQuery, state: FSMContext,
             f"Фильтр: <b>{filter_label}</b>\n"
             "Событий пока нет."
         )
-        await callback.message.edit_text(
+        await safe_edit_or_answer(
+            callback.message,
             text,
             reply_markup=admin_referral_activity_keyboard(safe_filter, 0, total_count, page_size),
         )
@@ -5951,11 +5952,7 @@ async def on_admin_ref_activity_page(callback: CallbackQuery, state: FSMContext,
         )
     text = "\n\n".join(lines)
     markup = admin_referral_activity_keyboard(safe_filter, max(0, offset), total_count, page_size)
-    with contextlib.suppress(Exception):
-        await callback.message.edit_text(text, reply_markup=markup)
-        await callback.answer()
-        return
-    await callback.message.answer(text, reply_markup=markup)
+    await safe_edit_or_answer(callback.message, text, reply_markup=markup)
     await callback.answer()
 
 
