@@ -2547,7 +2547,7 @@ async def get_worker_settings(worker_tg_id: int):
         cur = await db.execute("SELECT * FROM worker_settings WHERE worker_tg_id = ?", (worker_tg_id,))
         row = await cur.fetchone()
         if row:
-            return row
+            return dict(row)
         return {"worker_tg_id": worker_tg_id, "min_deposit": 0, "min_withdraw": 0}
 
 
